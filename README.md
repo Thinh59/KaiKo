@@ -4,44 +4,80 @@
 
 **Stack:** React · FastAPI · Transformers (XLM-RoBERTa) · Gemini API
 
-## 🚀 Cài đặt nhanh
+## 🚀 Hướng dẫn cài đặt chi tiết cho Team
 
-### Backend
+### 1. Cài đặt Backend (Python & FastAPI)
 
-```bash
-cd backend
+Thư mục `backend` chứa logic xử lý AI, phân tích ngụy biện và kết nối WebSocket.
 
-# Tạo virtual environment
-python -m venv venv
+**Các bước thực hiện:**
 
-# Kích hoạt (Windows)
-venv\Scripts\activate
-# Hoặc (Mac/Linux)
-source venv/bin/activate
+1.  **Mở terminal** và di chuyển vào thư mục backend:
+    ```bash
+    cd backend
+    ```
 
-# Cài dependencies
-pip install -r requirements.txt
+2.  **Tạo môi trường ảo (Virtual Environment):**
+    Việc này giúp tránh xung đột thư viện giữa các project.
+    - **Windows:**
+      ```powershell
+      python -m venv venv
+      ```
+    - **Mac/Linux:**
+      ```bash
+      python3 -m venv venv
+      ```
 
-# Thêm .env
-echo GEMINI_API_KEY=your_key_here > .env
+3.  **Kích hoạt môi trường ảo:**
+    - **Windows:**
+      ```powershell
+      .\venv\Scripts\activate
+      ```
+    - **Mac/Linux:**
+      ```bash
+      source venv/bin/activate
+      ```
+    *(Sau khi kích hoạt, bạn sẽ thấy chữ `(venv)` hiện ở đầu dòng lệnh)*
 
-# Chạy server
-uvicorn main:app --reload --port 8000
-```
+4.  **Cài đặt các thư viện cần thiết:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-### Frontend
+5.  **Cấu hình biến môi trường:**
+    Tạo file `.env` trong thư mục `backend/` và thêm key Gemini của bạn (lấy tại [AI Studio](https://aistudio.google.com/apikey)):
+    ```env
+    GEMINI_API_KEY=AIzaSy... (key của bạn)
+    ```
 
-```bash
-cd frontend
+6.  **Chạy server:**
+    ```bash
+    uvicorn main:app --reload --port 8000
+    ```
 
-# Cài dependencies
-npm install
+### 2. Cài đặt Frontend (React & Vite)
 
-# Chạy dev server
-npm run dev
-```
+Mở một terminal mới (vẫn ở thư mục gốc `kaiko`):
 
-Mở http://localhost:5173
+1.  **Di chuyển vào frontend:**
+    ```bash
+    cd frontend
+    ```
+
+2.  **Cài đặt dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Chạy ứng dụng:**
+    ```bash
+    npm run dev
+    ```
+
+4.  **Truy cập:** Mở trình duyệt vào [http://localhost:5173](http://localhost:5173)
+
+---
+
 
 ## 📁 Cấu trúc
 
