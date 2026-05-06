@@ -216,6 +216,3 @@ Xem `KaiKo_App_Guide (1).md` để biết chi tiết:
 
 MIT — Tự do sử dụng, sửa, phân phối
 
----
-
-**Hỗ trợ:** Tham khảo hướng dẫn chi tiết trong `KaiKo_App_Guide (1).md`
