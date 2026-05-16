@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
+import { useUser } from '@clerk/clerk-react'
 
 const API_BASE = 'http://localhost:8000'
 
@@ -101,7 +102,136 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0, total: 0, avgScore: 0 })
 
+  const { user } = useUser()
+  const avatarUrl = user?.imageUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username
+
+  const [avatarFrame, setAvatarFrame] = useState(localStorage.getItem('kaiko_frame') || 'none')
+  const [hasCheckedIn, setHasCheckedIn] = useState(localStorage.getItem('kaiko_checkin_' + username) === new Date().toLocaleDateString('vi-VN'))
+  const [extraPoints, setExtraPoints] = useState(parseInt(localStorage.getItem('kaiko_extra_points_' + username) || '0'))
+
+  const [friends, setFriends] = useState([])
+  const [friendRequests, setFriendRequests] = useState([])
+  const [friendInput, setFriendInput] = useState('')
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedUserStats, setSelectedUserStats] = useState(null)
+  const [nickname, setNickname] = useState(localStorage.getItem('kaiko_nickname_' + username) || '')
+  const [globalNicknames, setGlobalNicknames] = useState({})
+  const displayUsername = globalNicknames[username] || nickname || username
+  const getDisplayName = (u) => globalNicknames[u] || u
+
   const isGuest = username?.startsWith('Guest_')
+
+  const handleCheckIn = () => {
+    if (!hasCheckedIn) {
+      localStorage.setItem('kaiko_checkin_' + username, new Date().toLocaleDateString('vi-VN'))
+      
+      const newExtra = extraPoints + 50
+      localStorage.setItem('kaiko_extra_points_' + username, newExtra.toString())
+      setExtraPoints(newExtra)
+      setHasCheckedIn(true)
+      
+      setStats(prev => {
+        const newPoints = (prev.points || 0) + 50
+        return { ...prev, points: newPoints }
+      })
+      alert("Điểm danh thành công! Bạn nhận được 50 Điểm Tích Lũy (Dùng để mua sắm).")
+    }
+  }
+
+  const loadFriends = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/friends/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setFriends(res.data.friends || [])
+        setFriendRequests(res.data.requests || [])
+      }
+    } catch (err) {
+      console.warn('Lỗi tải danh sách bạn bè:', err)
+      setFriends([])
+      setFriendRequests([])
+    }
+  }, [username, isGuest])
+
+  const handleAddFriend = async () => {
+    if (friendInput.trim() && friendInput.trim() !== username) {
+      if (friends?.length >= 100) {
+        alert("Bạn đã đạt giới hạn tối đa 100 người bạn!")
+        return
+      }
+      const target = friendInput.trim()
+      try {
+        const res = await axios.post(`${API_BASE}/friend-request`, { user: username, target })
+        if (res.data.success) {
+          alert(`Đã gửi lời mời kết bạn tới: ${target}`)
+          setFriendInput('')
+        } else {
+          alert(`Lỗi: ${res.data.error}`)
+        }
+      } catch (err) {
+        alert("Lỗi kết nối máy chủ")
+      }
+    } else if (friendInput.trim() === username) {
+      alert("Không thể tự kết bạn với chính mình!")
+    }
+  }
+
+  const handleAcceptRequest = async (requester) => {
+    try {
+      await axios.post(`${API_BASE}/accept-friend`, { user: username, target: requester })
+      loadFriends()
+    } catch (e) {}
+  }
+
+  const handleDeclineRequest = async (requester) => {
+    try {
+      await axios.post(`${API_BASE}/decline-friend`, { user: username, target: requester })
+      loadFriends()
+    } catch (e) {}
+  }
+
+  const handleRemoveFriend = async (friendName) => {
+    if (window.confirm(`Bạn có chắc muốn xóa ${friendName} khỏi danh sách bạn bè?`)) {
+      try {
+        await axios.post(`${API_BASE}/remove-friend`, { user: username, target: friendName })
+        loadFriends()
+      } catch (e) {}
+    }
+  }
+
+  const handleViewUser = async (targetName) => {
+    setSelectedUser(targetName)
+    setSelectedUserStats(null)
+    try {
+        const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(targetName)}`)
+        if (res.data.success) {
+            const h = res.data.history
+            const wins   = h.filter(m => m.result === 'win').length
+            const losses = h.filter(m => m.result === 'lose').length
+            const draws  = h.filter(m => m.result === 'draw').length
+            const exp = wins * 10 + draws * 2 - losses * 2
+            const finalExp = Math.max(0, exp)
+            const level = Math.floor(finalExp / 100) + 1
+            const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
+            setSelectedUserStats({ wins, losses, draws, total: h.length, level, avgScore, exp: finalExp })
+        }
+    } catch (e) {
+        setSelectedUserStats({ error: true })
+    }
+  }
+
+  const handleFrameChange = (e) => {
+    setAvatarFrame(e.target.value)
+    localStorage.setItem('kaiko_frame', e.target.value)
+  }
+
+  const frameStyles = {
+    none: { border: 'none' },
+    wood: { border: '5px solid #8B4513', boxShadow: '0 0 10px #8B4513' },
+    silver: { border: '5px solid #C0C0C0', boxShadow: '0 0 15px #C0C0C0' },
+    gold: { border: '5px solid #FFD700', boxShadow: '0 0 20px #FFD700' },
+    diamond: { border: '5px solid #00FFFF', boxShadow: '0 0 25px #00FFFF', filter: 'drop-shadow(0 0 10px #00FFFF)' }
+  }
 
   const loadHistory = useCallback(async () => {
     if (isGuest) return
@@ -116,14 +246,21 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
         const losses = h.filter(m => m.result === 'lose').length
         const draws  = h.filter(m => m.result === 'draw').length
         const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
-        setStats({ wins, losses, draws, total: h.length, avgScore })
+        
+        // Tính toán EXP thực tế
+        const exp = wins * 10 + draws * 2 - losses * 2
+        const finalExp = Math.max(0, exp) // Chỉ điểm kinh nghiệm (Level)
+        const level = Math.floor(finalExp / 100) + 1
+        const currentExp = finalExp % 100
+        const points = extraPoints + wins * 5 // Điểm mua sắm (Tích lũy) = Điểm check-in + Điểm từ trận thắng
+        setStats({ wins, losses, draws, total: h.length, avgScore, level, exp: currentExp, totalExp: finalExp, points })
       }
     } catch (err) {
       console.warn('Không tải được lịch sử:', err.message)
     } finally {
       setHistoryLoading(false)
     }
-  }, [username, isGuest])
+  }, [username, isGuest, extraPoints])
 
   const loadLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true)
@@ -139,100 +276,213 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     }
   }, [])
 
+  const loadGlobalNicknames = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/nicknames`)
+      if (res.data.success) {
+        setGlobalNicknames(res.data.nicknames)
+      }
+    } catch(err) {}
+  }, [])
+
   useEffect(() => {
-    if (activeTab === 'history') loadHistory()
+    loadGlobalNicknames()
+  }, [loadGlobalNicknames])
+
+  // Tự động đồng bộ nickname từ localStorage lên backend khi mở Dashboard
+  useEffect(() => {
+    if (isGuest) return
+    const localNick = localStorage.getItem('kaiko_nickname_' + username)
+    if (localNick && localNick.trim()) {
+      axios.post(`${API_BASE}/set-nickname`, { username, nickname: localNick.trim() })
+        .then(() => {
+          setGlobalNicknames(prev => ({ ...prev, [username]: localNick.trim() }))
+        })
+        .catch(() => {})
+    }
+  }, [username, isGuest])
+
+  useEffect(() => {
+    if (activeTab === 'home' || activeTab === 'history') loadHistory()
     if (activeTab === 'leaderboard') loadLeaderboard()
-  }, [activeTab, loadHistory, loadLeaderboard])
+    if (activeTab === 'friends') loadFriends()
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends])
+
+  // Polling for friend requests every 5 seconds
+  useEffect(() => {
+    if (isGuest) return
+    const interval = setInterval(loadFriends, 5000)
+    return () => clearInterval(interval)
+  }, [loadFriends, isGuest])
 
   const TABS = [
-    { id: 'home',       icon: '🎮', label: 'Bảng điều khiển' },
-    { id: 'history',    icon: '📋', label: 'Lịch sử trận đấu' },
-    { id: 'leaderboard',icon: '🏆', label: 'Bảng xếp hạng' },
-    { id: 'guide',      icon: '📖', label: 'Hướng dẫn' },
-    { id: 'settings',   icon: '⚙️', label: 'Cài đặt' },
+    { id: 'profile',    icon: '👤', label: 'Hồ sơ cá nhân', color: '#a855f7' },
+    { id: 'history',    icon: '📋', label: 'Lịch sử trận đấu', color: '#3b82f6' },
+    { id: 'leaderboard',icon: '🏆', label: 'Bảng xếp hạng', color: '#f59e0b' },
+    { id: 'friends',    icon: '👥', label: 'Bạn bè', color: '#10b981' },
+    { id: 'events',     icon: '🎉', label: 'Sự kiện', color: '#ec4899' },
+    { id: 'store',      icon: '🛒', label: 'Cửa hàng', color: '#eab308' },
+    { id: 'guide',      icon: '📖', label: 'Hướng dẫn', color: '#6366f1' },
+    { id: 'settings',   icon: '⚙️', label: 'Cài đặt', color: '#9ca3af' },
   ]
 
+  const getRankInfo = (level) => {
+    if (level < 11) return { title: 'KaiKo Ngang Như Cua Non', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)', icon: '🦀' }
+    if (level < 31) return { title: 'KaiKo Mượt Nhưng Cua Gắt', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: '🌊' }
+    if (level < 61) return { title: 'KaiKo Ngon Như Cua Cùm', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', icon: '🔥' }
+    if (level < 91) return { title: 'KaiKo Nhưng Thư Giãn', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', icon: '🧘' }
+    return { title: 'KaiKo Sáng Rực Như Idol Cua Hoàng Đế', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', icon: '👑' }
+  }
+
+  const currentLevel = isGuest ? 1 : (stats.level || 1)
+  const rank = getRankInfo(currentLevel)
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
 
       {/* ── Header ── */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2rem', marginBottom: '2rem' }}>
-        <div>
-          <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>
-            Xin chào, <span style={{ color: 'var(--accent-primary)' }}>{username}</span>!
-          </h2>
-          {isGuest && (
-            <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-              🔒 Tài khoản khách — lịch sử không được lưu. Đăng ký để lưu kết quả!
-            </p>
-          )}
+      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.8rem' }}>
+              Xin chào, <span style={{ color: 'var(--accent-primary)' }}>{getDisplayName(username)}</span>!
+            </h2>
+            {isGuest ? (
+              <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                🔒 Tài khoản khách — lịch sử không được lưu. Đăng nhập để đua top!
+              </p>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                <span style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-primary)', padding: '4px 10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', border: '1px solid rgba(99,102,241,0.3)' }}>
+                  Level {currentLevel}
+                </span>
+                <span style={{ background: rank.bg, color: rank.color, padding: '4px 12px', borderRadius: '8px', fontWeight: '600', fontSize: '0.9rem', border: `1px solid ${rank.color}50`, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {rank.icon} {rank.title}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-        <button
-          onClick={onLogout}
-          style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.3s ease' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)' }}
-        >
-          Đăng xuất
-        </button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <button
+            onClick={onLogout}
+            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.3s ease' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
+          >
+            Đăng xuất
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '2rem', flex: 1 }}>
-
-        {/* ── Sidebar ── */}
-        <div className="glass-panel" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '6px', alignSelf: 'start' }}>
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              padding: '14px 16px',
-              background: activeTab === tab.id ? 'rgba(99,102,241,0.15)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--accent-primary)' : 'var(--text-secondary)',
-              border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer',
-              fontSize: '1rem', fontWeight: activeTab === tab.id ? '600' : 'normal',
-              textAlign: 'left', transition: 'all 0.2s ease',
-              borderLeft: activeTab === tab.id ? '3px solid var(--accent-primary)' : '3px solid transparent',
-            }}
-              onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-              onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.background = 'transparent' }}
-            >
-              <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span> {tab.label}
-            </button>
-          ))}
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
 
         {/* ── Content ── */}
-        <div className="glass-panel animate-fade-in" style={{ padding: '2rem', minHeight: '500px' }}>
+        <div className="glass-panel animate-fade-in" style={{ 
+          padding: activeTab === 'home' ? '2rem' : '1.5rem', 
+          minHeight: '600px', 
+          display: 'flex', 
+          flexDirection: 'column'
+        }}>
+          {/* Lớp nền con lồng bên trong */}
+          <div style={{
+            background: activeTab === 'home' ? 'transparent' : 'rgba(251, 146, 60, 0.12)', // Màu cam nhạt
+            borderRadius: '20px',
+            padding: activeTab === 'home' ? '0' : '2rem',
+            border: activeTab === 'home' ? 'none' : '1px solid rgba(251, 146, 60, 0.2)',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
 
-          {/* HOME */}
+          {activeTab !== 'home' && (
+            <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+              <button 
+                onClick={() => setActiveTab('home')}
+                style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+              >
+                ← Về Sảnh
+              </button>
+            </div>
+          )}
+
+          {/* HOME (SẢNH CHÍNH) */}
           {activeTab === 'home' && (
-            <div>
-              {/* Stats row */}
-              {!isGuest && stats.total > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '2.5rem' }}>
-                  {[
-                    { label: 'Trận đã chơi', value: stats.total, color: 'var(--accent-primary)', icon: '🎮' },
-                    { label: 'Chiến thắng',  value: stats.wins,  color: '#10b981', icon: '🏆' },
-                    { label: 'Thất bại',     value: stats.losses,color: '#ef4444', icon: '💔' },
-                    { label: 'Điểm TB',      value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
-                  ].map(s => (
-                    <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-md)', padding: '20px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ fontSize: '1.6rem', marginBottom: '4px' }}>{s.icon}</div>
-                      <div style={{ fontSize: '2rem', fontWeight: '800', color: s.color }}>{s.value}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{s.label}</div>
-                    </div>
-                  ))}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+              
+              <div style={{ marginBottom: '3rem', position: 'relative', display: 'inline-block' }}>
+                <div style={{ position: 'absolute', top: '-15px', right: '-15px', zIndex: 10 }}>
+                  <button 
+                    onClick={handleCheckIn}
+                    disabled={hasCheckedIn}
+                    style={{ 
+                      background: hasCheckedIn ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      color: hasCheckedIn ? 'rgba(255,255,255,0.3)' : '#fff',
+                      border: 'none', borderRadius: 'var(--radius-full)', padding: '10px 20px',
+                      cursor: hasCheckedIn ? 'not-allowed' : 'pointer', fontWeight: 'bold',
+                      boxShadow: hasCheckedIn ? 'none' : '0 4px 15px rgba(245, 158, 11, 0.4)',
+                      transition: 'all 0.3s'
+                    }}
+                  >
+                    {hasCheckedIn ? '✅ Đã Điểm Danh' : '🎁 Điểm Danh'}
+                  </button>
                 </div>
-              )}
-
-              <div style={{ textAlign: 'center', margin: 'auto', paddingTop: stats.total > 0 ? '1rem' : '4rem' }}>
-                <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Bạn đã sẵn sàng tranh biện?</h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '3rem' }}>
-                  Chọn <strong>Chơi ngay</strong> để bắt đầu ghép cặp hoặc thi đấu với AI.
-                </p>
-                <button onClick={onPlay} className="btn-primary" style={{ padding: '20px 48px', fontSize: '1.5rem', borderRadius: 'var(--radius-full)', boxShadow: '0 0 30px rgba(99,102,241,0.4)' }}>
-                  🎮 Chơi ngay
+                
+                <button 
+                  onClick={onPlay} 
+                  className="btn-primary hover-scale" 
+                  style={{ 
+                    padding: '24px 80px', fontSize: '2.5rem', borderRadius: 'var(--radius-full)', 
+                    boxShadow: '0 0 50px rgba(99,102,241,0.6)', cursor: 'pointer', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  🎮 Chơi Ngay
                 </button>
+                
+                {!isGuest && (
+                  <div style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
+                    ⭐ Điểm Tích Lũy (Mua sắm): <strong style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{stats.points || 0}</strong>
+                  </div>
+                )}
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', width: '100%', maxWidth: '1200px' }}>
+                {TABS.map(tab => (
+                  <div 
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '16px',
+                      padding: '2rem 1rem',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = `rgba(${parseInt(tab.color.slice(1,3),16)},${parseInt(tab.color.slice(3,5),16)},${parseInt(tab.color.slice(5,7),16)},0.15)`
+                      e.currentTarget.style.transform = 'translateY(-5px)'
+                      e.currentTarget.style.borderColor = tab.color
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                    }}
+                  >
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>{tab.icon}</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#78350f' }}>{tab.label}</div>
+                  </div>
+                ))}
+              </div>
+
             </div>
           )}
 
@@ -325,8 +575,11 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       <div style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : 'var(--text-secondary)' }}>
                         {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                       </div>
-                      <div style={{ fontWeight: '600', color: username === user.username ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '1.05rem' }}>
-                        {user.username} {username === user.username && '(Bạn)'}
+                      <div 
+                        onClick={() => handleViewUser(user.username)}
+                        style={{ fontWeight: '600', color: username === user.username ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '1.05rem', cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        {getDisplayName(user.username)} {username === user.username && '(Bạn)'}
                       </div>
                       <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{user.total_matches}</div>
                       <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold' }}>{user.wins}</div>
@@ -388,8 +641,339 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
             </div>
           )}
 
+          {/* PROFILE */}
+          {activeTab === 'profile' && (
+            <div style={{ padding: '2rem', textAlign: 'center' }}>
+              <div style={{ marginBottom: '2rem', position: 'relative', display: 'inline-block' }}>
+                <img 
+                  src={avatarUrl} 
+                  alt="Avatar" 
+                  style={{ 
+                    width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover',
+                    ...frameStyles[avatarFrame]
+                  }} 
+                />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Khung Avatar:</label>
+                <select value={avatarFrame} onChange={handleFrameChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <option value="none">Không có</option>
+                  <option value="wood" disabled={currentLevel < 11}>Khung Gỗ (Yêu cầu Lv 11)</option>
+                  <option value="silver" disabled={currentLevel < 31}>Khung Bạc (Yêu cầu Lv 31)</option>
+                  <option value="gold" disabled={currentLevel < 61}>Khung Vàng (Yêu cầu Lv 61)</option>
+                  <option value="diamond" disabled={currentLevel < 91}>Khung Kim Cương (Yêu cầu Lv 91)</option>
+                </select>
+              </div>
+
+              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '0.5rem', textShadow: '0 2px 10px rgba(255,255,255,0.1)' }}>Hồ sơ của {getDisplayName(username)}</h2>
+              <div style={{ display: 'inline-block', background: rank.bg, color: rank.color, padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '1.5rem', border: `1px solid ${rank.color}` }}>
+                {rank.icon} Level {currentLevel} - {rank.title}
+              </div>
+
+              {!isGuest && (
+                <div style={{ width: '350px', margin: '0 auto 3rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <div style={{ width: `${stats.exp || 0}%`, background: 'linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%)', height: '100%', transition: 'width 1s ease-in-out' }}></div>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                    {stats.exp || 0} / 100 EXP (Tới cấp tiếp theo)
+                  </div>
+                </div>
+              )}
+              
+              {!isGuest && (
+                <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '2.5rem', border: `1px solid #f59e0b` }}>
+                  ⭐ Điểm Tích Lũy (Mua Sắm): {stats.points || 0}
+                </div>
+              )}
+
+              {!isGuest && stats.total > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', maxWidth: '800px', margin: '0 auto' }}>
+                  {[
+                    { label: 'Trận đã chơi', value: stats.total, color: 'var(--accent-primary)', icon: '🎮' },
+                    { label: 'Chiến thắng',  value: stats.wins,  color: '#10b981', icon: '🏆' },
+                    { label: 'Thất bại',     value: stats.losses,color: '#ef4444', icon: '💔' },
+                    { label: 'Điểm TB',      value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
+                  ].map(s => (
+                    <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{s.icon}</div>
+                      <div style={{ fontSize: '2.5rem', fontWeight: '800', color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '8px' }}>{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)' }}>Chưa có dữ liệu thống kê.</p>
+              )}
+            </div>
+          )}
+
+          {/* FRIENDS */}
+          {activeTab === 'friends' && (
+            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <h2 style={{ fontSize: '2rem', color: 'var(--text-primary)', margin: 0 }}>👥 Danh Sách Bạn Bè</h2>
+                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '8px 16px', borderRadius: '20px', color: 'var(--accent-primary)', fontWeight: 'bold', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                  {friends.length} / 100
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '3rem' }}>
+                <input 
+                  type="text" 
+                  value={friendInput}
+                  onChange={(e) => setFriendInput(e.target.value)}
+                  placeholder="Nhập tên người chơi để kết bạn..." 
+                  style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1.1rem' }}
+                />
+                <button onClick={handleAddFriend} className="btn-primary" style={{ padding: '0 24px', borderRadius: '8px', fontWeight: 'bold' }}>
+                  Gửi Yêu Cầu
+                </button>
+              </div>
+
+                {friendRequests?.length > 0 && (
+                  <div style={{ marginBottom: '2rem' }}>
+                    <h3 style={{ color: '#f59e0b', marginBottom: '1rem' }}>🔔 Lời Mời Kết Bạn ({friendRequests.length})</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {friendRequests.map(req => (
+                        <div key={req} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(245, 158, 11, 0.1)', padding: '16px 24px', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                          <div style={{ cursor: 'pointer' }} onClick={() => handleViewUser(req)}>
+                            <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{getDisplayName(req)}</span>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}> (@{req} muốn kết bạn)</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button onClick={() => handleAcceptRequest(req)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontWeight: 'bold' }}>Chấp nhận</button>
+                            <button onClick={() => handleDeclineRequest(req)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid #ef4444', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>Từ chối</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Danh sách ({friends?.length || 0})</h3>
+                {!friends || friends.length === 0 ? (
+                  <p style={{ color: 'var(--text-secondary)' }}>Bạn chưa có người bạn nào.</p>
+                ) : friends.map(fname => (
+                  <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => handleViewUser(fname)}>
+                      <div style={{ position: 'relative' }}>
+                        <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{getDisplayName(fname)}</div>
+                        <div style={{ fontSize: '0.9rem', color: 'var(--accent-primary)' }}>Nhấn để xem hồ sơ</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => handleRemoveFriend(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* EVENTS */}
+          {activeTab === 'events' && (
+            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
+              
+              {/* Lịch Trình Sự Kiện */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '16px', border: '1px dashed var(--accent-primary)', marginBottom: '3rem', textAlign: 'left' }}>
+                <h3 style={{ color: 'var(--accent-primary)', margin: '0 0 10px 0' }}>📅 Lịch Trình Mở Sự Kiện (Định Kỳ)</h3>
+                <ul style={{ color: 'var(--text-secondary)', margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
+                  <li><strong>Sự kiện Thường 1:</strong> Mở từ Thứ 2 đến hết Thứ 5 hàng tuần.</li>
+                  <li><strong>Sự kiện Thường 2:</strong> Mở từ Thứ 6 đến hết Chủ nhật hàng tuần.</li>
+                  <li><strong>Sự kiện Lớn (Đại Chiến):</strong> Mở định kỳ vào <strong>Thứ 6 đầu tiên của tháng 3</strong> mỗi năm.</li>
+                </ul>
+              </div>
+
+              {/* Event Nhỏ (Mở Thường Xuyên) */}
+              <div style={{ marginBottom: '4rem' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>Các Sự Kiện Nhỏ Đang Mở</h2>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Tham gia để tích lũy EXP và nhận khung đại diện giới hạn!</p>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', textAlign: 'left' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>Đang diễn ra</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Còn 2 ngày</span>
+                      </div>
+                      <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Bàn Luận: Trí Tuệ Nhân Tạo</h3>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>Viết bài phân tích hoặc tham gia debate về chủ đề AI. Top 20 nhận khung "Người Tiên Phong".</p>
+                    </div>
+                    <button 
+                      className="btn-secondary" 
+                      onClick={() => alert("Sự kiện chưa bắt đầu tính điểm! Vui lòng quay lại sau.")}
+                      style={{ marginTop: '1.5rem', width: '100%' }}
+                    >
+                      Tham gia ngay
+                    </button>
+                  </div>
+
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>Sắp mở</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Mở sau 3 ngày</span>
+                      </div>
+                      <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Bình Chọn Chủ Đề Hot</h3>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>Đề xuất và bình chọn chủ đề tranh biện tuần tới. Nhận 50 Điểm Tích Lũy khi đề xuất lọt Top 5.</p>
+                    </div>
+                    <button className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%', opacity: 0.5, cursor: 'not-allowed' }}>Chưa mở</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Event Lớn (Sắp Mở / Khóa) */}
+              <div style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
+                  <h3 style={{ fontSize: '2rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
+                  <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi kết thúc đợt sự kiện nhỏ mùa này!</p>
+                </div>
+
+                <div style={{ filter: 'blur(4px)', opacity: 0.5 }}>
+                  <h2 style={{ fontSize: '3rem', color: '#facc15', marginBottom: '1rem', textShadow: '0 4px 20px rgba(250, 204, 21, 0.4)' }}>🎉 ĐẠI CHIẾN CUA MA & CUA THẦN 🎉</h2>
+                  <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '3rem' }}>Tranh biện tập thể liên server. Phe chiến thắng nhận đặc quyền Level 101!</p>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                    <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '2px solid #8b5cf6', borderRadius: '24px', padding: '3rem' }}>
+                      <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>👻</div>
+                      <h3 style={{ fontSize: '2rem', color: '#8b5cf6', margin: '0 0 1rem 0' }}>Phe Cua Ma</h3>
+                    </div>
+                    <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '2px solid #eab308', borderRadius: '24px', padding: '3rem' }}>
+                      <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>😇</div>
+                      <h3 style={{ fontSize: '2rem', color: '#eab308', margin: '0 0 1rem 0' }}>Phe Cua Thần</h3>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* CỬA HÀNG */}
+          {activeTab === 'store' && (
+            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '3rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>🛒 Cửa Hàng KaiKo</h2>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '3rem' }}>Sử dụng Điểm Tích Lũy để đổi khung đại diện và danh hiệu Vip.</p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                {[
+                  { name: 'Khung Cua Lửa', price: '1,500 Điểm', icon: '🔥', desc: 'Hiệu ứng cháy sáng quanh Avatar.' },
+                  { name: 'Thẻ Đổi Tên', price: '500 Điểm', icon: '🎫', desc: 'Sử dụng để đổi Nickname 1 lần.' },
+                  { name: 'Danh Hiệu: Khỏe Nhất Biển', price: '5,000 Điểm', icon: '👑', desc: 'Hiển thị danh hiệu vàng kế bên tên.' }
+                ].map(item => (
+                  <div key={item.name} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>{item.icon}</div>
+                    <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>{item.name}</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem', flex: 1 }}>{item.desc}</p>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#facc15', marginBottom: '1rem' }}>{item.price}</div>
+                    <button onClick={() => alert("Tính năng thanh toán/đổi điểm đang được bảo trì!")} className="btn-primary" style={{ width: '100%' }}>Mua Ngay</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* CÀI ĐẶT */}
+          {activeTab === 'settings' && (
+            <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem' }}>⚙️ Cài Đặt</h2>
+              
+              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem' }}>Thông tin hiển thị</h3>
+                
+                <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Biệt danh (Nickname)</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input 
+                    type="text" 
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder="Nhập biệt danh của bạn..." 
+                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
+                  />
+                  <button 
+                    onClick={async () => {
+                      localStorage.setItem('kaiko_nickname_' + username, nickname)
+                      try {
+                        await axios.post(`${API_BASE}/set-nickname`, { username, nickname })
+                        setGlobalNicknames(prev => ({...prev, [username]: nickname}))
+                      } catch(e) {}
+                      alert('Đã lưu biệt danh thành công!')
+                    }}
+                    className="btn-primary"
+                  >
+                    Lưu
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '10px' }}>
+                  Biệt danh này sẽ hiển thị thay thế cho tên đăng nhập gốc trong các trận tranh biện.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* CÁC TAB KHÁC CHƯA CÓ NỘI DUNG */}
+          {['guide'].includes(activeTab) && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'grayscale(1)' }}>🚧</div>
+              <h2>Tính năng đang phát triển</h2>
+              <p>Mục này sẽ sớm ra mắt trong các bản cập nhật tới!</p>
+            </div>
+          )}
+
+          </div> {/* End inner background div */}
         </div>
       </div>
+
+      {/* Modal Hồ sơ người chơi khác */}
+      {selectedUser && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }} onClick={() => setSelectedUser(null)}>
+          <div style={{ background: 'var(--bg-primary)', padding: '2rem', borderRadius: '24px', width: '90%', maxWidth: '500px', border: '1px solid rgba(251, 146, 60, 0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedUser(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+            <div style={{ textAlign: 'center' }}>
+              <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`} alt="Avatar" style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', marginBottom: '10px' }} />
+              <h2 style={{ margin: '0 0 5px', color: 'var(--text-primary)' }}>{getDisplayName(selectedUser)}</h2>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>@{selectedUser}</div>
+              
+              {!selectedUserStats ? (
+                <p style={{ color: 'var(--text-secondary)' }}>Đang tải thông tin...</p>
+              ) : selectedUserStats.error ? (
+                <p style={{ color: '#ef4444' }}>Không thể tải thông tin người chơi này.</p>
+              ) : (
+                <>
+                  <div style={{ display: 'inline-block', background: getRankInfo(selectedUserStats.level).bg, color: getRankInfo(selectedUserStats.level).color, padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '1.5rem', border: `1px solid ${getRankInfo(selectedUserStats.level).color}50` }}>
+                    {getRankInfo(selectedUserStats.level).icon} Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{selectedUserStats.total}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Trận</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{selectedUserStats.wins}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thắng</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{selectedUserStats.losses}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thua</div>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '15px', fontSize: '1.1rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                    ⭐ Điểm Tích Lũy: {selectedUserStats.exp}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

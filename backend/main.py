@@ -27,7 +27,8 @@ app.add_middleware(
 )
 
 # --- Load model khi khởi động server ---
-MODEL_PATH = "./fallacy_model"
+FALLACY_MODEL_PATH = "./fallacy_model/kaiko_fallacy_model_final"
+ARGKP_MODEL_PATH = "./fallacy_model/kaiko_argkp_model_final"
 
 LABEL_NAMES = [
     'ad hominem', 'ad populum', 'appeal to emotion',
@@ -52,23 +53,41 @@ LABEL_VI = {
     'intentional':          'Ngụy biện cố ý'
 }
 
-tokenizer = None
-model = None
+fallacy_tokenizer = None
+fallacy_model = None
+
+argkp_tokenizer = None
+argkp_model = None
 
 @app.on_event("startup")
 def load_model():
-    global tokenizer, model
-    if os.path.exists(MODEL_PATH):
-        print("Đang load model...")
+    global fallacy_tokenizer, fallacy_model, argkp_tokenizer, argkp_model
+    
+    # Load Fallacy Model
+    if os.path.exists(FALLACY_MODEL_PATH):
+        print("Đang load Fallacy Model...")
         try:
-            tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-            model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
-            model.eval()
-            print("✅ Load model xong!")
+            fallacy_tokenizer = AutoTokenizer.from_pretrained(FALLACY_MODEL_PATH)
+            fallacy_model = AutoModelForSequenceClassification.from_pretrained(FALLACY_MODEL_PATH)
+            fallacy_model.eval()
+            print("✅ Load Fallacy Model xong!")
         except Exception as e:
-            print(f"❌ Lỗi load model: {e}")
+            print(f"❌ Lỗi load Fallacy Model: {e}")
     else:
-        print("⚠️  Chưa có model. Sẽ sử dụng Gemini API làm phương án dự phòng.")
+        print("⚠️  Chưa có Fallacy model. Sẽ sử dụng Gemini API làm phương án dự phòng.")
+
+    # Load ArgKP Model
+    if os.path.exists(ARGKP_MODEL_PATH):
+        print("Đang load ArgKP Model...")
+        try:
+            argkp_tokenizer = AutoTokenizer.from_pretrained(ARGKP_MODEL_PATH)
+            argkp_model = AutoModelForSequenceClassification.from_pretrained(ARGKP_MODEL_PATH)
+            argkp_model.eval()
+            print("✅ Load ArgKP Model xong!")
+        except Exception as e:
+            print(f"❌ Lỗi load ArgKP Model: {e}")
+    else:
+        print("⚠️  Chưa có ArgKP model.")
 
     # Config Gemini
     api_key = os.getenv("GEMINI_API_KEY")
@@ -82,9 +101,14 @@ def load_model():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL
+            password_hash TEXT NOT NULL,
+            nickname TEXT
         )
     ''')
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
+    except sqlite3.OperationalError:
+        pass # Column already exists
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS match_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,6 +123,22 @@ def load_model():
             fallacies_opp INTEGER DEFAULT 0,
             summary TEXT DEFAULT '',
             played_at TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS friend_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT NOT NULL,
+            receiver TEXT NOT NULL,
+            UNIQUE(sender, receiver)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS friends (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user1 TEXT NOT NULL,
+            user2 TEXT NOT NULL,
+            UNIQUE(user1, user2)
         )
     ''')
     conn.commit()
@@ -127,6 +167,7 @@ TRENDING_TOPICS = [
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
+        self.player_names: Dict[str, str] = {}  # client_id -> playerName
         self.waiting_players = {"1v1": [], "2v2": []}
         self.rooms = {}
         self.topics = TRENDING_TOPICS
@@ -138,15 +179,30 @@ class ConnectionManager:
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
             del self.active_connections[client_id]
+        if client_id in self.player_names:
+            del self.player_names[client_id]
         for mode in self.waiting_players:
             if client_id in self.waiting_players[mode]:
                 self.waiting_players[mode].remove(client_id)
+
+    async def notify_opponent_disconnected(self, client_id: str):
+        """Find opponent in any room and notify them that this player disconnected."""
+        for room_id, room in self.rooms.items():
+            if client_id in room["players"]:
+                for pid in room["players"]:
+                    if pid != client_id and pid in self.active_connections:
+                        await self.send_personal_message(json.dumps({
+                            "type": "player_declined",
+                            "reason": "disconnect"
+                        }), pid)
+                break
 
     async def send_personal_message(self, message: str, client_id: str):
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_text(message)
 
     async def matchmake(self, client_id: str, player_name: str, mode: str):
+        self.player_names[client_id] = player_name
         print(f"🔍 Player '{player_name}' ({client_id}) is searching for a {mode} match...")
         queue = self.waiting_players.get(mode)
         if queue is None:
@@ -155,6 +211,7 @@ class ConnectionManager:
 
         if len(queue) > 0:
             opponent_id = queue.pop(0)
+            opponent_name = self.player_names.get(opponent_id, opponent_id)
             print(f"✅ Match Found! {client_id} vs {opponent_id}")
             room_id = f"room_{uuid.uuid4().hex[:8]}"
             topic = random.choice(self.topics)
@@ -168,6 +225,7 @@ class ConnectionManager:
                 "roomId": room_id,
                 "isHost": False,
                 "opponentId": opponent_id,
+                "opponentName": opponent_name,
                 "topic": topic
             }), client_id)
             # Báo cho opponent_id (host - người tạo)
@@ -176,6 +234,7 @@ class ConnectionManager:
                 "roomId": room_id,
                 "isHost": True,
                 "opponentId": client_id,
+                "opponentName": player_name,
                 "topic": topic
             }), opponent_id)
             print(f"📢 Notification sent to both players in {room_id}")
@@ -201,13 +260,53 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             if msg_type == "find_match":
                 await manager.matchmake(client_id, message.get("playerName"), message.get("mode", "1v1"))
                 
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended"]:
+            elif msg_type == "create_room":
+                room_code = str(random.randint(10000, 99999))
+                manager.rooms[room_code] = {
+                    "players": [client_id],
+                    "topic": random.choice(manager.topics)
+                }
+                await manager.send_personal_message(json.dumps({
+                    "type": "room_created",
+                    "roomCode": room_code
+                }), client_id)
+
+            elif msg_type == "join_room":
+                room_code = message.get("roomCode")
+                if room_code in manager.rooms and len(manager.rooms[room_code]["players"]) == 1:
+                    opponent_id = manager.rooms[room_code]["players"][0]
+                    topic = manager.rooms[room_code]["topic"]
+                    manager.rooms[room_code]["players"].append(client_id)
+                    
+                    # Notify Guest
+                    await manager.send_personal_message(json.dumps({
+                        "type": "matched",
+                        "roomId": room_code,
+                        "isHost": False,
+                        "opponentId": opponent_id,
+                        "topic": topic
+                    }), client_id)
+                    # Notify Host
+                    await manager.send_personal_message(json.dumps({
+                        "type": "matched",
+                        "roomId": room_code,
+                        "isHost": True,
+                        "opponentId": client_id,
+                        "topic": topic
+                    }), opponent_id)
+                else:
+                    await manager.send_personal_message(json.dumps({
+                        "type": "error",
+                        "message": "Phòng không tồn tại hoặc đã đầy!"
+                    }), client_id)
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn tới đối phương
                     await manager.send_personal_message(json.dumps(message), target_id)
                     
     except WebSocketDisconnect:
+        await manager.notify_opponent_disconnected(client_id)
         manager.disconnect(client_id)
 
 # --- Models dữ liệu ---
@@ -215,6 +314,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 class TextInput(BaseModel):
     text: str
     speaker: str = "unknown"
+
+class ArgInput(BaseModel):
+    argument: str
+    topic: str
 
 class DebateResult(BaseModel):
     topic: str
@@ -249,6 +352,10 @@ class SaveMatch(BaseModel):
     fallacies_self: int = 0
     fallacies_opp: int = 0
     summary: str = ""
+
+class FriendAction(BaseModel):
+    user: str
+    target: str
 
 # --- Routes ---
 
@@ -316,6 +423,32 @@ def login(user: AuthInput):
         return {"success": True, "username": row[0]}
     else:
         return {"success": False, "error": "Sai tài khoản hoặc mật khẩu"}
+
+class NicknameUpdate(BaseModel):
+    username: str
+    nickname: str
+
+@app.post("/set-nickname")
+def set_nickname(data: NicknameUpdate):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM users WHERE username = ?", (data.username,))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)", (data.username, "clerk_auth", data.nickname))
+    else:
+        cursor.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/nicknames")
+def get_nicknames():
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, nickname FROM users WHERE nickname IS NOT NULL AND nickname != ''")
+    rows = cursor.fetchall()
+    conn.close()
+    return {"success": True, "nicknames": {row[0]: row[1] for row in rows}}
 
 @app.post("/save-match")
 def save_match(data: SaveMatch):
@@ -391,6 +524,91 @@ def get_leaderboard(limit: int = 10):
             
     return {"success": True, "leaderboard": rows}
 
+# --- FRIENDS SYSTEM ---
+@app.get("/friends/{username}")
+def get_friends(username: str):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    # Lấy danh sách bạn bè
+    cursor.execute("""
+        SELECT user2 FROM friends WHERE user1 = ?
+        UNION
+        SELECT user1 FROM friends WHERE user2 = ?
+    """, (username, username))
+    friends = [row[0] for row in cursor.fetchall()]
+    
+    # Lấy lời mời kết bạn (những người gửi cho username)
+    cursor.execute("SELECT sender FROM friend_requests WHERE receiver = ?", (username,))
+    requests = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    
+    return {"success": True, "friends": friends, "requests": requests}
+
+@app.post("/friend-request")
+def send_friend_request(data: FriendAction):
+    if data.user == data.target:
+        return {"success": False, "error": "Không thể tự kết bạn"}
+        
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    
+    # Kiểm tra target có tồn tại không
+    cursor.execute("SELECT username FROM users WHERE username = ?", (data.target,))
+    if not cursor.fetchone():
+        conn.close()
+        return {"success": False, "error": "Người chơi không tồn tại"}
+        
+    # Kiểm tra đã là bạn chưa
+    cursor.execute("""
+        SELECT id FROM friends 
+        WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+    """, (data.user, data.target, data.target, data.user))
+    if cursor.fetchone():
+        conn.close()
+        return {"success": False, "error": "Đã là bạn bè"}
+        
+    try:
+        cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (?, ?)", (data.user, data.target))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass # Đã gửi rồi
+    conn.close()
+    return {"success": True}
+
+@app.post("/accept-friend")
+def accept_friend(data: FriendAction):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM friend_requests WHERE sender = ? AND receiver = ?", (data.target, data.user))
+    try:
+        cursor.execute("INSERT INTO friends (user1, user2) VALUES (?, ?)", (data.user, data.target))
+        conn.commit()
+    except:
+        pass
+    conn.close()
+    return {"success": True}
+
+@app.post("/decline-friend")
+def decline_friend(data: FriendAction):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM friend_requests WHERE sender = ? AND receiver = ?", (data.target, data.user))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.post("/remove-friend")
+def remove_friend(data: FriendAction):
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        DELETE FROM friends 
+        WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+    """, (data.user, data.target, data.target, data.user))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
 @app.post("/analyze")
 async def analyze_fallacy(input: TextInput):
     """Phân tích ngụy biện trong một câu/đoạn text"""
@@ -398,9 +616,9 @@ async def analyze_fallacy(input: TextInput):
         return {"fallacy": None, "confidence": 0}
 
     # Sử dụng HuggingFace Model nếu đã load
-    if model is not None and tokenizer is not None:
+    if fallacy_model is not None and fallacy_tokenizer is not None:
         try:
-            tokens = tokenizer(
+            tokens = fallacy_tokenizer(
                 input.text,
                 return_tensors='pt',
                 truncation=True,
@@ -408,7 +626,7 @@ async def analyze_fallacy(input: TextInput):
             )
 
             with torch.no_grad():
-                logits = model(**tokens).logits
+                logits = fallacy_model(**tokens).logits
 
             probs     = torch.softmax(logits, dim=-1)[0]
             top_idx   = probs.argmax().item()
@@ -465,7 +683,44 @@ async def analyze_fallacy(input: TextInput):
     except Exception as e:
         print(f"Lỗi Gemini fallback: {e}")
         
+        
     return {"fallacy": None, "confidence": 0, "is_fallacy": False}
+
+@app.post("/check-argument")
+async def check_argument(input: ArgInput):
+    """Đánh giá xem lập luận có bám sát chủ đề không (ArgKP)"""
+    if len(input.argument.strip()) < 10:
+        return {"match": False, "score": 0}
+
+    # Sử dụng ArgKP Model
+    if argkp_model is not None and argkp_tokenizer is not None:
+        try:
+            tokens = argkp_tokenizer(
+                input.argument,
+                input.topic,
+                return_tensors='pt',
+                padding="max_length",
+                truncation=True,
+                max_length=256
+            )
+
+            with torch.no_grad():
+                logits = argkp_model(**tokens).logits
+
+            probs = torch.softmax(logits, dim=-1)[0]
+            score = round(probs[1].item() * 100, 1) # Điểm khớp (Nhãn 1)
+            is_match = probs.argmax().item() == 1
+
+            return {
+                "match": is_match,
+                "score": score,
+                "argument": input.argument,
+                "topic": input.topic
+            }
+        except Exception as e:
+            print(f"Lỗi phân tích ArgKP model: {e}")
+            
+    return {"match": True, "score": 100} # Mặc định đúng nếu lỗi model
 
 @app.post("/hint")
 async def get_hint(context: DebateContext):

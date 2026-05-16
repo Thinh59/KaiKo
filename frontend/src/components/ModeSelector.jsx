@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 export default function ModeSelector({ onSelect }) {
+  const [showCustomOptions, setShowCustomOptions] = useState(false)
+  const [roomCodeInput, setRoomCodeInput] = useState('')
 
   const handleSelect = (mode) => {
     onSelect({ mode })
@@ -74,40 +76,85 @@ export default function ModeSelector({ onSelect }) {
             </p>
           </div>
 
-          {/* 2v2 Mode */}
+          {/* Custom Mode */}
           <div
-            onClick={() => handleSelect('2v2')}
             style={{
               padding: '2rem',
               background: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid var(--border-light)',
               borderRadius: 'var(--radius-lg)',
-              cursor: 'pointer',
               transition: 'all 0.3s ease',
-              textAlign: 'center'
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              position: 'relative'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-5px)';
-              e.currentTarget.style.borderColor = '#f59e0b';
-              e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)';
+              if (!showCustomOptions) {
+                e.currentTarget.style.transform = 'translateY(-5px)';
+                e.currentTarget.style.borderColor = '#ec4899';
+                e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.borderColor = 'var(--border-light)';
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              if (!showCustomOptions) {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.borderColor = 'var(--border-light)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              }
             }}
           >
-            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🤝</div>
-            <h3 style={{ fontSize: '1.5rem', margin: '0 0 1rem', color: 'var(--text-primary)' }}>2v2 Team</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
-              Đấu đội 2 người (Đang cập nhật...).
-            </p>
+            {!showCustomOptions ? (
+              <div onClick={() => setShowCustomOptions(true)} style={{ cursor: 'pointer' }}>
+                <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🤝</div>
+                <h3 style={{ fontSize: '1.5rem', margin: '0 0 1rem', color: 'var(--text-primary)' }}>Chơi Giao Hữu</h3>
+                <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>
+                  Tạo phòng hoặc nhập code để đấu với bạn bè.
+                </p>
+              </div>
+            ) : (
+              <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button 
+                  className="btn-primary" 
+                  onClick={() => onSelect({ mode: 'custom_create' })}
+                  style={{ background: '#ec4899', borderColor: '#ec4899', padding: '10px', borderRadius: '8px' }}
+                >
+                  Tạo Phòng Mới
+                </button>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Nhập Code..." 
+                    value={roomCodeInput}
+                    onChange={e => setRoomCodeInput(e.target.value)}
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: '#fff', textAlign: 'center' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '10px' }}>
+                  <button 
+                    onClick={() => setShowCustomOptions(false)}
+                    style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: '8px 0' }}
+                  >
+                    Quay lại
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if(roomCodeInput.trim()) onSelect({ mode: 'custom_join', roomCode: roomCodeInput.trim() })
+                    }}
+                    style={{ background: '#10b981', color: '#fff', border: 'none', padding: '8px 25px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    Vào
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
 
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', opacity: 0.7 }}>
-          💡 Chọn chế độ để bắt đầu. Hệ thống sẽ tự động tìm đối thủ và chọn chủ đề tranh biện.
+          💡 Chọn chế độ để bắt đầu. Hệ thống sẽ tự động tìm đối thủ hoặc tạo phòng.
         </p>
       </div>
     </div>

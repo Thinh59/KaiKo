@@ -1,0 +1,18 @@
+TÀI KHOẢN GIẢ LẬP ĐỂ TEST ĐỒ ÁN (FULL DANH HIỆU):
+
+1. Cấp 5 (Danh hiệu: KaiKo Ngang Như Cua Non 🦀)
+- Tên đăng nhập: cuanon_test
+- Mật khẩu: 123456
+
+2. Cấp 45 (Danh hiệu: KaiKo Ngon Như Cua Cùm 🔥)
+- Tên đăng nhập: cuacum_test
+- Mật khẩu: 123456
+
+3. Cấp 101 (Danh hiệu: KaiKo Sáng Rực Như Idol Cua Hoàng Đế 👑)
+- Tên đăng nhập: cuahoangde_test
+- Mật khẩu: 123456
+
+---
+Ghi chú: 
+- Bạn có thể dùng form Đăng nhập tại màn hình AuthPage để đăng nhập các tài khoản này.
+- Điểm Tích Lũy, số trận thắng thua đã được cấu hình sẵn trong Database để hiển thị chính xác cấp độ và EXP.

@@ -1,75 +1,63 @@
-import { useState } from 'react'
+import React from 'react'
 
-export default function HomePage({ onStart }) {
-  const [topic, setTopic] = useState('')
-  const [playerA, setPlayerA] = useState('')
-  const [playerB, setPlayerB] = useState('')
-
-  const handleStart = () => {
-    if (!topic || !playerA || !playerB) {
-      alert('Vui lòng điền đầy đủ thông tin')
-      return
-    }
-    onStart({ topic, playerA, playerB })
-  }
-
+export default function HomePage({ onPlay }) {
   return (
     <div style={{
-      minHeight: '80vh',
+      minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
+      background: 'url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop") center/cover no-repeat',
+      position: 'relative',
       padding: '2rem'
     }}>
-      <div className="glass-panel animate-fade-in" style={{
-        width: '100%',
-        maxWidth: '500px',
-        padding: '3rem 2.5rem',
-        textAlign: 'center'
-      }}>
-        <div style={{ marginBottom: '2.5rem' }}>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>KaiKo</h1>
-          <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)' }}>Nền tảng Tranh biện AI Đỉnh cao</p>
+      {/* Overlay để làm mờ nền */}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,23,42,0.8), rgba(15,23,42,0.95))' }}></div>
+
+      <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '900px' }}>
+        <h1 className="animate-fade-in" style={{ fontSize: '7rem', margin: '0 0 1rem', color: 'var(--text-primary)', letterSpacing: '-2px', textShadow: '0 10px 40px rgba(99, 102, 241, 0.8)' }}>
+          <span style={{ color: 'var(--accent-primary)' }}>Kai</span>Ko
+        </h1>
+        <p style={{ fontSize: '2rem', color: '#e2e8f0', marginBottom: '4rem', fontWeight: '300' }}>
+          Đấu Trường Tranh Biện Trí Tuệ Nhân Tạo
+        </p>
+
+        <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
+          <button 
+            onClick={onPlay}
+            className="btn-primary hover-scale"
+            style={{ 
+              padding: '24px 64px', 
+              fontSize: '2rem', 
+              borderRadius: '50px', 
+              fontWeight: 'bold', 
+              boxShadow: '0 0 50px rgba(99, 102, 241, 0.6)', 
+              textTransform: 'uppercase', 
+              letterSpacing: '2px', 
+              cursor: 'pointer',
+              transition: 'all 0.3s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            Chơi Ngay 🎮
+          </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', textAlign: 'left' }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Chủ đề tranh biện</label>
-            <input
-              value={topic}
-              onChange={e => setTopic(e.target.value)}
-              placeholder="VD: Học đại học có còn cần thiết không?"
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+        <div style={{ marginTop: '6rem', display: 'flex', gap: '4rem', justifyContent: 'center', opacity: 0.9 }}>
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🤖</div>
+            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Phân tích Real-time</div>
           </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Người chơi A (Ủng hộ)</label>
-            <input
-              value={playerA}
-              onChange={e => setPlayerA(e.target.value)}
-              placeholder="Nhập tên người chơi A..."
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>⚔️</div>
+            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Đối kháng 1v1</div>
           </div>
-
-          <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: 'var(--text-primary)' }}>Người chơi B (Phản đối)</label>
-            <input
-              value={playerB}
-              onChange={e => setPlayerB(e.target.value)}
-              placeholder="Nhập tên người chơi B..."
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🏆</div>
+            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Hệ thống Rank</div>
           </div>
-
-          <button
-            onClick={handleStart}
-            className="btn-primary"
-            style={{ width: '100%', marginTop: '1rem', padding: '16px' }}
-          >
-            Bắt đầu Tranh biện 🚀
-          </button>
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 export function useSignaling(playerName) {
   const [socket, setSocket] = useState(null)
   const [matchInfo, setMatchInfo] = useState(null)
+  const [roomError, setRoomError] = useState(null)
+  const [createdRoomCode, setCreatedRoomCode] = useState(null)
   const socketRef = useRef(null)
   const onMessageHandlers = useRef({})
 
@@ -25,8 +27,13 @@ export function useSignaling(playerName) {
           roomId: data.roomId,
           isHost: data.isHost,
           opponentId: data.opponentId,
+          opponentName: data.opponentName || data.opponentId,
           topic: data.topic
         })
+      } else if (data.type === 'room_created') {
+        setCreatedRoomCode(data.roomCode)
+      } else if (data.type === 'error') {
+        setRoomError(data.message)
       } else {
         // Handle other messages (offer, answer, candidate) via registered handlers
         if (onMessageHandlers.current[data.type]) {
@@ -50,19 +57,37 @@ export function useSignaling(playerName) {
     }
   }, [playerName])
 
-  const findMatch = (mode) => {
+  const findMatch = (mode, displayName) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setMatchInfo(null)
+      setRoomError(null)
+      setCreatedRoomCode(null)
       socketRef.current.send(JSON.stringify({
         type: 'find_match',
         mode: mode,
-        playerName: playerName
+        playerName: displayName || playerName
       }))
+    }
+  }
+
+  const createRoom = () => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      setRoomError(null)
+      socketRef.current.send(JSON.stringify({ type: 'create_room' }))
+    }
+  }
+
+  const joinRoom = (roomCode) => {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      setRoomError(null)
+      socketRef.current.send(JSON.stringify({ type: 'join_room', roomCode }))
     }
   }
 
   const cancelMatch = () => {
     setMatchInfo(null)
+    setCreatedRoomCode(null)
+    setRoomError(null)
     // Tùy chọn: gửi tín hiệu hủy lên server nếu cần
   }
 
@@ -79,7 +104,11 @@ export function useSignaling(playerName) {
   return {
     socket,
     matchInfo,
+    roomError,
+    createdRoomCode,
     findMatch,
+    createRoom,
+    joinRoom,
     cancelMatch,
     registerHandler,
     sendMessage

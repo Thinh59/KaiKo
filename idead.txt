@@ -1,0 +1,140 @@
+Quan trọng hệ thống vận hành:
+Chơi ngay:
+-Hệ thống phát hiện ngụy biện: Cần train model
+-Gọi Al Gemini để solo
+-Gọi Al Gemini để random topic
+-Gọi Al Gemini để chấm điểm, phân tích và gợi ý
+Nhũng chức năng có thể phát triển thêm:
+-Chức năng thêm danh hiệu cho người chơi: level
+1->11: KaiKo Ngang Như Cua Non, 11->31: KaiKо
+Mượt Nhưng Cua Gắt, 31->61: KaiKo Ngon Như
+Cua Cùm, 61->91: KaiKo Nhưng Thư Giấn, 91-
+>101: KaiKo Sáng Rực Như Idol Cua Hoàng Đế.:
+free để lên cấp hoặc nạp tiền để lên nhanh cấp
+10 (chỉ cấp 10 thôi): cách lên cấp sẽ là 1->10:
+mỗi trận đấu có tăng điểm so với trận có điểm
+cao nhất ở một phương diện nào (ko cần là tổng
+điểm, dù chỉ tăng 1 điểm cũng được), sẽ có thể
+tăng 1 cấp. 11->30: tăng ít nhất 2 phương diện,
+mỗi phương diện ít nhất 2 điểm sẽ tăng 1 cấp,
+hoặc nếu có đánh giá/comment tốt từ một
+người có level60-101 thì có thể lên thẳng 5 cấp.
+31->60: điểm số mỗi trận phải cao hơn trận
+trước đó với những trận đấu với người có cấp độ
+thấp hơn mình, và những người có cấp cao hơn
+mình thì cao hơn 2 phương diện nào đó thì mới
+tăng 1 cấp, hoặc có comment tốt từ một người
+có level 90-101 thì lên thẳng 5 cấp, cần tham gia
+ít nhất 1 event mới được lên level 61. 61-90: mỗi
+trận phải cao hơn trận trước đó bất kể đối thủ trừ
+level 101, nếu thua liên tiếp 3 trận sẽ bị trừ 1
+level (có thể tụt về dưới 61 và tuân thủ lại quy tắc
+lên level mức trước), nếu nhận được 2 đánh giá
+tốt của người có level 91-101 thì lên 5 cấp, 1
+đánh giá thì 2 cấp, cần tham gia ít nhất 2 event
+và có ít nhất 1 cái trong top 30 mới lên được
+level 91. 91-100: cần thắng liên tục, thua 1 trận
+sẽ tụt 1 level, cần tham gia ít nhất 3 event có 2
+event trong top 20 mới lên được level100, hoặc
+nhận đánh giá từ người có level101 thì có thể lên
+thẳng cấp 3. Level 101: cần đánh bại người có
+level101, hoặc là top1 10 event liên tiếp. Khi đạt
+được level này sẽ có nhiều quyền hạn hơn như là
+làm giám khảo, điểm chấm của bạn sẽ được
+chia phần trăm để quyết định điểm số của người
+chơi khác, quyết định level của họ, làm giám
+khảo có quyền lực nhất trong khu event, các đồ
+đệ của bạn sẽ có thể nhờ bạn đánh giá để lên
+thẳng các cấp level nhanh chóng hơn, nhận
+được đặc quyền vip nhất là mở khóa tất cả các
+hạn mức cần nạp tiền. Nếu top 1 bất kỳ event
+nào mà level dưới 101 thì có thể tăng liền 10
+cấp, nếu là level dưới 11 mà top 1 thì tặng danh
+hiệu KaiKo Thiên Tài Tinh Tú (tặng điểm tích lũy).
+Khi đã có level như vậy thì những người tham gia
+debate sẽ chỉ gặp những người trong khoảng
+mức level chênh lệch +1 -1 mức (Ví dụ: khoảng
+31-61: sẽ chỉ gặp các mức level trong khoảng
+11-91, nhưng xác suất sẽ khác nhau, free không
+được dùng tiền nạp để gian lận mà gặp toàn
+level yếu hơn)
+-Chức năng chọn bạn debate thay vì sẽ random:
+sẽ chỉ tích lũy điểm kinh nghiệm, không tăng
+level, hoặc tăng thì chỉ trong khoảng của level
+1-11: free
+-Chức năng debate bắng chat thay vì debate
+bång video+micro để người dùng tự nhiên thoải
+mái hơn: người dùng sẽ chat như viết văn hoặc
+là chat bình thường, Al ngụy biện = model train
+sẽ liên tục được dùng để tính điểm (cộng trừ liên
+tục): nhưng điểm tích lũy ở khu này sẽ ít hơn khu
+video và không có tiêu chí cử chỉ động tác tốt cải
+thiện điểm để tăng level: free
+-Chức năng kết bạn giữa các người chơi: giới hạn
+số bạn bè là 500, có thể đánh dấu bạn thân hay
+nhận huy hiệu bạn thân khi cùng nhau tranh biện
+nhiều hơn 50 trận. Khi những người có bạn thân,
+nếu khi thi đấu nâng hạng gặp topic khó, có
+quyền chat với 1 bạn thân để tìm hỗ trợ: free, nếu
+chưa là bạn thân thì cần tốn 50đ tích lũy (điểm
+này sẽ không giảm hạng trên leaderboard)
+-Chức năng xem thông tin người chơi khác: khi
+bấm vào leaderboard, sau khi kết thúc trận đấu,
+có thể bấm kết bạn luôn, chat với nhau luôn,
+nhưng như là tu tiên thì người có level cao hơn
+sẽ coi được danh hiệu và level của người thấp
+hơn nhưng người thấp thì không xem đượC.
+-Chức năng sẵn sàng sau khi đã biết user ghép
+nhóm, hoặc là thoát: Nếu 1 bên đã sẵn sàng, bên
+còn lại ko bấm sẵn sàng trong 30s thì sẽ bị cảnh
+báo trừ điểm tích lũy (ít thôi khoảng 1đ) và tự
+động sẵn sàng, nếu vẫn không tham gia debate
+thì mặc định người còn lại thắng.
+-Chức năng thả react, icon, sticker khi người chơi
+khác tranh biện: Các icon đơn giản đến phức tạp
+tinh xảo: free
+-Chức năng xem trận đấu có ở hiện tại, bình luận
+cộng đồng: free
+-Chức năng cộng đồng, diễn đàn chung của mọi
+người, có thể chat, call chung: free với số lượt 2/
+ngày và sau đó muốn thì cần nạp tiền = dùng
+tiền nạp rẻ thôi: 500đ/comment
+-Chức năng bái sư và xuất sư khi tích lũy đủ số
+điểm trò chuyện hay tranh biện với nhau.
+-Chức năng đổi ảnh đại diện: Sơ cấp là các ảnh
+mặc định, cao cấp là có thể up ảnh lên: free 5
+lượt/ngày => nạp tiền để đổi được nhiều lượt
+hơn hoặc đổi bằng điểm tích lũy
+-Chức năng đổi khung đại diện: có thể nhận
+được khung đẹp khi debate các event cũng như
+lên danh hiệu: free 5 lượt ngày => nạp tiền nhiều
+lượt đổi khung hơn
+-Tổ chức các event nho nhỏ trong game ở mục
+Event: như là đưa một chủ đề và user sẽ đăng ký
+tham gia: Viết bài tranh luận về chủ đề đó, các
+user có thể đánh giá lẫn nhau để tích lũy điểm,
+kinh nghiệm; đề xuất chủ đề tranh biện hot: nếu
+được nhiều vote thì sẽ có thể được tặng điểm
+tích lũy, danh hiệu,...
+Sẽ có 2 event lớn để nhận được 2 lệnh bài chỉ
+huy: phe Cua Ma và phe Cua Thần (mỗi event
+nhận 1 lệnh bài cho top1). Sau khi 2 event này
+được mở thì sẽ mở tính năng chọn phe để tham
+gia trận tranh biện lớn = debate tập thể giữa 2
+phe thằng sẽ nhận được điểm tích lũy lớn, phần
+thưởng lớn, phe có thể chọn ra 1 người và đạt
+được level101 và có thể bảo kê cho các thành
+viên khác 100 lần.
+Các event thì sẽ có thể nhận được kim cương
+tích lũy.
+-Chức năng điểm danh: tích lũy lửa để đổi điểm
+tích lũy cũng như là tương tác=chat với bạn thân
+để giữ huy hiệu trò chuyện thường xuyên (quá 1
+ngày ko tương tác mất) và huy hiệu bạn thân
+(quá 30 ngày ko tương tác mất) => free nhưng
+có thể nạp tiền để giữ chuỗi.
+
+bạn đã làm xong hết những ý tưởng này của tôi chưa?
+Những ràng buộc,...
+Tôi thấy cái event hiện tại đã mở luôn cái envent lớn rồi, phải mở event theo đợt chứ
+có thể chưa tích hợp Cổng thanh toán nhưng có thể để là cập nhật sau, còn những cái khác như giới hạn bạn bè thì có thể giảm xuống 100 người

@@ -33,7 +33,7 @@ function speakText(text, onEnd) {
   window.speechSynthesis.speak(utter)
 }
 
-export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName, onFinish, registerHandler, sendMessage }) {
+export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName, onFinish, registerHandler, sendMessage, onCancel }) {
   // ── State ────────────────────────────────────────────────────────────────
   const [isRunning, setIsRunning] = useState(false)
   const [isScoring, setIsScoring] = useState(false)
@@ -51,6 +51,25 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
   const [notification, setNotification] = useState(null)   // { text, type }
   const [hint, setHint] = useState(null)
   const [loadingHint, setLoadingHint] = useState(false)
+  const [mediaGranted, setMediaGranted] = useState(false)
+  const [floatingEmojis, setFloatingEmojis] = useState([])
+
+  const spawnEmoji = useCallback((emoji, side = 'right') => {
+    const id = Date.now() + Math.random()
+    setFloatingEmojis(prev => [...prev, { id, emoji, side }])
+    setTimeout(() => {
+      setFloatingEmojis(prev => prev.filter(e => e.id !== id))
+    }, 2500)
+  }, [])
+
+  const handleSendEmoji = (emoji) => {
+    spawnEmoji(emoji, 'right')
+    sendMessage({
+      type: 'emoji_react',
+      target: roomInfo?.opponentId,
+      emoji: emoji
+    })
+  }
 
   // Refs để tránh stale closure
   const transcriptARef = useRef('')
@@ -83,16 +102,23 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
   useEffect(() => { currentPlayerRef.current = currentPlayer }, [currentPlayer])
   useEffect(() => { isRunningRef.current = isRunning }, [isRunning])
 
-  // ── Khởi tạo camera/WebRTC ──────────────────────────────────────────────
+  // ── Khởi tạo TTS Voices ──────────────────────────────────────────────
   useEffect(() => {
-    // Always try to get local camera first
-    initWebRTC()
     // Pre-load TTS voices
     if ('speechSynthesis' in window) {
       window.speechSynthesis.getVoices()
       window.speechSynthesis.addEventListener('voiceschanged', () => {})
     }
   }, []) // eslint-disable-line
+
+  const handleGrantMedia = async () => {
+    try {
+      await initWebRTC()
+      setMediaGranted(true)
+    } catch (e) {
+      alert("Lỗi cấp quyền hoặc không tìm thấy thiết bị!")
+    }
+  }
 
   // ── Timer ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -224,7 +250,12 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
       showNotification('🏁 Đối thủ đã kết thúc trận đấu. Đang chấm điểm...', 'warning')
       performFinalScoring()
     })
-  }, [mode, registerHandler, roomData.isLocalHost, startSpeech, startAudio, stopSpeech, stopAudio])
+
+    // Nhận emoji
+    registerHandler('emoji_react', (data) => {
+      spawnEmoji(data.emoji, 'left')
+    })
+  }, [mode, registerHandler, roomData.isLocalHost, startSpeech, startAudio, stopSpeech, stopAudio, spawnEmoji])
 
   // ── Hết giờ lượt hiện tại ──────────────────────────────────────────────
   const handleTimeUp = useCallback(() => {
@@ -440,6 +471,43 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
   const playerBName = remotePlayerName || roomData.playerB
 
   // ── Render ───────────────────────────────────────────────────────────────
+  if (!mediaGranted) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg-primary)', padding: '20px'
+      }}>
+        <div style={{
+          background: 'var(--bg-glass)', padding: '3rem', borderRadius: '24px',
+          border: '1px solid var(--border-light)', textAlign: 'center', maxWidth: '500px'
+        }}>
+          <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>🎥🎤</div>
+          <h2 style={{ fontSize: '2rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>Cấp Quyền Thiết Bị</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem', lineHeight: '1.5' }}>
+            KaiKo cần quyền truy cập Camera và Microphone của bạn để có thể bắt đầu trận đấu. Vui lòng nhấn nút bên dưới để cấp quyền.
+          </p>
+          <button 
+            onClick={handleGrantMedia}
+            className="btn-primary" 
+            style={{ padding: '16px 32px', fontSize: '1.2rem', width: '100%', fontWeight: 'bold' }}
+          >
+            Cho Phép Truy Cập
+          </button>
+          <button 
+            onClick={() => onCancel && onCancel()}
+            style={{ 
+              marginTop: '15px', padding: '12px 32px', fontSize: '1rem', width: '100%', 
+              background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-light)', 
+              borderRadius: 'var(--radius-full)', cursor: 'pointer' 
+            }}
+          >
+            Quay lại
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{
       maxWidth: 1400,
@@ -595,6 +663,53 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
 
       {/* ── Fallacy Alert ── */}
       <FallacyAlert fallacy={fallacy} speaker={fallacySpeaker} />
+
+      {/* ── Reaction Toolbar ── */}
+      {mode !== 'solo_ai' && (
+        <div style={{
+          position: 'fixed',
+          right: '20px',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          background: 'var(--bg-glass)',
+          padding: '10px',
+          borderRadius: 'var(--radius-full)',
+          border: '1px solid var(--border-light)',
+          zIndex: 100,
+          backdropFilter: 'blur(10px)'
+        }}>
+          {['👍', '👎', '😂', '🔥', '🦀', '😡', '👏'].map(emo => (
+            <button 
+              key={emo} 
+              onClick={() => handleSendEmoji(emo)} 
+              style={{ background: 'transparent', border: 'none', fontSize: '2rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.3)'} 
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              {emo}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Floating Emojis ── */}
+      {floatingEmojis.map(e => (
+        <div key={e.id} style={{
+          position: 'fixed',
+          bottom: '100px',
+          [e.side]: '100px',
+          fontSize: '4rem',
+          animation: 'floatUp 2.5s ease-out forwards',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.5))'
+        }}>
+          {e.emoji}
+        </div>
+      ))}
     </div>
   )
 }
