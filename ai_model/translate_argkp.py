@@ -9,7 +9,7 @@ import os
 # CONFIG
 # =====================================================
 
-API_KEY = "AIzaSyCLILnfyaYYckb4L4580epXWFHrsQBH5Bg"
+API_KEY = "YOUR API KEY"
 MODEL_NAME = "gemini-3.1-flash-lite-preview"
 
 INPUT_FILE = "ArgKP_combined.csv"

@@ -116,25 +116,51 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [selectedUserStats, setSelectedUserStats] = useState(null)
   const [nickname, setNickname] = useState(localStorage.getItem('kaiko_nickname_' + username) || '')
   const [globalNicknames, setGlobalNicknames] = useState({})
+  const [serverPoints, setServerPoints] = useState(0)
+  const [myItems, setMyItems] = useState([])
+  const [events, setEvents] = useState([])
+  const [selectedAvatar, setSelectedAvatar] = useState(localStorage.getItem('kaiko_avatar_' + username) || '')
   const displayUsername = globalNicknames[username] || nickname || username
   const getDisplayName = (u) => globalNicknames[u] || u
 
   const isGuest = username?.startsWith('Guest_')
 
-  const handleCheckIn = () => {
+  // Fetch server-side user info (points + items)
+  const loadMyInfo = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/my-info/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setServerPoints(res.data.store_points || 0)
+        setMyItems(res.data.items || [])
+      }
+    } catch(e) {}
+  }, [username, isGuest])
+
+  const loadEvents = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/events`)
+      if (res.data.success) setEvents(res.data.events)
+    } catch(e) {}
+  }, [])
+
+  const handleCheckIn = async () => {
     if (!hasCheckedIn) {
       localStorage.setItem('kaiko_checkin_' + username, new Date().toLocaleDateString('vi-VN'))
-      
-      const newExtra = extraPoints + 50
-      localStorage.setItem('kaiko_extra_points_' + username, newExtra.toString())
-      setExtraPoints(newExtra)
       setHasCheckedIn(true)
-      
-      setStats(prev => {
-        const newPoints = (prev.points || 0) + 50
-        return { ...prev, points: newPoints }
-      })
-      alert("Điểm danh thành công! Bạn nhận được 50 Điểm Tích Lũy (Dùng để mua sắm).")
+      try {
+        const res = await axios.post(`${API_BASE}/checkin`, { username })
+        if (res.data.success) {
+          setServerPoints(res.data.store_points)
+          alert(`Điểm danh thành công! +50 Điểm Tích Lũy. Tổng: ${res.data.store_points} điểm.`)
+        }
+      } catch(e) {
+        // fallback localStorage
+        const newExtra = extraPoints + 50
+        localStorage.setItem('kaiko_extra_points_' + username, newExtra.toString())
+        setExtraPoints(newExtra)
+        alert('Điểm danh thành công! Bạn nhận được 50 Điểm Tích Lũy.')
+      }
     }
   }
 
@@ -306,7 +332,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     if (activeTab === 'home' || activeTab === 'history') loadHistory()
     if (activeTab === 'leaderboard') loadLeaderboard()
     if (activeTab === 'friends') loadFriends()
-  }, [activeTab, loadHistory, loadLeaderboard, loadFriends])
+    if (activeTab === 'events') loadEvents()
+    if (activeTab === 'store' || activeTab === 'home') loadMyInfo()
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyInfo])
 
   // Polling for friend requests every 5 seconds
   useEffect(() => {
@@ -754,15 +782,23 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Danh sách ({friends?.length || 0})</h3>
                 {!friends || friends.length === 0 ? (
                   <p style={{ color: 'var(--text-secondary)' }}>Bạn chưa có người bạn nào.</p>
-                ) : friends.map(fname => (
-                  <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                ) : friends.map(fobj => {
+                  const fname = typeof fobj === 'string' ? fobj : fobj.username || fobj
+                  const debateCount = fobj?.debate_count || 0
+                  const isBestFriend = debateCount >= 50
+                  return (
+                  <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isBestFriend ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: `1px solid ${isBestFriend ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => handleViewUser(fname)}>
                       <div style={{ position: 'relative' }}>
                         <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+                        {isBestFriend && <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', fontSize: '1.1rem' }}>💚</div>}
                       </div>
                       <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{getDisplayName(fname)}</div>
-                        <div style={{ fontSize: '0.9rem', color: 'var(--accent-primary)' }}>Nhấn để xem hồ sơ</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {getDisplayName(fname)}
+                          {isBestFriend && <span style={{ fontSize: '0.75rem', background: '#10b981', color: '#fff', borderRadius: '12px', padding: '2px 8px' }}>Bạn Thân 💚</span>}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{debateCount > 0 ? `Đã debate ${debateCount} trận cùng nhau` : 'Nhấn để xem hồ sơ'}</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -771,111 +807,141 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       </button>
                     </div>
                   </div>
-                ))}
+                  )
+                })}}
               </div>
             </div>
           )}
 
-          {/* EVENTS */}
+          {/* EVENTS - Dynamic from API */}
           {activeTab === 'events' && (
-            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              
-              {/* Lịch Trình Sự Kiện */}
-              <div style={{ background: 'rgba(239, 68, 68, 0.1)', padding: '1.5rem', borderRadius: '16px', border: '1px dashed var(--accent-primary)', marginBottom: '3rem', textAlign: 'left' }}>
-                <h3 style={{ color: 'var(--accent-primary)', margin: '0 0 10px 0' }}>📅 Lịch Trình Mở Sự Kiện (Định Kỳ)</h3>
-                <ul style={{ color: 'var(--text-secondary)', margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
-                  <li><strong>Sự kiện Thường 1:</strong> Mở từ Thứ 2 đến hết Thứ 5 hàng tuần.</li>
-                  <li><strong>Sự kiện Thường 2:</strong> Mở từ Thứ 6 đến hết Chủ nhật hàng tuần.</li>
-                  <li><strong>Sự kiện Lớn (Đại Chiến):</strong> Mở định kỳ vào <strong>Thứ 6 đầu tiên của tháng 3</strong> mỗi năm.</li>
+            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+              <div style={{ background: 'rgba(99,102,241,0.08)', padding: '1.5rem', borderRadius: '16px', border: '1px dashed var(--accent-primary)', marginBottom: '2rem', textAlign: 'left' }}>
+                <h3 style={{ color: 'var(--accent-primary)', margin: '0 0 8px 0' }}>📅 Lịch Trình</h3>
+                <ul style={{ color: 'var(--text-secondary)', margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
+                  <li><strong>Sự kiện Thường:</strong> Mở hàng tuần luân phiên (Thứ 2–5 và Thứ 6–CN).</li>
+                  <li><strong>Đại Chiến:</strong> Mở định kỳ đầu tháng 3 mỗi năm, sau khi event nhỏ kết thúc.</li>
                 </ul>
               </div>
 
-              {/* Event Nhỏ (Mở Thường Xuyên) */}
-              <div style={{ marginBottom: '4rem' }}>
-                <h2 style={{ fontSize: '2.5rem', color: 'var(--accent-primary)', marginBottom: '0.5rem' }}>Các Sự Kiện Nhỏ Đang Mở</h2>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Tham gia để tích lũy EXP và nhận khung đại diện giới hạn!</p>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', textAlign: 'left' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>Đang diễn ra</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Còn 2 ngày</span>
+              {/* Small events */}
+              {events.filter(e => e.event_type === 'small').length > 0 && (
+                <div style={{ marginBottom: '3rem' }}>
+                  <h2 style={{ fontSize: '2rem', color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>🎉 Sự Kiện Đang Diễn Ra</h2>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                    {events.filter(e => e.event_type === 'small').map(ev => {
+                      const isOpen = ev.status === 'open'
+                      const isUpcoming = ev.status === 'upcoming'
+                      return (
+                        <div key={ev.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: `1px solid ${isOpen ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                              <span style={{ background: isOpen ? 'rgba(16,185,129,0.2)' : isUpcoming ? 'rgba(59,130,246,0.2)' : 'rgba(107,114,128,0.2)', color: isOpen ? '#10b981' : isUpcoming ? '#3b82f6' : '#6b7280', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                {isOpen ? '🟢 Đang mở' : isUpcoming ? '🔵 Sắp mở' : '⚫ Đã đóng'}
+                              </span>
+                              {ev.deadline && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Đến {ev.deadline}</span>}
+                            </div>
+                            <h3 style={{ fontSize: '1.4rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{ev.title}</h3>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>{ev.description}</p>
+                            {ev.reward && <div style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>🎁 {ev.reward}</div>}
+                          </div>
+                          <button
+                            className={isOpen ? 'btn-primary' : 'btn-secondary'}
+                            disabled={!isOpen}
+                            onClick={() => isOpen ? alert('Tính năng tham gia sự kiện đang được phát triển!') : null}
+                            style={{ marginTop: '1.5rem', width: '100%', opacity: isOpen ? 1 : 0.5, cursor: isOpen ? 'pointer' : 'not-allowed' }}
+                          >
+                            {isOpen ? 'Tham gia ngay' : isUpcoming ? 'Chưa mở' : 'Đã kết thúc'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Large event */}
+              {events.filter(e => e.event_type === 'large').map(ev => {
+                const isLocked = ev.status === 'locked'
+                return (
+                  <div key={ev.id} style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden', textAlign: 'center' }}>
+                    {isLocked && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
+                        <h3 style={{ fontSize: '1.8rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
+                        <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi tất cả sự kiện nhỏ kết thúc!</p>
                       </div>
-                      <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Bàn Luận: Trí Tuệ Nhân Tạo</h3>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>Viết bài phân tích hoặc tham gia debate về chủ đề AI. Top 20 nhận khung "Người Tiên Phong".</p>
-                    </div>
-                    <button 
-                      className="btn-secondary" 
-                      onClick={() => alert("Sự kiện chưa bắt đầu tính điểm! Vui lòng quay lại sau.")}
-                      style={{ marginTop: '1.5rem', width: '100%' }}
-                    >
-                      Tham gia ngay
-                    </button>
-                  </div>
-
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <span style={{ background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>Sắp mở</span>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Mở sau 3 ngày</span>
+                    )}
+                    <div style={{ filter: isLocked ? 'blur(4px)' : 'none', opacity: isLocked ? 0.5 : 1 }}>
+                      <h2 style={{ fontSize: '2.5rem', color: '#facc15', marginBottom: '1rem', textShadow: '0 4px 20px rgba(250,204,21,0.4)' }}>🎉 {ev.title} 🎉</h2>
+                      <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{ev.description}</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '600px', margin: '0 auto' }}>
+                        <div style={{ background: 'rgba(139,92,246,0.1)', border: '2px solid #8b5cf6', borderRadius: '20px', padding: '2rem' }}>
+                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem' }}>👻</div>
+                          <h3 style={{ color: '#8b5cf6' }}>Phe Cua Ma</h3>
+                        </div>
+                        <div style={{ background: 'rgba(234,179,8,0.1)', border: '2px solid #eab308', borderRadius: '20px', padding: '2rem' }}>
+                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem' }}>😇</div>
+                          <h3 style={{ color: '#eab308' }}>Phe Cua Thần</h3>
+                        </div>
                       </div>
-                      <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>Bình Chọn Chủ Đề Hot</h3>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.5' }}>Đề xuất và bình chọn chủ đề tranh biện tuần tới. Nhận 50 Điểm Tích Lũy khi đề xuất lọt Top 5.</p>
-                    </div>
-                    <button className="btn-secondary" style={{ marginTop: '1.5rem', width: '100%', opacity: 0.5, cursor: 'not-allowed' }}>Chưa mở</button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Event Lớn (Sắp Mở / Khóa) */}
-              <div style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(5px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                  <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
-                  <h3 style={{ fontSize: '2rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
-                  <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi kết thúc đợt sự kiện nhỏ mùa này!</p>
-                </div>
-
-                <div style={{ filter: 'blur(4px)', opacity: 0.5 }}>
-                  <h2 style={{ fontSize: '3rem', color: '#facc15', marginBottom: '1rem', textShadow: '0 4px 20px rgba(250, 204, 21, 0.4)' }}>🎉 ĐẠI CHIẾN CUA MA & CUA THẦN 🎉</h2>
-                  <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)', marginBottom: '3rem' }}>Tranh biện tập thể liên server. Phe chiến thắng nhận đặc quyền Level 101!</p>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                    <div style={{ background: 'rgba(139, 92, 246, 0.1)', border: '2px solid #8b5cf6', borderRadius: '24px', padding: '3rem' }}>
-                      <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>👻</div>
-                      <h3 style={{ fontSize: '2rem', color: '#8b5cf6', margin: '0 0 1rem 0' }}>Phe Cua Ma</h3>
-                    </div>
-                    <div style={{ background: 'rgba(234, 179, 8, 0.1)', border: '2px solid #eab308', borderRadius: '24px', padding: '3rem' }}>
-                      <div style={{ fontSize: '6rem', marginBottom: '1rem' }}>😇</div>
-                      <h3 style={{ fontSize: '2rem', color: '#eab308', margin: '0 0 1rem 0' }}>Phe Cua Thần</h3>
                     </div>
                   </div>
-                </div>
-              </div>
-
+                )
+              })}
             </div>
           )}
 
-          {/* CỬA HÀNG */}
+          {/* CỬA HÀNG - Real purchase logic */}
           {activeTab === 'store' && (
             <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              <h2 style={{ fontSize: '3rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>🛒 Cửa Hàng KaiKo</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '3rem' }}>Sử dụng Điểm Tích Lũy để đổi khung đại diện và danh hiệu Vip.</p>
-
+              <h2 style={{ fontSize: '3rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>🛒 Cửa Hàng KaiKo</h2>
+              <div style={{ display: 'inline-block', background: 'rgba(251,191,36,0.1)', border: '1px solid #fbbf24', borderRadius: '12px', padding: '8px 24px', marginBottom: '2.5rem', color: '#fbbf24', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                ⭐ Điểm Tích Lũy: {serverPoints}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
                 {[
-                  { name: 'Khung Cua Lửa', price: '1,500 Điểm', icon: '🔥', desc: 'Hiệu ứng cháy sáng quanh Avatar.' },
-                  { name: 'Thẻ Đổi Tên', price: '500 Điểm', icon: '🎫', desc: 'Sử dụng để đổi Nickname 1 lần.' },
-                  { name: 'Danh Hiệu: Khỏe Nhất Biển', price: '5,000 Điểm', icon: '👑', desc: 'Hiển thị danh hiệu vàng kế bên tên.' }
-                ].map(item => (
-                  <div key={item.name} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>{item.icon}</div>
-                    <h3 style={{ fontSize: '1.5rem', color: 'var(--text-primary)', margin: '0 0 10px 0' }}>{item.name}</h3>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem', flex: 1 }}>{item.desc}</p>
-                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#facc15', marginBottom: '1rem' }}>{item.price}</div>
-                    <button onClick={() => alert("Tính năng thanh toán/đổi điểm đang được bảo trì!")} className="btn-primary" style={{ width: '100%' }}>Mua Ngay</button>
-                  </div>
-                ))}
+                  { id: 'frame_fire', name: 'Khung Cua Lửa', price: 1500, icon: '🔥', desc: 'Hiệu ứng cháy sáng quanh Avatar. Mở khóa frame "fire" trong hồ sơ.' },
+                  { id: 'rename_card', name: 'Thẻ Đổi Nickname', price: 500, icon: '🎫', desc: 'Cho phép đổi Biệt Danh không giới hạn 1 lần. (Mặc định đã miễn phí)' },
+                  { id: 'title_best', name: 'Danh Hiệu: Khỏe Nhất Biển', price: 5000, icon: '👑', desc: 'Hiển thị huy hiệu vàng đặc biệt kế bên tên trong leaderboard và phòng debate.' },
+                  { id: 'frame_diamond_plus', name: 'Khung Kim Cương Plus', price: 2000, icon: '💎', desc: 'Phiên bản nâng cấp của Khung Kim Cương với hiệu ứng pulse. Yêu cầu Lv 61+.' },
+                  { id: 'avatar_crab_gold', name: 'Avatar Cua Hoàng Đế', price: 800, icon: '🦀', desc: 'Avatar cua vàng độc quyền. Dùng trong hồ sơ cá nhân.' },
+                  { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
+                ].map(item => {
+                  const owned = myItems.includes(item.id)
+                  const canAfford = serverPoints >= item.price
+                  return (
+                    <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                      {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
+                      <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>{item.icon}</div>
+                      <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{item.name}</h3>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.2rem', flex: 1 }}>{item.desc}</p>
+                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: canAfford || owned ? '#fbbf24' : '#ef4444', marginBottom: '1rem' }}>{item.price} ⭐</div>
+                      <button
+                        onClick={async () => {
+                          if (owned) return
+                          if (!canAfford) { alert(`Không đủ điểm! Cần ${item.price}, bạn có ${serverPoints}.`); return }
+                          if (!window.confirm(`Xác nhận mua "${item.name}" với ${item.price} điểm?`)) return
+                          try {
+                            const res = await axios.post(`${API_BASE}/purchase`, { username, item_id: item.id, price: item.price })
+                            if (res.data.success) {
+                              setServerPoints(res.data.remaining_points)
+                              setMyItems(prev => [...prev, item.id])
+                              alert(`🎉 Mua thành công! Còn lại ${res.data.remaining_points} điểm.`)
+                            } else {
+                              alert(res.data.error)
+                            }
+                          } catch(e) { alert('Lỗi kết nối!') }
+                        }}
+                        disabled={owned}
+                        className={owned ? 'btn-secondary' : 'btn-primary'}
+                        style={{ width: '100%', opacity: owned ? 0.6 : 1, cursor: owned ? 'default' : 'pointer' }}
+                      >
+                        {owned ? 'Đã sở hữu' : canAfford ? 'Mua Ngay' : 'Không đủ điểm'}
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

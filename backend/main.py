@@ -138,12 +138,53 @@ def load_model():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user1 TEXT NOT NULL,
             user2 TEXT NOT NULL,
+            debate_count INTEGER DEFAULT 0,
             UNIQUE(user1, user2)
         )
     ''')
+    # Add debate_count to friends if missing
+    try:
+        cursor.execute('ALTER TABLE friends ADD COLUMN debate_count INTEGER DEFAULT 0')
+    except sqlite3.OperationalError:
+        pass
+    # Add store_points to users if missing
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN store_points INTEGER DEFAULT 0')
+    except sqlite3.OperationalError:
+        pass
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            purchased_at TEXT NOT NULL,
+            UNIQUE(username, item_id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'upcoming',
+            event_type TEXT NOT NULL DEFAULT 'small',
+            reward TEXT DEFAULT '',
+            deadline TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    ''')
+    cursor.execute('SELECT COUNT(*) FROM events')
+    if cursor.fetchone()[0] == 0:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.executemany('INSERT INTO events (title, description, status, event_type, reward, deadline, created_at) VALUES (?,?,?,?,?,?,?)', [
+            ('Bàn Luận: Trí Tuệ Nhân Tạo', 'Viết bài hoặc tham gia debate về AI. Top 20 nhận khung Người Tiên Phong.', 'open', 'small', 'Khung Avatar + 200 Điểm', '2026-05-20', now),
+            ('Bình Chọn Chủ Đề Hot', 'Đề xuất chủ đề tranh biện. Top 5 nhận 50 Điểm Tích Lũy.', 'upcoming', 'small', '50 Điểm Tích Lũy', '2026-05-24', now),
+            ('Đại Chiến Cua Ma & Cua Thần', 'Tranh biện tập thể. Phe thắng nhận đặc quyền Level 101!', 'locked', 'large', 'Level 101 + VIP', '2026-12-01', now),
+        ])
     conn.commit()
     conn.close()
-    print("✅ SQLite DB ready")
+    print('✅ SQLite DB ready')
 
 TRENDING_TOPICS = [
     "TikTok có nên bị cấm cho trẻ em dưới 16 tuổi?",
@@ -452,7 +493,7 @@ def get_nicknames():
 
 @app.post("/save-match")
 def save_match(data: SaveMatch):
-    """Lưu kết quả trận đấu vào lịch sử"""
+    """Lưu kết quả trận đấu vào lịch sử và cộng điểm tích lũy nếu thắng"""
     from datetime import datetime, timezone
     played_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     conn = sqlite3.connect("users.db")
@@ -468,6 +509,103 @@ def save_match(data: SaveMatch):
         data.fallacies_self, data.fallacies_opp,
         data.summary, played_at
     ))
+    # Award store points on win (+5), draw (+1)
+    if data.result == 'win':
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 5 WHERE username = ?", (data.username,))
+    elif data.result == 'draw':
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 1 WHERE username = ?", (data.username,))
+    # Increment debate_count between these two players if they're friends
+    cursor.execute("""
+        UPDATE friends SET debate_count = COALESCE(debate_count,0) + 1
+        WHERE (user1=? AND user2=?) OR (user1=? AND user2=?)
+    """, (data.username, data.opponent, data.opponent, data.username))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+class PurchaseRequest(BaseModel):
+    username: str
+    item_id: str
+    price: int
+
+@app.post("/purchase")
+def purchase_item(data: PurchaseRequest):
+    """Mua vật phẩm bằng Điểm Tích Lũy"""
+    from datetime import datetime, timezone
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    # Check if already owned
+    cursor.execute("SELECT id FROM user_items WHERE username=? AND item_id=?", (data.username, data.item_id))
+    if cursor.fetchone():
+        conn.close()
+        return {"success": False, "error": "Bạn đã sở hữu vật phẩm này rồi!"}
+    # Check balance (backend store_points + we trust frontend for localStorage points)
+    cursor.execute("SELECT store_points FROM users WHERE username=?", (data.username,))
+    row = cursor.fetchone()
+    current_points = row[0] if row and row[0] else 0
+    if current_points < data.price:
+        conn.close()
+        return {"success": False, "error": f"Không đủ điểm! Cần {data.price}, hiện có {current_points}."}
+    cursor.execute("UPDATE users SET store_points = store_points - ? WHERE username=?", (data.price, data.username))
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute("INSERT INTO user_items (username, item_id, purchased_at) VALUES (?,?,?)", (data.username, data.item_id, now))
+    conn.commit()
+    conn.close()
+    return {"success": True, "remaining_points": current_points - data.price}
+
+@app.get("/my-info/{username}")
+def get_my_info(username: str):
+    """Lấy thông tin điểm số và vật phẩm của user"""
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT store_points FROM users WHERE username=?", (username,))
+    row = cursor.fetchone()
+    store_points = row[0] if row and row[0] else 0
+    cursor.execute("SELECT item_id FROM user_items WHERE username=?", (username,))
+    items = [r[0] for r in cursor.fetchall()]
+    conn.close()
+    return {"success": True, "store_points": store_points, "items": items}
+
+class CheckinRequest(BaseModel):
+    username: str
+
+@app.post("/checkin")
+def server_checkin(data: CheckinRequest):
+    """Server-side check-in: cộng 50 điểm vào store_points"""
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 50 WHERE username=?", (data.username,))
+    if cursor.rowcount == 0:
+        cursor.execute("INSERT OR IGNORE INTO users (username, password_hash, store_points) VALUES (?,?,?)", (data.username, 'clerk_auth', 50))
+    conn.commit()
+    cursor.execute("SELECT store_points FROM users WHERE username=?", (data.username,))
+    row = cursor.fetchone()
+    conn.close()
+    return {"success": True, "store_points": row[0] if row else 50}
+
+@app.get("/events")
+def get_events():
+    """Lấy danh sách sự kiện theo trạng thái"""
+    conn = sqlite3.connect("users.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM events ORDER BY event_type DESC, status ASC")
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return {"success": True, "events": rows}
+
+class EventToggle(BaseModel):
+    event_id: int
+    status: str  # 'open' | 'upcoming' | 'locked'
+
+@app.post("/admin/event-toggle")
+def admin_toggle_event(data: EventToggle):
+    """Admin toggle trạng thái sự kiện"""
+    if data.status not in ['open', 'upcoming', 'locked']:
+        return {"success": False, "error": "Invalid status"}
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE events SET status=? WHERE id=?", (data.status, data.event_id))
     conn.commit()
     conn.close()
     return {"success": True}
@@ -529,13 +667,13 @@ def get_leaderboard(limit: int = 10):
 def get_friends(username: str):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    # Lấy danh sách bạn bè
+    # Lấy danh sách bạn bè kèm debate_count
     cursor.execute("""
-        SELECT user2 FROM friends WHERE user1 = ?
-        UNION
-        SELECT user1 FROM friends WHERE user2 = ?
-    """, (username, username))
-    friends = [row[0] for row in cursor.fetchall()]
+        SELECT CASE WHEN user1=? THEN user2 ELSE user1 END as friend,
+               COALESCE(debate_count, 0) as debate_count
+        FROM friends WHERE user1=? OR user2=?
+    """, (username, username, username))
+    friends = [{"username": row[0], "debate_count": row[1]} for row in cursor.fetchall()]
     
     # Lấy lời mời kết bạn (những người gửi cho username)
     cursor.execute("SELECT sender FROM friend_requests WHERE receiver = ?", (username,))
@@ -543,6 +681,7 @@ def get_friends(username: str):
     conn.close()
     
     return {"success": True, "friends": friends, "requests": requests}
+
 
 @app.post("/friend-request")
 def send_friend_request(data: FriendAction):
