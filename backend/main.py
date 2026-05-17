@@ -182,13 +182,97 @@ def load_model():
     for col_sql in [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS store_points INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS frame TEXT DEFAULT 'none'",
         "ALTER TABLE friends ADD COLUMN IF NOT EXISTS debate_count INTEGER DEFAULT 0",
         "ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS submission_text TEXT",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1"
     ]:
         try:
             cursor.execute(col_sql)
         except Exception:
             conn.rollback()
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS submission_votes (
+            id SERIAL PRIMARY KEY,
+            participant_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            voted_at TEXT NOT NULL,
+            UNIQUE(participant_id, username)
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            type TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_achievements (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            achievement_id TEXT NOT NULL,
+            unlocked_at TEXT NOT NULL,
+            UNIQUE(username, achievement_id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mentorship (
+            id SERIAL PRIMARY KEY,
+            master TEXT NOT NULL,
+            disciple TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            is_graduated BOOLEAN DEFAULT FALSE,
+            debate_count INTEGER DEFAULT 0,
+            UNIQUE(master, disciple)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS community_posts (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            likes INTEGER DEFAULT 0
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS post_comments (
+            id SERIAL PRIMARY KEY,
+            post_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_daily_comments (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            comment_date TEXT NOT NULL,
+            count INTEGER DEFAULT 0,
+            UNIQUE(username, comment_date)
+        )
+    ''')
+    
     cursor.execute('SELECT COUNT(*) as count FROM events')
     if cursor.fetchone()['count'] == 0:
         from datetime import datetime, timezone
@@ -196,9 +280,9 @@ def load_model():
         cursor.executemany(
             'INSERT INTO events (title, description, status, event_type, reward, deadline, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)',
             [
-                ('Bàn Luận: Trí Tuệ Nhân Tạo', 'Viết bài hoặc tham gia debate về AI. Top 20 nhận khung Người Tiên Phong.', 'open', 'small', 'Khung Avatar + 200 Điểm', '2026-05-20', now),
-                ('Bình Chọn Chủ Đề Hot', 'Đề xuất chủ đề tranh biện. Top 5 nhận 50 Điểm Tích Lũy.', 'upcoming', 'small', '50 Điểm Tích Lũy', '2026-05-24', now),
-                ('Đại Chiến Cua Ma & Cua Thần', 'Tranh biện tập thể. Phe thắng nhận đặc quyền Level 101!', 'locked', 'large', 'Level 101 + VIP', '2026-12-01', now),
+                ('Đại Chiến Văn Mẫu', 'Debate: Tả con chó nhà em nhưng dưới góc nhìn của một hoàng thượng mèo.', 'open', 'small', 'Khung Hoàng Thượng + 200 Điểm', '2026-06-20', now),
+                ('Bình Chọn Chủ Đề Tuần Mới', 'Vote chọn chủ đề tranh biện siêu hot từ TikTok/Reddit. (Bắt đầu vote từ 10g sáng ngày mở sự kiện)', 'upcoming', 'small', '50 Điểm Tích Lũy', '2026-06-24', now),
+                ('Đại Chiến Cua Ma & Cua Thần', 'Tranh biện: Cua ma hay Cua hoàng đế ngon hơn? Phe thắng nhận đặc quyền Level 101!', 'locked', 'large', 'Level 101 + VIP', '2026-12-01', now),
             ]
         )
     conn.commit()
@@ -206,21 +290,29 @@ def load_model():
     print('✅ PostgreSQL DB ready')
 
 TRENDING_TOPICS = [
-    "TikTok có nên bị cấm cho trẻ em dưới 16 tuổi%s",
-    "Có nên đánh thuế thu nhập với idol tóp tóp/streamer%s",
-    "Làm việc từ xa (WFH) có hiệu quả hơn lên văn phòng%s",
-    "Sự nghiệp hay tình yêu quan trọng hơn ở tuổi 25%s",
-    "Bằng đại học có còn quan trọng trong thời đại AI%s",
-    "ChatGPT có đang làm học sinh lười đi%s",
-    "AI có nên được cấp quyền công dân không%s",
-    "Giáo dục đại học có nên miễn phí cho tất cả mọi người%s",
-    "Công nghệ có đang làm con người xa cách nhau hơn%s",
-    "Mạng xã hội có lợi hay có hại cho dân chủ%s",
-    "Thế hệ Gen Z có đang chịu quá nhiều áp lực đồng trang lứa%s",
-    "Có nên ủng hộ văn hóa tẩy chay (Cancel Culture) trên MXH%s",
-    "E-Sports có nên được công nhận như một môn thể thao Olympic%s",
-    "Có nên cấm sử dụng điện thoại thông minh trong trường học%s",
-    "Phẫu thuật thẩm mỹ có làm giảm giá trị thực của con người%s"
+    # Mạng xã hội & Trend
+    "TikTok có nên bị cấm cho trẻ em dưới 16 tuổi?",
+    "Flexing trên mạng xã hội: Sống ảo hay động lực phấn đấu?",
+    "Gen Z dùng quá nhiều tiếng lóng: Tiến hóa hay làm hỏng tiếng Việt?",
+    "Review quán ăn trên TikTok: Đáng tin hay toàn seeding?",
+    "Sống 'phông bạt' trên MXH có phải là một loại bệnh lý?",
+    "Hủy diệt (Cancel) một người trên MXH: Công lý hay bạo lực mạng?",
+    "Tóp Tóp đang làm giới trẻ mất khả năng tập trung sâu?",
+    
+    # Reddit & Thắc mắc cuộc sống
+    "Có nên tin lời khuyên tình cảm từ cộng đồng mạng Reddit?",
+    "Chia tiền 50/50 buổi hẹn đầu tiên: Hiện đại hay quá đáng?",
+    "Sự nghiệp hay tình yêu quan trọng hơn ở tuổi 25?",
+    "Văn hóa 'hustle' (làm việc bất chấp): Đam mê hay bóc lột?",
+    "Bằng đại học có còn quan trọng trong thời đại AI?",
+    
+    # Văn mẫu hài hước
+    "Tả con chó nhà em dưới góc nhìn của 'hoàng thượng' mèo",
+    "Tại sao 'Trà Sữa' lại có sức mạnh hòa giải lớn hơn lời xin lỗi?",
+    "Cảm nghĩ của cái điện thoại khi bị rớt xuống bồn cầu",
+    "Phân tích tâm lý khi lỡ tay gửi nhầm tin nhắn nói xấu cho sếp",
+    "Có nên đưa môn 'Thấu hiểu phụ nữ' vào giảng dạy THPT?",
+    "Tranh biện: Cua ma hay Cua hoàng đế ngon hơn?"
 ]
 
 # --- WebSocket Matchmaking & Signaling ---
@@ -228,7 +320,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
         self.player_names: Dict[str, str] = {}  # client_id -> playerName
-        self.waiting_players = {"1v1": [], "2v2": []}
+        self.waiting_players = {"1v1": [], "text_1v1": [], "2v2": []}
         self.rooms = {}
         self.topics = TRENDING_TOPICS
 
@@ -242,8 +334,7 @@ class ConnectionManager:
         if client_id in self.player_names:
             del self.player_names[client_id]
         for mode in self.waiting_players:
-            if client_id in self.waiting_players[mode]:
-                self.waiting_players[mode].remove(client_id)
+            self.waiting_players[mode] = [p for p in self.waiting_players[mode] if p["id"] != client_id]
 
     async def notify_opponent_disconnected(self, client_id: str):
         """Find opponent in any room and notify them that this player disconnected."""
@@ -261,18 +352,30 @@ class ConnectionManager:
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_text(message)
 
-    async def matchmake(self, client_id: str, player_name: str, mode: str):
+    async def matchmake(self, client_id: str, player_name: str, mode: str, level: int = 1):
         self.player_names[client_id] = player_name
-        print(f"🔍 Player '{player_name}' ({client_id}) is searching for a {mode} match...")
+        print(f"🔍 Player '{player_name}' (Lv.{level}, {client_id}) is searching for a {mode} match...")
         queue = self.waiting_players.get(mode)
         if queue is None:
             print(f"❌ Invalid mode: {mode}")
             return
 
         if len(queue) > 0:
-            opponent_id = queue.pop(0)
+            # Tìm người chơi có level chênh lệch <= 10 (Tier-based matching)
+            matched_idx = -1
+            for i, p in enumerate(queue):
+                if abs(p["level"] - level) <= 10:
+                    matched_idx = i
+                    break
+            
+            # Nếu không tìm thấy ai chênh <= 10 level, lấy người đầu tiên (chờ lâu)
+            if matched_idx == -1:
+                matched_idx = 0
+                
+            opponent_info = queue.pop(matched_idx)
+            opponent_id = opponent_info["id"]
             opponent_name = self.player_names.get(opponent_id, opponent_id)
-            print(f"✅ Match Found! {client_id} vs {opponent_id}")
+            print(f"✅ Match Found! {client_id} (Lv.{level}) vs {opponent_id} (Lv.{opponent_info['level']})")
             room_id = f"room_{uuid.uuid4().hex[:8]}"
             topic = random.choice(self.topics)
             self.rooms[room_id] = {
@@ -299,9 +402,9 @@ class ConnectionManager:
             }), opponent_id)
             print(f"📢 Notification sent to both players in {room_id}")
         else:
-            if client_id not in queue:
-                queue.append(client_id)
-                print(f"⏳ Added {client_id} to {mode} queue. Current queue: {len(queue)}")
+            if not any(p["id"] == client_id for p in queue):
+                queue.append({"id": client_id, "level": level})
+                print(f"⏳ {client_id} added to {mode} waiting queue. Current queue: {len(queue)}")
             else:
                 print(f"ℹ️ {client_id} is already in the queue.")
 
@@ -359,7 +462,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng không tồn tại hoặc đã đầy!"
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined"]:
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "chat_msg"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn tới đối phương
@@ -417,6 +520,11 @@ class FriendAction(BaseModel):
     user: str
     target: str
 
+class TextAnalyzeInput(BaseModel):
+    text: str
+    speaker: str
+    topic: str
+
 # --- Routes ---
 
 import random
@@ -435,7 +543,7 @@ async def get_random_topic():
                 temperature=0.9,
             )
         )
-        prompt = "Hãy liệt kê 1 chủ đề tranh biện đang hot nhất trên mạng xã hội Việt Nam hôm nay. Chỉ trả về đúng 1 câu chủ đề ngắn gọn (dưới 15 chữ), không kèm thêm bất kỳ văn bản nào khác. Ví dụ: 'Có nên cấm học sinh dùng điện thoại trong trường%s'"
+        prompt = "Hãy tạo 1 chủ đề tranh biện siêu thú vị, hài hước hoặc đang cực kỳ viral trên TikTok, Facebook, Reddit, hoặc một đề tập làm văn hài hước phá cách. Chỉ trả về đúng 1 câu ngắn gọn (dưới 15 chữ), không giải thích. Ví dụ: 'Có nên cấm Flexing trên mạng xã hội?' hoặc 'Tại sao Lão Hạc không ăn thịt chó?'"
         response = await asyncio.to_thread(gemini.generate_content, prompt)
         topic = response.text.strip().replace('"', '')
         if len(topic) > 10:
@@ -510,34 +618,128 @@ def get_nicknames():
     conn.close()
     return {"success": True, "nicknames": {row['username']: row['nickname'] for row in rows}}
 
+class SaveMatch(BaseModel):
+    username: str
+    opponent: str
+    topic: str
+    mode: str
+    result: str
+    score_self: int
+    score_opp: int
+    fallacies_self: int
+    fallacies_opp: int
+    fallacies_list_self: list[str] = []
+    fallacies_list_opp: list[str] = []
+    summary: str
+    transcript_self: str = ""
+    transcript_opp: str = ""
+
 @app.post("/save-match")
 def save_match(data: SaveMatch):
-    """Lưu kết quả trận đấu vào lịch sử và cộng điểm tích lũy nếu thắng"""
+    """Lưu kết quả trận đấu, cộng điểm và kiểm tra thành tích"""
     from datetime import datetime, timezone
     played_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    fs_self_str = ",".join(data.fallacies_list_self)
+    fs_opp_str = ",".join(data.fallacies_list_opp)
+    
     cursor.execute("""
         INSERT INTO match_history
             (username, opponent, topic, mode, result,
-             score_self, score_opp, fallacies_self, fallacies_opp, summary, played_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             score_self, score_opp, fallacies_self, fallacies_opp, 
+             fallacies_list_self, fallacies_list_opp, summary, played_at,
+             transcript_self, transcript_opp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
         data.score_self, data.score_opp,
         data.fallacies_self, data.fallacies_opp,
-        data.summary, played_at
+        fs_self_str, fs_opp_str,
+        data.summary, played_at,
+        data.transcript_self, data.transcript_opp
     ))
-    # Award store points on win (+5), draw (+1)
+    
+    # Phân biệt điểm theo loại: Video/Solo win=5, Chat win=3; Video draw=1, Chat draw=0
+    is_chat = data.mode.startswith('text_')
     if data.result == 'win':
-        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 5 WHERE username = %s", (data.username,))
-    elif data.result == 'draw':
+        pts = 3 if is_chat else 5
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + %s WHERE username = %s", (pts, data.username))
+    elif data.result == 'draw' and not is_chat:
         cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 1 WHERE username = %s", (data.username,))
-    # Increment debate_count between these two players if they're friends
+        
+    # Tăng số trận đấu giữa 2 bạn bè
     cursor.execute("""
         UPDATE friends SET debate_count = COALESCE(debate_count,0) + 1
         WHERE (user1=%s AND user2=%s) OR (user1=%s AND user2=%s)
     """, (data.username, data.opponent, data.opponent, data.username))
+
+    # --- TÍNH TOÁN LEVEL PHỨC TẠP ---
+    cursor.execute("SELECT level_real, consecutive_losses FROM users WHERE username=%s", (data.username,))
+    user_data = cursor.fetchone()
+    current_level = user_data['level_real'] if user_data and user_data['level_real'] else 1
+    consecutive_losses = user_data['consecutive_losses'] if user_data and user_data['consecutive_losses'] else 0
+
+    if data.result == 'lose':
+        consecutive_losses += 1
+    else:
+        consecutive_losses = 0
+
+    cursor.execute("SELECT MAX(score_self) as max_score FROM match_history WHERE username=%s AND played_at < %s", (data.username, played_at))
+    max_score = cursor.fetchone()['max_score'] or 0
+
+    cursor.execute("SELECT score_self FROM match_history WHERE username=%s AND played_at < %s ORDER BY id DESC LIMIT 1", (data.username, played_at))
+    prev_row = cursor.fetchone()
+    prev_score = prev_row['score_self'] if prev_row else 0
+    
+    cursor.execute("SELECT COUNT(DISTINCT event_id) as event_count FROM event_participants WHERE username=%s", (data.username,))
+    event_count = cursor.fetchone()['event_count'] or 0
+
+    new_level = current_level
+
+    # Phân cấp:
+    if current_level < 10:
+        if data.score_self > max_score or data.result == 'win':
+            new_level += 1
+    elif current_level < 30:
+        if data.score_self >= prev_score + 2 and data.result == 'win':
+            new_level += 1
+    elif current_level < 60:
+        if data.score_self > prev_score and event_count >= 1:
+            new_level += 1
+    elif current_level < 90:
+        if consecutive_losses >= 3:
+            new_level = max(60, new_level - 1)
+        elif data.score_self > prev_score and event_count >= 2:
+            new_level += 1
+    elif current_level < 100:
+        if data.result == 'lose':
+            new_level = max(90, new_level - 1)
+        elif data.result == 'win' and event_count >= 3:
+            new_level += 1
+
+    new_level = min(101, max(1, new_level))
+    cursor.execute("UPDATE users SET level_real=%s, consecutive_losses=%s WHERE username=%s", (new_level, consecutive_losses, data.username))
+    
+    # --- KIỂM TRA THÀNH TÍCH (ACHIEVEMENTS) ---
+    # 1. First Win
+    if data.result == 'win':
+        cursor.execute("SELECT COUNT(id) as win_count FROM match_history WHERE username=%s AND result='win'", (data.username,))
+        win_count = cursor.fetchone()['win_count']
+        if win_count == 1:
+            cursor.execute("INSERT INTO user_achievements (username, achievement_id, unlocked_at) VALUES (%s, 'first_win', %s) ON CONFLICT DO NOTHING", (data.username, played_at))
+        elif win_count == 10:
+            cursor.execute("INSERT INTO user_achievements (username, achievement_id, unlocked_at) VALUES (%s, 'win_10', %s) ON CONFLICT DO NOTHING", (data.username, played_at))
+            
+    # 2. Hoàn mỹ (Không có ngụy biện)
+    if data.fallacies_self == 0:
+        cursor.execute("INSERT INTO user_achievements (username, achievement_id, unlocked_at) VALUES (%s, 'perfect_logic', %s) ON CONFLICT DO NOTHING", (data.username, played_at))
+        
+    # 3. 100 Điểm
+    if data.score_self >= 100:
+        cursor.execute("INSERT INTO user_achievements (username, achievement_id, unlocked_at) VALUES (%s, 'perfect_score', %s) ON CONFLICT DO NOTHING", (data.username, played_at))
+        
     conn.commit()
     conn.close()
     return {"success": True}
@@ -574,16 +776,43 @@ def purchase_item(data: PurchaseRequest):
 
 @app.get("/my-info/{username}")
 def get_my_info(username: str):
-    """Lấy thông tin điểm số và vật phẩm của user"""
+    """Lấy thông tin profile đầy đủ của user"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute("SELECT store_points FROM users WHERE username=%s", (username,))
-    row = cursor.fetchone()
-    store_points = row['store_points'] if row and row['store_points'] else 0
+    
+    # Lấy thông tin user (points, avatar, frame, level, streak)
+    cursor.execute("SELECT store_points, avatar, frame, level_real, checkin_streak FROM users WHERE username=%s", (username,))
+    user_row = cursor.fetchone()
+    store_points = user_row['store_points'] if user_row and user_row['store_points'] else 0
+    avatar = user_row['avatar'] if user_row and user_row['avatar'] else ''
+    frame = user_row['frame'] if user_row and user_row['frame'] else 'none'
+    level_real = user_row['level_real'] if user_row and user_row['level_real'] else 1
+    checkin_streak = user_row['checkin_streak'] if user_row and user_row['checkin_streak'] else 0
+    
+    # Lấy items
     cursor.execute("SELECT item_id FROM user_items WHERE username=%s", (username,))
     items = [r['item_id'] for r in cursor.fetchall()]
+    
+    # Lấy achievements
+    cursor.execute("SELECT achievement_id FROM user_achievements WHERE username=%s", (username,))
+    achievements = [r['achievement_id'] for r in cursor.fetchall()]
+    
+    # Lấy số thông báo chưa đọc
+    cursor.execute("SELECT COUNT(id) as unread FROM notifications WHERE username=%s AND is_read=FALSE", (username,))
+    unread = cursor.fetchone()['unread']
+    
     conn.close()
-    return {"success": True, "store_points": store_points, "items": items}
+    return {
+        "success": True, 
+        "store_points": store_points, 
+        "avatar": avatar,
+        "frame": frame,
+        "items": items,
+        "achievements": achievements,
+        "unread_notifications": unread,
+        "level_real": level_real,
+        "checkin_streak": checkin_streak
+    }
 
 class CheckinRequest(BaseModel):
     username: str
@@ -602,13 +831,37 @@ def server_checkin(data: CheckinRequest):
     conn.close()
     return {"success": True, "store_points": row['store_points'] if row else 50}
 
+class PenaltyRequest(BaseModel):
+    username: str
+
+@app.post("/deduct-penalty")
+def deduct_penalty(data: PenaltyRequest):
+    """Trừ 1 điểm tích lũy khi không bấm Sẵn Sàng đúng hạn"""
+    if data.username == 'guest':
+        return {"success": True}
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET store_points = GREATEST(0, COALESCE(store_points,0) - 1) WHERE username=%s", (data.username,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
 @app.get("/events")
 def get_events():
-    """Lấy danh sách sự kiện theo trạng thái"""
+    """Lấy danh sách sự kiện theo trạng thái. Event lớn bị khóa nếu event nhỏ chưa kết thúc."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    cursor.execute("SELECT COUNT(*) as count FROM events WHERE event_type = 'small' AND status IN ('open', 'upcoming')")
+    active_small = cursor.fetchone()['count'] > 0
+    
     cursor.execute("SELECT * FROM events ORDER BY event_type DESC, status ASC")
     rows = list(cursor.fetchall())
+    
+    for r in rows:
+        if r['event_type'] == 'large' and active_small:
+            r['status'] = 'locked'
+            
     conn.close()
     return {"success": True, "events": rows}
 
@@ -697,6 +950,59 @@ def get_event_submission(event_id: int, username: str):
         return {"success": True, "content": row['submission_text'] or ""}
     return {"success": False, "error": "Not found"}
 
+@app.get("/event-submissions-list/{event_id}")
+def get_event_submissions_list(event_id: int):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("""
+        SELECT ep.id as participant_id, ep.username, ep.submission_text,
+               (SELECT COUNT(*) FROM submission_votes sv WHERE sv.participant_id = ep.id) as votes
+        FROM event_participants ep
+        WHERE ep.event_id = %s AND ep.submission_text IS NOT NULL AND ep.submission_text != ''
+        ORDER BY votes DESC, ep.joined_at DESC
+    """, (event_id,))
+    rows = list(cursor.fetchall())
+    conn.close()
+    return {"success": True, "submissions": rows}
+
+class VoteSubmission(BaseModel):
+    participant_id: int
+    voter_username: str
+
+@app.post("/vote-submission")
+def vote_submission(data: VoteSubmission):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        # Check daily limit
+        cursor.execute("SELECT COUNT(*) as count FROM submission_votes WHERE username = %s AND DATE(voted_at) = CURRENT_DATE", (data.voter_username,))
+        today_votes = cursor.fetchone()['count']
+        if today_votes >= 10:
+            return {"success": False, "error": "Bạn đã hết 10 lượt vote trong ngày hôm nay."}
+        
+        # Ensure not voting for self
+        cursor.execute("SELECT username FROM event_participants WHERE id = %s", (data.participant_id,))
+        participant = cursor.fetchone()
+        if participant and participant['username'] == data.voter_username:
+            return {"success": False, "error": "Bạn không thể tự vote cho chính mình."}
+
+        # Check if already voted
+        cursor.execute("SELECT COUNT(*) as count FROM submission_votes WHERE username = %s AND participant_id = %s", (data.voter_username, data.participant_id))
+        if cursor.fetchone()['count'] > 0:
+            return {"success": False, "error": "Bạn đã vote cho bài viết này rồi."}
+            
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("INSERT INTO submission_votes (participant_id, username, voted_at) VALUES (%s, %s, %s)", (data.participant_id, data.voter_username, now))
+        conn.commit()
+        return {"success": True, "remaining_votes": 9 - today_votes}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
 @app.get("/history/{username}")
 def get_history(username: str, limit: int = 20):
     """Lấy lịch sử trận đấu của user"""
@@ -705,7 +1011,7 @@ def get_history(username: str, limit: int = 20):
     cursor.execute("""
         SELECT id, opponent, topic, mode, result,
                score_self, score_opp, fallacies_self, fallacies_opp,
-               summary, played_at
+               summary, played_at, transcript_self, transcript_opp
         FROM match_history
         WHERE username = %s
         ORDER BY played_at DESC
@@ -733,7 +1039,7 @@ def get_leaderboard(limit: int = 10):
                ROUND(AVG(CASE WHEN score_self > 0 THEN score_self ELSE NULL END), 1) as avg_score
         FROM match_history
         GROUP BY username
-        HAVING total_matches > 0
+        HAVING COUNT(id) > 0
         ORDER BY wins DESC, avg_score DESC
         LIMIT %s
     """, (limit,))
@@ -782,6 +1088,17 @@ def send_friend_request(data: FriendAction):
         conn.close()
         return {"success": False, "error": "Người chơi không tồn tại"}
         
+    # Check giới hạn 100 bạn bè
+    cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (data.user, data.user))
+    if cursor.fetchone()['count'] >= 100:
+        conn.close()
+        return {"success": False, "error": "Bạn đã đạt giới hạn tối đa 100 bạn bè."}
+        
+    cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (data.target, data.target))
+    if cursor.fetchone()['count'] >= 100:
+        conn.close()
+        return {"success": False, "error": "Người này đã đạt giới hạn tối đa 100 bạn bè."}
+        
     # Kiểm tra đã là bạn chưa
     cursor.execute("""
         SELECT id FROM friends 
@@ -804,6 +1121,13 @@ def send_friend_request(data: FriendAction):
 def accept_friend(data: FriendAction):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    # Check giới hạn 100 bạn bè
+    cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (data.user, data.user))
+    if cursor.fetchone()['count'] >= 100:
+        conn.close()
+        return {"success": False, "error": "Bạn đã đạt giới hạn tối đa 100 bạn bè."}
+        
     cursor.execute("DELETE FROM friend_requests WHERE sender = %s AND receiver = %s", (data.target, data.user))
     try:
         cursor.execute("INSERT INTO friends (user1, user2) VALUES (%s, %s) ON CONFLICT (user1, user2) DO NOTHING", (data.user, data.target))
@@ -948,6 +1272,67 @@ async def check_argument(input: ArgInput):
             
     return {"match": True, "score": 100} # Mặc định đúng nếu lỗi model
 
+@app.post("/analyze-text")
+async def analyze_text(input: TextAnalyzeInput):
+    """Phân tích ngụy biện và gian lận (AI generated) cho chế độ gõ văn bản"""
+    if len(input.text.strip()) < 10:
+        return {"fallacy": None, "is_fallacy": False, "is_ai": False, "score_deduct": 0, "message": ""}
+        
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"error": "Chưa config GEMINI_API_KEY", "is_fallacy": False, "is_ai": False}
+        
+    try:
+        gemini = genai.GenerativeModel(
+            "gemini-3.1-flash-lite-preview",
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                max_output_tokens=200,
+                temperature=0.1,
+            )
+        )
+        prompt = f"""Phân tích câu nói sau trong cuộc tranh biện về chủ đề "{input.topic}".
+        Câu nói: "{input.text}"
+        Hãy đánh giá:
+        1. Có chứa từ ngữ xúc phạm, chửi thề, thô tục hoặc độc hại không? (is_profanity)
+        2. Có hoàn toàn lạc đề, không liên quan gì đến chủ đề tranh biện không? (is_off_topic)
+        3. Câu nói có cực kỳ hay, lập luận sắc bén, "tuyệt cú mèo" không? (is_excellent)
+        4. Có ngụy biện logic không? (is_fallacy, fallacy_name_vi)
+        5. Đoạn văn này có dấu hiệu rõ ràng của việc copy từ AI (như ChatGPT, Gemini) hay không?
+        
+        Trả về JSON đúng với các khóa (keys) sau:
+        {{
+            "is_profanity": false,
+            "is_off_topic": false,
+            "is_excellent": false,
+            "is_fallacy": false,
+            "fallacy_name_vi": "",
+            "fallacy_name_en": "",
+            "is_ai_generated": false,
+            "ai_reason": ""
+        }}
+        Lưu ý: Chỉ trả về true/false thực sự dựa trên đánh giá, không copy y nguyên cấu trúc ví dụ."""
+        response = await asyncio.to_thread(gemini.generate_content, prompt)
+        text = response.text
+        match = re.search(r'\{.*\}', text, re.DOTALL)
+        if match:
+            res = json.loads(match.group())
+            return {
+                "fallacy": res.get("fallacy_name_vi") if res.get("is_fallacy") else None,
+                "fallacy_en": res.get("fallacy_name_en"),
+                "is_fallacy": res.get("is_fallacy", False),
+                "is_ai": res.get("is_ai_generated", False),
+                "ai_reason": res.get("ai_reason", ""),
+                "is_profanity": res.get("is_profanity", False),
+                "is_off_topic": res.get("is_off_topic", False),
+                "is_excellent": res.get("is_excellent", False),
+                "speaker": input.speaker
+            }
+    except Exception as e:
+        print(f"Lỗi phân tích Text: {e}")
+        
+    return {"is_fallacy": False, "is_ai": False}
+
 @app.post("/hint")
 async def get_hint(context: DebateContext):
     """Tạo gợi ý ngắn gọn (Hint Bot) cho user dựa trên lời của đối thủ"""
@@ -1062,4 +1447,102 @@ JSON format (bắt buộc):
 
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# --- ACHIEVEMENTS & STATS ---
+@app.get("/fallacy-stats/{username}")
+def get_fallacy_stats(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT fallacies_list_self FROM match_history WHERE username=%s AND fallacies_list_self != ''", (username,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    stats = {}
+    for row in rows:
+        fallacies = row['fallacies_list_self'].split(',')
+        for f in fallacies:
+            f = f.strip()
+            if f:
+                stats[f] = stats.get(f, 0) + 1
+    
+    return {"success": True, "stats": stats}
+
+# --- PROFILE & NOTIFICATIONS ---
+class UpdateProfile(BaseModel):
+    username: str
+    avatar: str
+    frame: str
+
+@app.post("/update-profile")
+def update_profile(data: UpdateProfile):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET avatar=%s, frame=%s WHERE username=%s", (data.avatar, data.frame, data.username))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/notifications/{username}")
+def get_notifications(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT * FROM notifications WHERE username=%s ORDER BY id DESC LIMIT 20", (username,))
+    rows = cursor.fetchall()
+    conn.close()
+    return {"success": True, "notifications": rows}
+
+@app.post("/notifications/read/{notif_id}")
+def mark_notification_read(notif_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE notifications SET is_read=TRUE WHERE id=%s", (notif_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+# --- MENTORSHIP ---
+class MentorshipRequest(BaseModel):
+    master: str
+    disciple: str
+
+@app.post("/mentorship/request")
+def request_mentorship(data: MentorshipRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    
+    try:
+        cursor.execute("INSERT INTO mentorship (master, disciple, start_date) VALUES (%s, %s, %s)", (data.master, data.disciple, now))
+        # Create notification for master
+        cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                       (data.master, "mentorship", f"{data.disciple} muốn bái bạn làm sư phụ!", now))
+        conn.commit()
+        success = True
+        error = ""
+    except Exception as e:
+        conn.rollback()
+        success = False
+        error = "Đã có quan hệ sư đồ hoặc lỗi hệ thống."
+    finally:
+        conn.close()
+        
+    return {"success": success, "error": error}
+
+@app.get("/mentorship/{username}")
+def get_mentorship(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # Check if they are a master
+    cursor.execute("SELECT * FROM mentorship WHERE master=%s", (username,))
+    disciples = cursor.fetchall()
+    # Check if they are a disciple
+    cursor.execute("SELECT * FROM mentorship WHERE disciple=%s", (username,))
+    masters = cursor.fetchall()
+    conn.close()
+    return {"success": True, "disciples": disciples, "masters": masters}
+
+
+
+
 

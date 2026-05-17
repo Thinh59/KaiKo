@@ -1,6 +1,26 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 
 export default function HomePage({ onPlay }) {
+  useEffect(() => {
+    // Add particles on mount
+    const container = document.createElement('div')
+    container.id = 'home-particles'
+    document.body.appendChild(container)
+    for (let i = 0; i < 15; i++) {
+      const p = document.createElement('div')
+      p.className = 'particle'
+      p.style.left = `${Math.random() * 100}vw`
+      p.style.width = `${Math.random() * 5 + 2}px`
+      p.style.height = p.style.width
+      p.style.animationDuration = `${Math.random() * 10 + 5}s`
+      p.style.animationDelay = `${Math.random() * 5}s`
+      container.appendChild(p)
+    }
+    return () => {
+      document.getElementById('home-particles')?.remove()
+    }
+  }, [])
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -26,7 +46,7 @@ export default function HomePage({ onPlay }) {
         <div style={{ display: 'flex', gap: '20px', justifyContent: 'center' }}>
           <button 
             onClick={onPlay}
-            className="btn-primary hover-scale"
+            className="btn-primary hover-scale btn-play-shine"
             style={{ 
               padding: '24px 64px', 
               fontSize: '2rem', 
@@ -46,15 +66,15 @@ export default function HomePage({ onPlay }) {
         </div>
 
         <div style={{ marginTop: '6rem', display: 'flex', gap: '4rem', justifyContent: 'center', opacity: 0.9 }}>
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🤖</div>
             <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Phân tích Real-time</div>
           </div>
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>⚔️</div>
             <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Đối kháng 1v1</div>
           </div>
-          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '20px', borderRadius: '16px', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
             <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🏆</div>
             <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Hệ thống Rank</div>
           </div>
@@ -63,3 +83,4 @@ export default function HomePage({ onPlay }) {
     </div>
   )
 }
+

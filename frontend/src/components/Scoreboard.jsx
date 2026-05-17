@@ -14,7 +14,7 @@ function Badge({ type, text }) {
   )
 }
 
-function PlayerCard({ name, data, videoScores, audioScores }) {
+function PlayerCard({ name, data, transcript }) {
   const [tab, setTab] = useState('score')
 
   return (
@@ -27,7 +27,7 @@ function PlayerCard({ name, data, videoScores, audioScores }) {
       </div>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-light)', background: 'rgba(0,0,0,0.2)' }}>
-        {['score', 'analysis', 'tips'].map(t => (
+        {['score', 'analysis', 'tips', 'transcript'].map(t => (
           <button key={t} onClick={() => setTab(t)} style={{
             flex: 1, padding: '12px 0', border: 'none', cursor: 'pointer',
             background: tab === t ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
@@ -36,7 +36,7 @@ function PlayerCard({ name, data, videoScores, audioScores }) {
             fontWeight: tab === t ? '600' : 'normal', fontSize: '0.95rem',
             transition: 'all 0.3s'
           }}>
-            {{ score: '📊 Điểm', analysis: '🔍 Phân tích', tips: '💡 Gợi ý' }[t]}
+            {{ score: '📊 Điểm', analysis: '🔍 Phân tích', tips: '💡 Gợi ý', transcript: '📜 Ghi âm' }[t]}
           </button>
         ))}
       </div>
@@ -105,6 +105,17 @@ function PlayerCard({ name, data, videoScores, audioScores }) {
             )) : <span style={{ color: 'var(--text-secondary)' }}>Chưa có gợi ý</span>}
           </div>
         )}
+
+        {tab === 'transcript' && (
+          <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+             <p style={{ fontWeight: '600', marginBottom: '12px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+               <span>📜</span> Nội dung phát biểu / Chat:
+             </p>
+             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '15px', borderRadius: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {transcript || 'Không có dữ liệu ghi âm / chat.'}
+             </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -112,7 +123,7 @@ function PlayerCard({ name, data, videoScores, audioScores }) {
 
 export default function Scoreboard({ result, onRestart }) {
   if (!result) return null
-  const { scores, playerA, playerB } = result
+  const { scores, playerA, playerB, transcript_a, transcript_b } = result
 
   return (
     <div style={{ maxWidth: 1000, margin: '40px auto', padding: '24px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
@@ -126,8 +137,8 @@ export default function Scoreboard({ result, onRestart }) {
       </div>
 
       <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <PlayerCard name={playerA} data={scores?.player_a} />
-        <PlayerCard name={playerB} data={scores?.player_b} />
+        <PlayerCard name={playerA} data={scores?.player_a} transcript={transcript_a} />
+        <PlayerCard name={playerB} data={scores?.player_b} transcript={transcript_b} />
       </div>
 
       {scores?.comment && (

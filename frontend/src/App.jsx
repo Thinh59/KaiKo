@@ -9,7 +9,97 @@ import RoomWaiting from './components/RoomWaiting'
 import ReadyCheck from './components/ReadyCheck'
 import DebateRoom from './components/DebateRoom'
 import Scoreboard from './components/Scoreboard'
+import MusicPlayer from './components/MusicPlayer'
+import TextDebateRoom from './components/TextDebateRoom'
 import { useSignaling } from './hooks/useSignaling'
+
+const DIALOGUES = [
+  "(◕‿◕✿) Cố lên nhé!",
+  "KaiKo siêu cấp vô địch! 🦀",
+  "Hãy trở thành vua tranh biện nào! 👑",
+  "Bạn đã xem bảng xếp hạng chưa? 🏆",
+  "Hôm nay kiếm được bao nhiêu điểm rồi? ⭐",
+  "Vote bài trong sự kiện để nhận điểm nha! 🎁",
+  "Tranh luận vui vẻ, không quạu nha! ╰(▔∀▔)╯",
+];
+
+const ANIMATIONS = [
+  'floatMascotTopRight',
+  'flyAcrossScreen',
+  'bounceAround'
+];
+
+function InteractiveMascot() {
+  const [dialogue, setDialogue] = useState(DIALOGUES[0]);
+  const [animClass, setAnimClass] = useState(ANIMATIONS[0]);
+  const [showBubble, setShowBubble] = useState(false); // Ẩn mặc định
+
+  // Tự động biến mất sau 5s
+  useEffect(() => {
+    let hideTimer;
+    if (showBubble) {
+      hideTimer = setTimeout(() => {
+        setShowBubble(false);
+      }, 5000);
+    }
+    return () => clearTimeout(hideTimer);
+  }, [showBubble, dialogue]);
+
+  // Lâu lâu tự hiện thoại (ngẫu nhiên 10 - 20s)
+  useEffect(() => {
+    let randomTimer;
+    const triggerRandomTalk = () => {
+      const nextDelay = Math.random() * 10000 + 10000; // 10s -> 20s
+      randomTimer = setTimeout(() => {
+        if (!showBubble) {
+          setDialogue(DIALOGUES[Math.floor(Math.random() * DIALOGUES.length)]);
+          setShowBubble(true);
+        }
+        triggerRandomTalk(); // loop
+      }, nextDelay);
+    };
+    triggerRandomTalk();
+    return () => clearTimeout(randomTimer);
+  }, []);
+
+  const handleClick = () => {
+    // Đổi thoại ngẫu nhiên (tránh trùng cái hiện tại)
+    let newD = dialogue;
+    while (newD === dialogue) {
+      newD = DIALOGUES[Math.floor(Math.random() * DIALOGUES.length)];
+    }
+    setDialogue(newD);
+
+    // Đổi animation ngẫu nhiên
+    let newA = animClass;
+    while (newA === animClass) {
+      newA = ANIMATIONS[Math.floor(Math.random() * ANIMATIONS.length)];
+    }
+    setAnimClass(newA);
+    
+    // Hiện bubble
+    setShowBubble(true);
+  };
+
+  return (
+    <div 
+      className={`floating-mascot-interactive ${animClass}`} 
+      onClick={handleClick}
+    >
+      {showBubble && (
+        <div className="mascot-bubble mascot-bubble-interactive">
+          {dialogue}
+        </div>
+      )}
+      <img 
+        src="/assets/mascots/mascot.png" 
+        alt="Mascot" 
+        style={{ width: '130px', height: '130px', filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.6))', cursor: 'pointer' }} 
+        onError={e => { e.target.style.display='none'; }} 
+      />
+    </div>
+  );
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -87,9 +177,9 @@ function App() {
   // 3. Nếu cả 2 cùng ready, vào phòng Debate
   useEffect(() => {
     if (selfReady && oppReady && page === 'ready_check') {
-      setPage('debate')
+      setPage(mode?.startsWith('text_') ? 'text_debate' : 'debate')
     }
-  }, [selfReady, oppReady, page])
+  }, [selfReady, oppReady, page, mode])
 
   // Clerk Hooks
   const { isSignedIn, user } = useUser()
@@ -124,14 +214,14 @@ function App() {
 
   const handleModeSelect = async (info) => {
     setMode(info.mode)
-    if (info.mode === 'solo_ai') {
+    if (info.mode === 'solo_ai' || info.mode === 'text_solo') {
       try {
         const res = await axios.get(`${API_BASE}/random-topic`)
         if (res.data.success) setSoloTopic(res.data.topic)
       } catch(e) {
         console.warn("Failed to fetch random topic", e)
       }
-      setPage('debate')
+      setPage(info.mode === 'text_solo' ? 'text_debate' : 'debate')
     } else if (info.mode === 'custom_create') {
       setPage('waiting')
       createRoom()
@@ -175,6 +265,8 @@ function App() {
           fallacies_self: scores?.player_a?.deduct ?? 0,
           fallacies_opp:  scores?.player_b?.deduct ?? 0,
           summary:        scores?.why ?? '',
+          transcript_self: result.transcript_a ?? '',
+          transcript_opp:  result.transcript_b ?? '',
         })
       } catch (err) {
         console.warn('Không lưu được lịch sử:', err.message)
@@ -194,6 +286,8 @@ function App() {
       playerA: match.username,
       playerB: match.opponent,
       topic: match.topic,
+      transcript_a: match.transcript_self,
+      transcript_b: match.transcript_opp,
       scores: {
         player_a: { total: match.score_self, deduct: match.fallacies_self },
         player_b: { total: match.score_opp, deduct: match.fallacies_opp },
@@ -218,28 +312,21 @@ function App() {
 
   // --- RENDERS ---
 
+  let content = null;
   if (window.location.pathname === '/sso-callback') {
-    return <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />;
-  }
-
-  if (page === 'home') {
-    return <HomePage onPlay={handlePlayNowClick} />
-  }
-
-  if (page === 'auth') {
-    return <AuthPage onLogin={handleLogin} />
-  }
-
-  if (page === 'dashboard') {
-    return (
+    content = <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />;
+  } else if (page === 'home') {
+    content = <HomePage onPlay={handlePlayNowClick} />
+  } else if (page === 'auth') {
+    content = <AuthPage onLogin={handleLogin} />
+  } else if (page === 'dashboard') {
+    content = (
       <ErrorBoundary>
         <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} />
       </ErrorBoundary>
     )
-  }
-
-  if (page === 'mode') {
-    return (
+  } else if (page === 'mode') {
+    content = (
       <div>
         <ModeSelector onSelect={handleModeSelect} />
         <button
@@ -251,10 +338,8 @@ function App() {
         </button>
       </div>
     )
-  }
-
-  if (page === 'waiting') {
-    return (
+  } else if (page === 'waiting') {
+    content = (
       <RoomWaiting
         onCancel={handleRoomCancel}
         roomError={roomError}
@@ -262,10 +347,8 @@ function App() {
         mode={mode}
       />
     )
-  }
-
-  if (page === 'ready_check') {
-    return (
+  } else if (page === 'ready_check') {
+    content = (
       <ReadyCheck 
         matchInfo={matchInfo} 
         onReady={handleSelfReady} 
@@ -273,10 +356,7 @@ function App() {
         getDisplayName={getDisplayName}
       />
     )
-  }
-
-  if (page === 'debate') {
-    // Nếu là Solo AI, tự tạo thông tin mock
+  } else if (page === 'debate') {
     const currentMatch = mode === 'solo_ai' ? {
       topic: soloTopic,
       isHost: true,
@@ -288,13 +368,12 @@ function App() {
 
     const roomData = {
       topic: currentMatch?.topic || 'Chủ đề ngẫu nhiên',
-      // Host luôn là Player A, Guest luôn là Player B
       playerA: isHost ? getDisplayName(username) : opponentName,
       playerB: isHost ? opponentName : getDisplayName(username),
-      isLocalHost: isHost // Lưu lại để DebateRoom biết mình là ai
+      isLocalHost: isHost
     }
 
-    return (
+    content = (
       <DebateRoom
         roomData={roomData}
         roomInfo={currentMatch}
@@ -309,18 +388,63 @@ function App() {
         }}
       />
     )
-  }
+  } else if (page === 'text_debate') {
+    const currentMatch = mode === 'text_solo' ? {
+      topic: soloTopic,
+      isHost: true,
+      opponentId: 'ai_bot'
+    } : matchInfo
 
-  if (page === 'score') {
-    return (
+    const isHost = mode === 'text_solo' ? true : currentMatch?.isHost
+    const opponentName = mode === 'text_solo' ? 'AI Gemini' : (currentMatch?.opponentName || currentMatch?.opponentId || 'Đối thủ')
+
+    const roomData = {
+      topic: currentMatch?.topic || 'Chủ đề ngẫu nhiên',
+      playerA: isHost ? getDisplayName(username) : opponentName,
+      playerB: isHost ? opponentName : getDisplayName(username),
+      isLocalHost: isHost
+    }
+
+    content = (
+      <TextDebateRoom
+        roomData={roomData}
+        roomInfo={currentMatch}
+        mode={mode}
+        username={username}
+        onFinish={handleDebateFinish}
+        registerHandler={registerHandler}
+        sendMessage={sendMessage}
+        onCancel={() => {
+          if (mode !== 'text_solo') cancelMatch()
+          setMode(null)
+          setPage('mode')
+        }}
+      />
+    )
+  } else if (page === 'score') {
+    content = (
       <Scoreboard
         result={debateResult}
         onRestart={handleRestart}
       />
     )
+  } else {
+    content = <div>Error: Unknown page</div>
   }
 
-  return <div>Error: Unknown page</div>
+  return (
+    <>
+      {content}
+      {page !== 'home' && page !== 'auth' && (
+        <>
+          <InteractiveMascot />
+          <ErrorBoundary>
+            <MusicPlayer />
+          </ErrorBoundary>
+        </>
+      )}
+    </>
+  )
 }
 
 export default App

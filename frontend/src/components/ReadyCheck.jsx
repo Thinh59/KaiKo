@@ -6,12 +6,23 @@ export default function ReadyCheck({ matchInfo, onReady, onCancel, getDisplayNam
 
   useEffect(() => {
     if (timeLeft <= 0) {
-      if (!isReady) onCancel()
+      if (!isReady) {
+        // Hết 30s không bấm sẵn sàng -> Bị trừ 1 điểm và tự động sẵn sàng
+        alert("Hết 30s! Bạn đã bị trừ 1 điểm và tự động chuyển trạng thái Sẵn Sàng.")
+        try {
+          fetch('http://localhost:8000/deduct-penalty', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username: localStorage.getItem('kaiko_username') || 'guest' })
+          })
+        } catch(e) {}
+        handleReady()
+      }
       return
     }
     const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000)
     return () => clearInterval(timer)
-  }, [timeLeft, isReady, onCancel])
+  }, [timeLeft, isReady])
 
   const handleReady = () => {
     setIsReady(true)

@@ -45,7 +45,6 @@ function HistoryRow({ match, onClick }) {
         <div style={{ fontSize: '0.7rem', color: meta.color, fontWeight: '700' }}>{meta.label}</div>
       </div>
 
-      {/* Topic + opponent */}
       <div>
         <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.95rem',
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
@@ -53,7 +52,10 @@ function HistoryRow({ match, onClick }) {
         </p>
         <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
           vs <strong style={{ color: '#a855f7' }}>{match.opponent}</strong>
-          {'  ·  '}{match.mode === 'solo_ai' ? '🤖 Solo AI' : '👥 1v1'}
+          {'  ·  '}
+          {match.mode?.startsWith('text_') ? '💬 Chat' : match.mode === 'solo_ai' ? '🤖 Solo AI' : '🎥 Video'}
+          {' '}
+          {match.mode === 'text_1v1' ? '1v1' : match.mode === 'text_solo' ? 'Solo' : match.mode === '1v1' ? '1v1' : ''}
           {'  ·  '}{date}
         </p>
       </div>
@@ -81,9 +83,9 @@ function HistoryRow({ match, onClick }) {
       {/* Mode badge */}
       <div style={{ textAlign: 'right' }}>
         <span style={{
-          background: 'rgba(99,102,241,0.1)',
-          color: 'var(--accent-primary)',
-          border: '1px solid rgba(99,102,241,0.3)',
+          background: match.mode?.startsWith('text_') ? 'rgba(168,85,247,0.12)' : 'rgba(99,102,241,0.1)',
+          color: match.mode?.startsWith('text_') ? '#a855f7' : 'var(--accent-primary)',
+          border: `1px solid ${match.mode?.startsWith('text_') ? 'rgba(168,85,247,0.3)' : 'rgba(99,102,241,0.3)'}`,
           borderRadius: 'var(--radius-full)',
           padding: '3px 10px',
           fontSize: '0.78rem',
@@ -159,9 +161,97 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
   );
 };
 
+const EventVotingModal = ({ event, onClose, username }) => {
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, [event.id]);
+
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE}/event-submissions-list/${event.id}`);
+      if (res.data.success) {
+        setSubmissions(res.data.submissions);
+      }
+    } catch(e) {}
+    setLoading(false);
+  };
+
+  const handleVote = async (participantId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/vote-submission`, { participant_id: participantId, voter_username: username });
+      if (res.data.success) {
+        alert(`Bình chọn thành công! Bạn còn ${res.data.remaining_votes} lượt vote hôm nay.`);
+        fetchSubmissions(); // reload to update vote counts
+      } else {
+        alert(res.data.error || 'Lỗi bình chọn!');
+      }
+    } catch(e) {
+      alert('Lỗi kết nối!');
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--bg-primary)', width: '90%', maxWidth: '800px', borderRadius: '16px', padding: '24px', border: '1px solid var(--accent-primary)', display: 'flex', flexDirection: 'column', height: '80vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>👍 Bình chọn: {event.title}</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+        </div>
+        
+        {loading ? <p style={{ color: 'var(--text-secondary)' }}>Đang tải danh sách bài viết...</p> : (
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', paddingRight: '10px' }}>
+            {submissions.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)' }}>Chưa có bài viết nào cho sự kiện này.</p>
+            ) : (
+              submissions.map(sub => {
+                const isExpanded = expandedId === sub.participant_id;
+                return (
+                  <div key={sub.participant_id} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>@{sub.username}</div>
+                      <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>⭐ {sub.votes} Votes</div>
+                    </div>
+                    <div 
+                      style={{ 
+                        color: 'var(--text-primary)', 
+                        maxHeight: isExpanded ? 'none' : '60px', 
+                        overflow: 'hidden',
+                        position: 'relative',
+                        whiteSpace: 'pre-wrap'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: sub.submission_text }}
+                    />
+                    {!isExpanded && (
+                      <div style={{ textAlign: 'center', marginTop: '-10px', position: 'relative', zIndex: 1, background: 'linear-gradient(transparent, var(--bg-primary))', paddingTop: '20px' }}>
+                        <button onClick={() => setExpandedId(sub.participant_id)} style={{ background: 'transparent', border: 'none', color: '#3b82f6', cursor: 'pointer', textDecoration: 'underline' }}>Xem cả bài</button>
+                      </div>
+                    )}
+                    {isExpanded && (
+                      <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                        <button onClick={() => setExpandedId(null)} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', textDecoration: 'underline', marginRight: '15px' }}>Thu gọn</button>
+                        <button onClick={() => handleVote(sub.participant_id)} className="btn-primary" style={{ padding: '6px 16px', borderRadius: '20px', fontSize: '0.9rem' }}>👍 Vote bài này</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [activeTab, setActiveTab] = useState('home')
   const [activeEvent, setActiveEvent] = useState(null)
+  const [activeVotingEvent, setActiveVotingEvent] = useState(null)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
@@ -173,6 +263,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [avatarFrame, setAvatarFrame] = useState(localStorage.getItem('kaiko_frame') || 'none')
   const [hasCheckedIn, setHasCheckedIn] = useState(localStorage.getItem('kaiko_checkin_' + username) === new Date().toLocaleDateString('vi-VN'))
   const [extraPoints, setExtraPoints] = useState(parseInt(localStorage.getItem('kaiko_extra_points_' + username) || '0'))
+  const [realLevel, setRealLevel] = useState(1)
+  const [checkinStreak, setCheckinStreak] = useState(0)
 
   const [friends, setFriends] = useState([])
   const [friendRequests, setFriendRequests] = useState([])
@@ -189,6 +281,15 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [selectedBadges, setSelectedBadges] = useState(() => {
     try { return JSON.parse(localStorage.getItem('kaiko_badges_' + username) || '[]') } catch { return [] }
   })
+  
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [achievements, setAchievements] = useState([])
+  const [fallacyStats, setFallacyStats] = useState({})
+  const [mentorData, setMentorData] = useState({ masters: [], disciples: [] })
+  const [mentorInput, setMentorInput] = useState('')
+  const [historyFilter, setHistoryFilter] = useState('all')
 
   // All badge-type items with their image mappings
   const RANK_BADGE_CATALOG = [
@@ -238,6 +339,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
       if (res.data.success) {
         setServerPoints(res.data.store_points || 0)
         setMyItems(res.data.items || [])
+        setAchievements(res.data.achievements || [])
+        setUnreadCount(res.data.unread_notifications || 0)
+        if (res.data.level_real) setRealLevel(res.data.level_real)
+        if (res.data.checkin_streak) setCheckinStreak(res.data.checkin_streak)
+        if (res.data.avatar) {
+          setSelectedAvatar(res.data.avatar)
+          localStorage.setItem('kaiko_avatar_' + username, res.data.avatar)
+        }
+        if (res.data.frame) {
+          setAvatarFrame(res.data.frame)
+          localStorage.setItem('kaiko_frame', res.data.frame)
+        }
       }
     } catch(e) {}
   }, [username, isGuest])
@@ -369,7 +482,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
             const draws  = h.filter(m => m.result === 'draw').length
             const exp = wins * 10 + draws * 2 - losses * 2
             const finalExp = Math.max(0, exp)
-            const level = Math.floor(finalExp / 100) + 1
+            const calculatedLevel = Math.floor(finalExp / 100) + 1
+            const level = Math.min(calculatedLevel, 101)
             const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
             setSelectedUserStats({ wins, losses, draws, total: h.length, level, avgScore, exp: finalExp })
         }
@@ -378,9 +492,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     }
   }
 
-  const handleFrameChange = (e) => {
-    setAvatarFrame(e.target.value)
-    localStorage.setItem('kaiko_frame', e.target.value)
+  const handleFrameChange = async (e) => {
+    const val = e.target.value
+    setAvatarFrame(val)
+    localStorage.setItem('kaiko_frame', val)
+    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: selectedAvatar, frame: val }).catch(()=>{})
+  }
+
+  const handleAvatarChange = async (e) => {
+    const val = e.target.value
+    setSelectedAvatar(val)
+    localStorage.setItem('kaiko_avatar_' + username, val)
+    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: val, frame: avatarFrame }).catch(()=>{})
   }
 
   const frameFileMap = {
@@ -416,13 +539,29 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
         const draws  = h.filter(m => m.result === 'draw').length
         const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
         
-        // Tính toán EXP thực tế
-        const exp = wins * 10 + draws * 2 - losses * 2
+        // Tính toán EXP thực tế (Chat thấp hơn Video)
+        // Video/Solo: win=10, draw=2, lose=-2 | Chat: win=7, draw=1, lose=-1
+        const exp = h.reduce((acc, m) => {
+          const isChat = m.mode?.startsWith('text_')
+          if (m.result === 'win')  return acc + (isChat ? 7 : 10)
+          if (m.result === 'draw') return acc + (isChat ? 1 : 2)
+          if (m.result === 'lose') return acc + (isChat ? -1 : -2)
+          return acc
+        }, 0)
         const finalExp = Math.max(0, exp) // Chỉ điểm kinh nghiệm (Level)
-        const level = Math.floor(finalExp / 100) + 1
+        const calculatedLevel = Math.floor(finalExp / 100) + 1
         const currentExp = finalExp % 100
-        const points = extraPoints + wins * 5 // Điểm mua sắm (Tích lũy) = Điểm check-in + Điểm từ trận thắng
-        setStats({ wins, losses, draws, total: h.length, avgScore, level, exp: currentExp, totalExp: finalExp, points })
+        // Use realLevel from server if available, otherwise fallback to calculated
+        const finalLevel = realLevel > 1 ? realLevel : Math.min(calculatedLevel, 101)
+        // Điểm mua sắm cũng phân biệt: Video win=5, Chat win=3
+        const shopPoints = h.reduce((acc, m) => {
+          const isChat = m.mode?.startsWith('text_')
+          if (m.result === 'win')  return acc + (isChat ? 3 : 5)
+          if (m.result === 'draw') return acc + (isChat ? 0 : 1)
+          return acc
+        }, 0)
+        const points = extraPoints + shopPoints
+        setStats({ wins, losses, draws, total: h.length, avgScore, level: finalLevel, exp: currentExp, totalExp: finalExp, points })
       }
     } catch (err) {
       console.warn('Không tải được lịch sử:', err.message)
@@ -471,13 +610,45 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     }
   }, [username, isGuest])
 
+  const loadNotifications = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/notifications/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setNotifications(res.data.notifications)
+      }
+    } catch (e) {}
+  }, [username, isGuest])
+
+  const loadFallacyStats = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/fallacy-stats/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setFallacyStats(res.data.stats)
+      }
+    } catch (e) {}
+  }, [username, isGuest])
+
+  const loadMentorship = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/mentorship/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setMentorData({ masters: res.data.masters, disciples: res.data.disciples })
+      }
+    } catch (e) {}
+  }, [username, isGuest])
+
   useEffect(() => {
     if (activeTab === 'home' || activeTab === 'history') loadHistory()
     if (activeTab === 'leaderboard') loadLeaderboard()
     if (activeTab === 'friends') loadFriends()
     if (activeTab === 'events') { loadEvents(); loadMyEvents(); }
     if (activeTab === 'store' || activeTab === 'home') loadMyInfo()
-  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo])
+    if (activeTab === 'stats') loadFallacyStats()
+    if (activeTab === 'mentor') loadMentorship()
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo, loadFallacyStats, loadMentorship])
 
   // Polling for friend requests every 5 seconds
   useEffect(() => {
@@ -487,14 +658,16 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   }, [loadFriends, isGuest])
 
   const TABS = [
-    { id: 'profile',    icon: '👤', label: 'Hồ sơ cá nhân', color: '#a855f7' },
-    { id: 'history',    icon: '📋', label: 'Lịch sử trận đấu', color: '#3b82f6' },
-    { id: 'leaderboard',icon: '🏆', label: 'Bảng xếp hạng', color: '#f59e0b' },
+    { id: 'profile',    icon: '👤', label: 'Hồ sơ', color: '#a855f7' },
+    { id: 'history',    icon: '📋', label: 'Lịch sử', color: '#3b82f6' },
+    { id: 'leaderboard',icon: '🏆', label: 'BXH', color: '#f59e0b' },
     { id: 'friends',    icon: '👥', label: 'Bạn bè', color: '#10b981' },
     { id: 'events',     icon: '🎉', label: 'Sự kiện', color: '#ec4899' },
     { id: 'store',      icon: '🛒', label: 'Cửa hàng', color: '#eab308' },
-    { id: 'guide',      icon: '📖', label: 'Hướng dẫn', color: '#6366f1' },
-    { id: 'settings',   icon: '⚙️', label: 'Cài đặt', color: '#9ca3af' },
+    { id: 'stats',      icon: '📊', label: 'Thống Kê', color: '#ef4444' },
+    { id: 'mentor',     icon: '🎓', label: 'Bái Sư', color: '#8b5cf6' },
+    { id: 'community',  icon: '🌐', label: 'Cộng Đồng', color: '#14b8a6' },
+    { id: 'live',       icon: '📺', label: 'Xem Live', color: '#ef4444' },
   ]
 
   const getRankInfo = (level) => {
@@ -508,37 +681,144 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const currentLevel = isGuest ? 1 : (stats.level || 1)
   const rank = getRankInfo(currentLevel)
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+  // Rarity helper for rank
+  const getRarityClass = (level) => {
+    if (level >= 91) return 'rarity-legendary'
+    if (level >= 61) return 'rarity-epic'
+    if (level >= 31) return 'rarity-rare'
+    if (level >= 11) return 'rarity-rare'
+    return 'rarity-common'
+  }
 
-      {/* ── Header ── */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.5rem 2.5rem', marginBottom: '2rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.8rem' }}>
-              Xin chào, <span style={{ color: 'var(--accent-primary)' }}>{getDisplayName(username)}</span>!
-            </h2>
-            {isGuest ? (
-              <p style={{ margin: '6px 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                🔒 Tài khoản khách — lịch sử không được lưu. Đăng nhập để đua top!
-              </p>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                <span style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent-primary)', padding: '4px 10px', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.9rem', border: '1px solid rgba(99,102,241,0.3)' }}>
-                  Level {currentLevel}
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+
+      {/* ── Header with Avatar + EXP Bar ── */}
+      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 2rem', marginBottom: '1.5rem', gap: '20px' }}>
+        {/* Left: Avatar + Info */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
+          {/* Avatar circle with glow */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '50%',
+              background: rank.bg,
+              border: `3px solid ${rank.color}`,
+              boxShadow: `0 0 18px ${rank.color}60`,
+              overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: 'avatarGlow 3s ease-in-out infinite'
+            }}>
+              <img src={avatarUrl} alt="avatar"
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={e => e.target.src = `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`}
+              />
+            </div>
+            {avatarFrame !== 'none' && (
+              <img src={`/assets/frames/${frameFileMap[avatarFrame] || avatarFrame + '.png'}`}
+                alt="frame" style={{ position: 'absolute', top: '-18%', left: '-18%', width: '136%', height: '136%', pointerEvents: 'none', zIndex: 10 }}
+                onError={e => { e.target.style.display = 'none' }} />
+            )}
+            {/* Level badge */}
+            <div style={{
+              position: 'absolute', bottom: '-6px', left: '50%', transform: 'translateX(-50%)',
+              background: rank.color, color: '#fff', borderRadius: 'var(--radius-full)',
+              fontSize: '0.65rem', fontWeight: '800', padding: '1px 7px',
+              fontFamily: 'var(--font-heading)', letterSpacing: '0.05em', whiteSpace: 'nowrap',
+              boxShadow: `0 2px 8px ${rank.color}80`
+            }}>LV {currentLevel}</div>
+          </div>
+
+          {/* Name + rank + EXP bar */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '1.25rem', color: 'var(--text-primary)', letterSpacing: '0.02em' }}>
+                {getDisplayName(username)}
+              </span>
+              <span style={{
+                background: rank.bg, color: rank.color, padding: '2px 10px',
+                borderRadius: 'var(--radius-full)', fontSize: '0.78rem', fontWeight: '700',
+                border: `1px solid ${rank.color}60`, display: 'flex', alignItems: 'center', gap: '5px'
+              }}>
+                {rank.icon} {rank.title}
+              </span>
+              {!isGuest && (
+                <span style={{ fontSize: '0.78rem', color: '#f59e0b', fontWeight: '700' }}>
+                  ⭐ {serverPoints} pts
                 </span>
-                <span style={{ background: rank.bg, color: rank.color, padding: '4px 12px', borderRadius: '8px', fontWeight: '600', fontSize: '0.9rem', border: `1px solid ${rank.color}50`, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {rank.icon} {rank.title}
+              )}
+            </div>
+            {/* EXP Progress Bar */}
+            {!isGuest && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>EXP</span>
+                <div className="exp-bar-track" style={{ flex: 1, height: '12px' }}>
+                  <div className="exp-bar-fill" style={{ width: `${stats.exp || 0}%` }} />
+                </div>
+                <span style={{ fontSize: '0.7rem', color: rank.color, fontWeight: '700', whiteSpace: 'nowrap', fontFamily: 'var(--font-heading)' }}>
+                  {stats.exp || 0}<span style={{ opacity: 0.6 }}>/100</span>
                 </span>
               </div>
             )}
+            {isGuest && (
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>🔒 Khách — Đăng nhập để lưu tiến trình!</p>
+            )}
           </div>
         </div>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+
+        {/* Right: Logout & Notifications */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          
+          {/* Notification Bell */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={() => { setShowNotifications(!showNotifications); loadNotifications(); }}
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', position: 'relative' }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <div style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg-primary)' }}>
+                  {unreadCount}
+                </div>
+              )}
+            </button>
+
+            {/* Dropdown */}
+            {showNotifications && (
+              <div className="glass-panel animate-fade-in" style={{ position: 'fixed', top: 'auto', right: '16px', marginTop: '0', width: '320px', background: 'var(--bg-primary)', border: '1px solid var(--border-light)', borderRadius: '12px', zIndex: 9999, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.7)' }}>
+                <div style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Thông Báo</span>
+                  <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>✖</button>
+                </div>
+                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Không có thông báo nào.</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div 
+                        key={n.id} 
+                        style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: n.is_read ? 'transparent' : 'rgba(168,85,247,0.1)', cursor: 'pointer' }}
+                        onClick={async () => {
+                          if (!n.is_read) {
+                            await axios.post(`${API_BASE}/notifications/read/${n.id}`);
+                            loadNotifications();
+                            loadMyInfo();
+                          }
+                          // Nếu là lời mời bái sư, mở tab mentor
+                          if (n.type === 'mentorship') setActiveTab('mentor');
+                        }}
+                      >
+                        <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{n.message}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(n.created_at + 'Z').toLocaleString('vi-VN')}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={onLogout}
-            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '8px 16px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.3s ease' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '8px 18px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.25s ease', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
           >
@@ -584,76 +864,121 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
 
           {/* HOME (SẢNH CHÍNH) */}
           {activeTab === 'home' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: '1rem', flex: 1 }}>
-              
-              <div style={{ marginBottom: '3rem', position: 'relative', display: 'inline-block' }}>
-                <div style={{ position: 'absolute', top: '-15px', right: '-15px', zIndex: 10 }}>
-                  <button 
-                    onClick={handleCheckIn}
-                    disabled={hasCheckedIn}
-                    style={{ 
-                      background: hasCheckedIn ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      color: hasCheckedIn ? 'rgba(255,255,255,0.3)' : '#fff',
-                      border: 'none', borderRadius: 'var(--radius-full)', padding: '10px 20px',
-                      cursor: hasCheckedIn ? 'not-allowed' : 'pointer', fontWeight: 'bold',
-                      boxShadow: hasCheckedIn ? 'none' : '0 4px 15px rgba(245, 158, 11, 0.4)',
-                      transition: 'all 0.3s'
-                    }}
-                  >
-                    {hasCheckedIn ? '✅ Đã Điểm Danh' : '🎁 Điểm Danh'}
-                  </button>
-                </div>
-                
-                <button 
-                  onClick={onPlay} 
-                  className="btn-primary hover-scale" 
-                  style={{ 
-                    padding: '24px 80px', fontSize: '2.5rem', borderRadius: 'var(--radius-full)', 
-                    boxShadow: '0 0 50px rgba(99,102,241,0.6)', cursor: 'pointer', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '2px'
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingTop: '0.5rem' }}>
+
+              {/* ── Row 1: PLAY button (full width hero) ── */}
+              <div style={{ position: 'relative', textAlign: 'center' }}>
+                {/* Ambient glow behind button */}
+                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
+                <button
+                  onClick={onPlay}
+                  className="btn-primary play-btn-ring"
+                  style={{
+                    padding: '20px 90px', fontSize: '2rem', borderRadius: 'var(--radius-full)',
+                    letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'var(--font-heading)',
+                    boxShadow: '0 0 40px rgba(239,68,68,0.5), 0 8px 32px rgba(245,158,11,0.3)',
+                    position: 'relative', zIndex: 1
                   }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                  🎮 Chơi Ngay
+                  🎮 CHƠI NGAY
                 </button>
-                
-                {!isGuest && (
-                  <div style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
-                    ⭐ Điểm Tích Lũy (Mua sắm): <strong style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{serverPoints}</strong>
-                  </div>
-                )}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.5rem', width: '100%', maxWidth: '1200px' }}>
-                {TABS.map(tab => (
-                  <div 
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    style={{
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: '16px',
-                      padding: '2rem 1rem',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = `rgba(${parseInt(tab.color.slice(1,3),16)},${parseInt(tab.color.slice(3,5),16)},${parseInt(tab.color.slice(5,7),16)},0.15)`
-                      e.currentTarget.style.transform = 'translateY(-5px)'
-                      e.currentTarget.style.borderColor = tab.color
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-                    }}
-                  >
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>{tab.icon}</div>
-                    <div style={{ fontSize: '1.2rem', fontWeight: '700', color: '#78350f' }}>{tab.label}</div>
+              {/* ── Row 2: Daily Quest + Check-in streak ── */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'stretch' }}>
+                {/* Daily Quest card */}
+                <div className="daily-quest-card" style={{ padding: '1rem 1.4rem', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ fontSize: '2rem', flexShrink: 0 }}>📋</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.95rem', letterSpacing: '0.05em', marginBottom: '6px' }}>NHIỆM VỤ HÔM NAY</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {[
+                        { label: 'Thắng 3 trận', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
+                        { label: 'Điểm danh hôm nay', reward: '+50 pts', done: hasCheckedIn },
+                      ].map((q, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: q.done ? '#10b981' : 'rgba(0,0,0,0.15)', border: `2px solid ${q.done ? '#10b981' : 'rgba(217,119,6,0.4)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                            {q.done && '✓'}
+                          </div>
+                          <span style={{ fontSize: '0.82rem', color: q.done ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: q.done ? 'line-through' : 'none', flex: 1 }}>{q.label}</span>
+                          <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{q.reward}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                </div>
+                {/* Check-in button */}
+                <button
+                  onClick={handleCheckIn}
+                  disabled={hasCheckedIn}
+                  style={{
+                    background: hasCheckedIn ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                    color: hasCheckedIn ? '#10b981' : '#fff',
+                    border: hasCheckedIn ? '1px solid rgba(16,185,129,0.4)' : 'none',
+                    borderRadius: 'var(--radius-lg)', padding: '0 1.5rem',
+                    cursor: hasCheckedIn ? 'not-allowed' : 'pointer',
+                    fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem',
+                    boxShadow: hasCheckedIn ? 'none' : '0 4px 20px rgba(245,158,11,0.45)',
+                    transition: 'all 0.25s', minWidth: '120px', flexDirection: 'column', gap: '4px'
+                  }}
+                >
+                  <div style={{ fontSize: '1.5rem' }}>{hasCheckedIn ? '✅' : '🎁'}</div>
+                  <div>{hasCheckedIn ? 'Đã Điểm Danh' : 'Điểm Danh'}</div>
+                </button>
+              </div>
+
+              {/* ── Row 3: Asymmetric nav grid ── */}
+              {/* Layout: [Profile TALL] [3-col grid: History, Rank, Store / Friend, Event, Guide] */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
+                {/* Profile card — tall */}
+                {(() => {
+                  const profileTab = TABS.find(t => t.id === 'profile')
+                  return (
+                    <div
+                      className="nav-card"
+                      onClick={() => setActiveTab('profile')}
+                      style={{
+                        background: `linear-gradient(145deg, ${profileTab.color}22, ${profileTab.color}08)`,
+                        border: `1px solid ${profileTab.color}50`,
+                        borderRadius: '20px', padding: '2rem 1.5rem',
+                        cursor: 'pointer', textAlign: 'center',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        gap: '12px', minHeight: '200px',
+                        boxShadow: `0 4px 20px ${profileTab.color}25`
+                      }}
+                    >
+                      <div className="nav-card-icon" style={{ fontSize: '3.5rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}60)` }}>{profileTab.icon}</div>
+                      <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '1.3rem', color: profileTab.color, letterSpacing: '0.05em' }}>{profileTab.label.toUpperCase()}</div>
+                      {!isGuest && (
+                        <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '3px 12px', fontSize: '0.75rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
+                          LV {currentLevel} · {rank.title}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {/* Grid of other tabs */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)', gap: '1rem' }}>
+                  {TABS.filter(t => t.id !== 'profile').map((tab, idx) => (
+                    <div
+                      key={tab.id}
+                      className="nav-card"
+                      onClick={() => setActiveTab(tab.id)}
+                      style={{
+                        background: `linear-gradient(145deg, ${tab.color}18, ${tab.color}06)`,
+                        border: `1px solid ${tab.color}40`,
+                        borderRadius: '16px', padding: '1.2rem 1rem',
+                        cursor: 'pointer', textAlign: 'center',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        gap: '8px', boxShadow: `0 2px 12px ${tab.color}15`
+                      }}
+                    >
+                      <div className="nav-card-icon" style={{ fontSize: '2.2rem', filter: `drop-shadow(0 3px 8px ${tab.color}50)` }}>{tab.icon}</div>
+                      <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.88rem', color: tab.color, letterSpacing: '0.04em' }}>{tab.label.toUpperCase()}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
             </div>
@@ -662,13 +987,25 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           {/* HISTORY */}
           {activeTab === 'history' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
                 <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>📋 Lịch sử trận đấu</h2>
-                {!isGuest && (
-                  <button onClick={loadHistory} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                    🔄 Làm mới
-                  </button>
-                )}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <select
+                    value={historyFilter}
+                    onChange={e => setHistoryFilter(e.target.value)}
+                    style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(0,0,0,0.4)', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer' }}
+                  >
+                    <option value="all">Tất cả loại</option>
+                    <option value="video">🎥 Video Debate</option>
+                    <option value="chat">💬 Chat Debate</option>
+                    <option value="solo_ai">🤖 Solo AI</option>
+                  </select>
+                  {!isGuest && (
+                    <button onClick={loadHistory} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                      🔄 Làm mới
+                    </button>
+                  )}
+                </div>
               </div>
 
               {isGuest ? (
@@ -709,7 +1046,15 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                     <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'center' }}>Lỗi</span><span style={{ textAlign: 'right' }}>ID</span>
                   </div>
 
-                  {history.map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
+                  {(historyFilter === 'all'
+                    ? history
+                    : history.filter(m => {
+                        if (historyFilter === 'chat') return m.mode?.startsWith('text_')
+                        if (historyFilter === 'video') return !m.mode?.startsWith('text_') && m.mode !== 'solo_ai'
+                        if (historyFilter === 'solo_ai') return m.mode === 'solo_ai'
+                        return true
+                      })
+                  ).map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
                 </div>
               )}
             </div>
@@ -860,7 +1205,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 </div>
                 <div>
                   <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Avatar:</label>
-                  <select value={selectedAvatar} onChange={(e) => { setSelectedAvatar(e.target.value); localStorage.setItem('kaiko_avatar_' + username, e.target.value); }} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <select value={selectedAvatar} onChange={handleAvatarChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
                     <option value="">Ảnh Mặc định (Bottts)</option>
                     <option value="/assets/avatars/CuaDoTruyenThong.png">Cua Đỏ Truyền Thống</option>
                     <option value="/assets/avatars/CuaXanh.png">Cua Xanh Học Giả</option>
@@ -955,6 +1300,19 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 </div>
               ) : (
                 <p style={{ color: 'var(--text-secondary)' }}>Chưa có dữ liệu thống kê.</p>
+              )}
+
+              {/* ACHIEVEMENTS */}
+              {!isGuest && achievements.length > 0 && (
+                <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(16,185,129,0.05)', borderRadius: '16px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                  <h3 style={{ margin: '0 0 1rem', color: '#10b981' }}>🏆 Thành Tích Đạt Được</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+                    {achievements.includes('first_win') && <span style={{ padding: '5px 12px', background: 'rgba(16,185,129,0.2)', color: '#10b981', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>⭐ Chiến thắng đầu tiên</span>}
+                    {achievements.includes('win_10') && <span style={{ padding: '5px 12px', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🌟 10 Trận Thắng</span>}
+                    {achievements.includes('perfect_logic') && <span style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🔥 Hoàn Mỹ Logic</span>}
+                    {achievements.includes('perfect_score') && <span style={{ padding: '5px 12px', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>💯 100 Điểm</span>}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -1072,17 +1430,26 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                           {(() => {
                             const hasJoined = joinedEvents.includes(ev.id)
                             return (
-                              <button
-                                className={hasJoined || (isOpen && !hasJoined) ? 'btn-primary' : 'btn-secondary'}
-                                disabled={(!isOpen && !hasJoined)}
-                                onClick={() => {
-                                  if (hasJoined) setActiveEvent(ev)
-                                  else if (isOpen) handleJoinEvent(ev.id, ev.title)
-                                }}
-                                style={{ marginTop: '1.5rem', width: '100%', opacity: (isOpen || hasJoined) ? 1 : 0.5, cursor: (isOpen || hasJoined) ? 'pointer' : 'not-allowed', background: hasJoined ? '#10b981' : '', color: hasJoined ? '#fff' : '' }}
-                              >
-                                {hasJoined ? '✅ Vào Sự Kiện' : isOpen ? 'Tham gia ngay' : isUpcoming ? 'Chưa mở' : 'Đã kết thúc'}
-                              </button>
+                              <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                <button
+                                  className={hasJoined || (isOpen && !hasJoined) ? 'btn-primary' : 'btn-secondary'}
+                                  disabled={(!isOpen && !hasJoined)}
+                                  onClick={() => {
+                                    if (hasJoined) setActiveEvent(ev)
+                                    else if (isOpen) handleJoinEvent(ev.id, ev.title)
+                                  }}
+                                  style={{ flex: 1, opacity: (isOpen || hasJoined) ? 1 : 0.5, cursor: (isOpen || hasJoined) ? 'pointer' : 'not-allowed', background: hasJoined ? '#10b981' : '', color: hasJoined ? '#fff' : '' }}
+                                >
+                                  {hasJoined ? '📝 Sửa Bài' : isOpen ? 'Tham gia' : isUpcoming ? 'Chưa mở' : 'Đã đóng'}
+                                </button>
+                                <button
+                                  className="btn-secondary"
+                                  onClick={() => setActiveVotingEvent(ev)}
+                                  style={{ flex: 1, border: '1px solid #fbbf24', color: '#fbbf24' }}
+                                >
+                                  👍 Bình chọn
+                                </button>
+                              </div>
                             )
                           })()}
                         </div>
@@ -1110,14 +1477,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '600px', margin: '0 auto' }}>
                         <div style={{ background: 'rgba(139,92,246,0.1)', border: '2px solid #8b5cf6', borderRadius: '20px', padding: '2rem' }}>
                           <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                            <img src="/assets/mascots/ghost.png" alt="Cua Ma" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
+                            <img src="/assets/mascots/CuaMa.png" alt="Cua Ma" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
                             <div style={{ display: 'none' }}>👻</div>
                           </div>
                           <h3 style={{ color: '#8b5cf6' }}>Phe Cua Ma</h3>
                         </div>
                         <div style={{ background: 'rgba(234,179,8,0.1)', border: '2px solid #eab308', borderRadius: '20px', padding: '2rem' }}>
                           <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                            <img src="/assets/mascots/god.png" alt="Cua Thần" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
+                            <img src="/assets/mascots/CuaThan.png" alt="Cua Thần" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
                             <div style={{ display: 'none' }}>😇</div>
                           </div>
                           <h3 style={{ color: '#eab308' }}>Phe Cua Thần</h3>
@@ -1227,14 +1594,120 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
             </div>
           )}
 
+          {/* THỐNG KÊ NGỤY BIỆN */}
+          {activeTab === 'stats' && (
+            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>📊 Phân Tích Ngụy Biện</h2>
+              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
+              
+              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                {Object.keys(fallacyStats).length === 0 ? (
+                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
+                    Tuyệt vời! Bạn chưa mắc lỗi ngụy biện nào.
+                  </div>
+                ) : (
+                  <div>
+                    {Object.entries(fallacyStats).sort((a,b) => b[1] - a[1]).map(([fallacy, count]) => (
+                      <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ margin: '0 0 5px 0', color: '#ef4444' }}>{fallacy}</h4>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Bạn đã mắc lỗi này <strong style={{color: '#fff'}}>{count} lần</strong>. Hãy chú ý hơn trong lập luận!</div>
+                        </div>
+                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', opacity: 0.8 }}>{count}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* HỆ THỐNG BÁI SƯ */}
+          {activeTab === 'mentor' && (
+            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>🎓 Hệ Thống Bái Sư</h2>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                {/* Xin Bái Sư */}
+                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                  <h3 style={{ marginTop: 0, color: '#8b5cf6' }}>🤝 Xin Bái Sư</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Tìm sư phụ giỏi hơn để học hỏi kinh nghiệm. Hai người có thể thi đấu với nhau để nhận quà.</p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="Nhập tên sư phụ..." 
+                      value={mentorInput}
+                      onChange={e => setMentorInput(e.target.value)}
+                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                    />
+                    <button 
+                      onClick={async () => {
+                        if (!mentorInput.trim()) return;
+                        try {
+                          const res = await axios.post(`${API_BASE}/mentorship/request`, { master: mentorInput.trim(), disciple: username });
+                          if (res.data.success) { alert('Đã gửi lời bái sư!'); setMentorInput(''); }
+                          else alert(res.data.error);
+                        } catch(e) { alert('Lỗi kết nối'); }
+                      }}
+                      style={{ background: '#8b5cf6', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      Gửi
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tình Trạng */}
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>📜 Môn Phái</h3>
+                  <div style={{ marginBottom: '1rem' }}>
+                    <strong style={{ color: '#f59e0b' }}>Sư Phụ của bạn:</strong>
+                    {mentorData.masters.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có sư phụ</div> : 
+                      mentorData.masters.map(m => <div key={m.id} style={{ color: '#fff', marginTop: '5px' }}>👑 {m.master} {m.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
+                    }
+                  </div>
+                  <div>
+                    <strong style={{ color: '#10b981' }}>Đệ Tử của bạn:</strong>
+                    {mentorData.disciples.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có đệ tử</div> : 
+                      mentorData.disciples.map(d => <div key={d.id} style={{ color: '#fff', marginTop: '5px' }}>👶 {d.disciple} {d.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* CÁC TAB KHÁC CHƯA CÓ NỘI DUNG */}
-          {['guide'].includes(activeTab) && (
+          {['unknown_tab', 'guide'].includes(activeTab) && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-secondary)' }}>
               <div style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'grayscale(1)' }}>🚧</div>
               <h2>Tính năng đang phát triển</h2>
               <p>Mục này sẽ sớm ra mắt trong các bản cập nhật tới!</p>
             </div>
           )}
+
+        {/* LIVE TAB */}
+        {activeTab === 'live' && (
+          <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
+            <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>📺 Xem Live Debate</h2>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Tính năng đang trong giai đoạn phát triển.</p>
+              <p style={{ color: 'var(--text-secondary)' }}>Sắp tới bạn có thể theo dõi trực tiếp các trận tranh biện đỉnh cao và bình luận cùng cộng đồng.</p>
+            </div>
+          </div>
+        )}
+
+        {/* COMMUNITY TAB */}
+        {activeTab === 'community' && (
+          <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
+            <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>🌐 Diễn Đàn Cộng Đồng</h2>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Cộng đồng KaiKo sắp ra mắt!</p>
+              <p style={{ color: 'var(--text-secondary)' }}>Nơi giao lưu, chia sẻ kinh nghiệm, chat nhóm và kết nối bạn bè 4 phương.</p>
+              <button className="btn-primary" style={{ marginTop: '1.5rem', padding: '10px 24px', borderRadius: '8px' }}>Tải lại tin mới</button>
+            </div>
+          </div>
+        )}
 
           </div> {/* End inner background div */}
         </div>
@@ -1359,6 +1832,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
       )}
       
       {activeEvent && <EventWorkspaceModal event={activeEvent} onClose={() => setActiveEvent(null)} username={username} />}
+      {activeVotingEvent && <EventVotingModal event={activeVotingEvent} username={username} onClose={() => setActiveVotingEvent(null)} />}
 
       {/* === MODAL CHỌN HUY HIỆU === */}
       {showBadgeSelector && (

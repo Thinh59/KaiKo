@@ -138,3 +138,192 @@ bạn đã làm xong hết những ý tưởng này của tôi chưa?
 Những ràng buộc,...
 Tôi thấy cái event hiện tại đã mở luôn cái envent lớn rồi, phải mở event theo đợt chứ
 có thể chưa tích hợp Cổng thanh toán nhưng có thể để là cập nhật sau, còn những cái khác như giới hạn bạn bè thì có thể giảm xuống 100 người
+
+
+
+🦀 KaiKo — Phân Tích Tính Năng & Lộ Trình
+✅ Đã Làm Xong
+Tính năng	Ghi chú
+Phát hiện ngụy biện (AI Model)	Model train xong, chạy real-time
+Solo AI với Gemini	Gemini đóng vai đối thủ, có TTS
+Random topic từ Gemini	API /random-topic đã có
+Chấm điểm + phân tích + gợi ý (Gemini)	API /score + /hint đã có
+Hệ thống Level 1–101 cơ bản	Tính từ lịch sử trận đấu
+5 mốc Danh Hiệu theo level	KaiKo Ngang Như Cua Non → KaiKo Sáng Rực Như Idol Cua Hoàng Đế
+Khung Avatar theo level	Gỗ/Bạc/Vàng/Kim Cương (CSS border + glow)
+Điểm Tích Lũy (Shopping Points)	Tách biệt với EXP leveling
+Điểm Danh hàng ngày	+50 Điểm Tích Lũy/ngày
+Hệ thống Bạn Bè	Gửi/Chấp nhận/Từ chối/Xóa, giới hạn 100 người
+Bảng Xếp Hạng (Leaderboard)	Theo Wins + Điểm TB
+Lịch sử trận đấu	Lưu vào SQLite, hiển thị đầy đủ
+Thả React/Emoji trong trận	Real-time qua WebSocket
+Nickname (Biệt danh)	Lưu DB, hiển thị toàn hệ thống
+1v1 Matchmaking	WebSocket queue, ready-check
+Chơi Giao Hữu (Custom Room)	Tạo/Vào bằng mã phòng 5 số
+Xem hồ sơ người chơi khác	Click từ leaderboard/friends list
+Ready Check + Timeout	30s, tự động từ chối nếu AFK
+Thông báo khi đối thủ disconnect	Backend gửi player_declined ngay lập tức
+Event tab cơ bản	Có lịch trình, Event lớn bị khóa
+Cửa Hàng (Store UI)	Hiển thị items, chưa có logic mua
+🚧 Có Thể Làm Thêm (Không Cần Thanh Toán)
+1. 🎭 Mua Sắm bằng Điểm Tích Lũy
+Thẻ Đổi Tên (500đ): trừ điểm → cho phép đổi nickname
+Khung Cua Lửa (1500đ): mở khóa frame mới với hiệu ứng
+Danh Hiệu VIP (5000đ): hiển thị badge đặc biệt kế tên
+Cần thêm: cột store_items trong DB hoặc bảng purchases
+2. 📅 Event Phân Đợt (Cần Fix Ngay)
+⚠️ Hiện tại Events UI đang hiển thị static. Cần thêm trạng thái open/locked do Admin kiểm soát.
+
+Thêm bảng events trong DB với status: 'open' | 'upcoming' | 'locked'
+Admin toggle trạng thái qua API endpoint /admin/event/:id/toggle
+Sự kiện lớn chỉ mở sau khi event nhỏ kết thúc → backend kiểm tra điều kiện
+3. 💬 Debate bằng Chat (Text Mode)
+Thêm tab "Debate Văn Bản" trong ModeSelector
+Giao diện chat 2 cột, AI phân tích mỗi lượt submit
+Chấm điểm thiếu phần cử chỉ, điểm tích lũy ít hơn
+Không cần Camera/Mic → dễ dùng hơn
+4. 👥 Bạn Thân + Huy Hiệu
+Đếm số trận cùng nhau (debate_count trong bảng friends)
+Sau 50 trận: tự động gắn badge "Bạn Thân 💚"
+Hiển thị badge trên danh sách bạn bè và hồ sơ
+5. 🎓 Bái Sư / Xuất Sư
+Người level cao có thể "nhận đệ tử" (level thấp hơn)
+Đệ tử chơi đủ N trận → Xuất sư, nhận thưởng
+Backend: bảng mentorship(master, disciple, debate_count)
+6. 🏅 Level-Based Matchmaking
+Phân tier: [1-10], [11-30], [31-60], [61-90], [91-101]
+Khi ghép cặp, ưu tiên tier gần nhau (±1 tier)
+Backend: matchmake filter theo player_tier
+7. 👁️ Xem Hồ Sơ Có Giới Hạn Level
+Người level cao hơn mới xem được đầy đủ thông tin
+Người level thấp hơn chỉ thấy tên + danh hiệu
+Frontend: so sánh currentUserLevel vs selectedUserLevel
+8. 📸 Chọn Avatar Mẫu Sẵn
+Thêm bộ avatar cua-themed (6–12 options) vào /public/avatars/
+Trong Profile: hiển thị grid chọn avatar
+Lưu vào localStorage / backend field avatar_seed
+❌ Tạm Hoãn (Cần Thanh Toán / Phức Tạp)
+Tính năng	Lý do hoãn
+Nạp tiền tăng level 10	Cần Payment Gateway (VNPay/Stripe)
+Cổng thanh toán tích lũy	Xử lý sau
+Diễn đàn cộng đồng (Forum)	Cần backend chat riêng (WebSocket mở rộng lớn)
+Xem trận đấu live	Cần luồng video/spectate phức tạp
+Level 101 làm Giám Khảo	Phụ thuộc hệ thống event phức tạp hơn
+🎨 Cần Vẽ / Generate Assets
+Khung Avatar (Frame Images)
+Thay thế CSS border bằng ảnh PNG thực sự sẽ đẹp hơn nhiều:
+
+Frame	Phong cách gợi ý
+Khung Gỗ (Lv 11)	Gỗ nâu vintage, góc có mây xoắn
+Khung Bạc (Lv 31)	Kim loại bạc, hoa văn sóng biển
+Khung Vàng (Lv 61)	Vàng sáng, họa tiết cua vương miện
+Khung Kim Cương (Lv 91)	Pha lê xanh cyan, lung linh
+Khung Cua Lửa (Store)	Lửa đỏ cam cháy quanh viền
+Avatar Mẫu (Default Avatars)
+8–12 avatar kiểu cua chibi với màu sắc khác nhau
+Có thể dùng emoji style hoặc pixel art
+Ví dụ: 🦀 đỏ, 🔵 cua biển, ⚫ cua đêm, 🟡 cua vàng hoàng đế...
+Thanh Danh Hiệu (Title Badge)
+Thay dòng text đơn giản bằng badge có nền đẹp:
+
+Danh hiệu tương ứng mỗi tier có màu riêng + icon cua
+"KaiKo Ngang Như Cua Non" → badge xám có 🦀
+"KaiKo Sáng Rực..." → badge gold gradient có 👑
+Banner/Mascot
+Mascot chính: Con cua chibi mặc áo giáp debate 🦀⚔️
+2 mascot đại chiến: Cua Ma (tím tối) vs Cua Thần (vàng sáng)
+🔧 Fix Cần Làm Ngay
+Fix Event Phân Đợt
+Hiện tại Events mở cứng, cần:
+
+backend: thêm bảng events với status field
+frontend: fetch events từ API thay vì hardcode
+Fix Giới Hạn Bạn Bè
+✅ Đã làm: giới hạn 100 người (theo yêu cầu giảm từ 500)
+
+📊 Tổng Kết
+Nhóm	Số lượng	Ghi chú
+✅ Đã hoàn thành	~20 tính năng	Sẵn sàng demo
+🚧 Có thể thêm	~8 tính năng	Không cần thanh toán
+❌ Tạm hoãn	~5 tính năng	Cần thanh toán/backend lớn
+🎨 Assets cần tạo	~4 nhóm	Khung, avatar, badge, mascot
+
+
+🦀 KaiKo — Phân Tích Tính Năng & Lộ Trình
+✅ Đã Làm Xong
+Tính năng	Ghi chú
+Core: Solo AI Debate	Gọi Gemini để thi đấu solo, tạo topic ngẫu nhiên, chấm điểm
+Core: Phát hiện ngụy biện	Dùng gemini-3.1-flash-lite-preview, trả về is_fallacy, fallacy_name_vi
+Core: Phân tích toàn diện	Chấm điểm logic, phong thái, giọng nói, phản biện; trả về điểm mạnh/yếu/gợi ý
+Video Debate 1v1	WebRTC real-time, WebSocket signaling, ghép cặp tier-based
+Chat Debate	Chat text real-time không cần camera, phân tích từng tin nhắn bằng Gemini
+Phát hiện nội dung xấu	Profanity detection → ban account; off-topic → cảnh cáo; excellent → thưởng
+Hệ thống Level & EXP	Tính EXP từ lịch sử trận, hiển thị EXP bar, tiêu đề rank, level cap 101
+Danh hiệu theo level	"Cua Non", "Cua Gắt", "Cua Cùm", "Thư Giãn", "Idol Cua" đã có trong UI
+Matchmaking tier-based	Ghép cặp trong khoảng chênh lệch level ≤10
+Phân biệt điểm Chat vs Video	Chat: win=7EXP/3pts; Video: win=10EXP/5pts
+Hệ thống bạn bè	Thêm, xóa, chấp nhận/từ chối lời mời, debateCount, huy hiệu Bạn Thân (≥50 trận)
+Xem profile người chơi khác	Modal hiển thị level, avatar, frame, stats
+Leaderboard	Bảng xếp hạng theo số win + điểm TB
+Avatar & Frame	Đổi avatar/frame, lưu vào DB, đồng bộ cross-device
+Cửa hàng (Store)	Mua item/frame bằng điểm tích lũy
+Events nhỏ	Tạo/tham gia event, nộp bài, vote bình chọn
+Event lớn Cua Ma vs Cua Thần	UI có nhưng đang bị lock (chưa có logic mở theo đợt)
+Check-in hàng ngày	Cộng điểm tích lũy khi check-in
+Thành tích (Achievements)	First Win, 10 Wins, Perfect Logic, Perfect Score
+Thông báo in-app	Bell icon, dropdown, đánh dấu đã đọc
+Hệ thống Bái Sư / Xuất Sư	Gửi lời bái sư, duyệt yêu cầu, DB mentorship
+Thống kê ngụy biện cá nhân	Tab "Phân tích ngụy biện" trong dashboard
+Lịch sử trận đấu	Lưu + xem lại, filter theo loại (Chat/Video/Solo), tab Ghi Âm trong scoreboard
+Sẵn sàng (Ready)	Nút sẵn sàng trước khi vào phòng video debate
+Emoji React	Gửi emoji reaction trong debate video
+❌ Chưa Làm — Cần Phát Triển Thêm
+🔴 Ưu tiên cao (ảnh hưởng core gameplay)
+Tính năng	Mô tả chi tiết
+Quy tắc lên level phức tạp	Hiện tại tính EXP đơn giản (×10/×7). Cần implement đúng rule từng dải:
+• Lv 1-10: Cải thiện bất kỳ 1 chỉ số so với record cá nhân → +1 level
+• Lv 11-30: Cải thiện ≥2 chỉ số, mỗi chỉ số ≥2 điểm → +1 level; nhận đánh giá tốt từ Lv60-101 → +5 level thẳng
+• Lv 31-60: Cần beat điểm trận trước (tùy đối thủ level); bình luận từ Lv90-101 → +5 level; cần tham gia ≥1 event để lên Lv61
+• Lv 61-90: Phải beat điểm trận trước (trừ đối thủ Lv101); thua 3 liên tiếp = -1 level (có thể tụt xuống <61); đánh giá từ Lv91-101; cần ≥2 events, top30 ≥1 cái để lên Lv91
+• Lv 91-100: Thắng liên tiếp, thua 1 trận = -1 level; ≥3 events, top20 ≥2 để lên Lv100; đánh giá từ Lv101 → +3 thẳng
+• Lv 101: Beat người Lv101, hoặc top1 10 events liên tiếp
+Đặc quyền Level 101	Làm giám khảo (điểm chấm có % ảnh hưởng điểm người khác), quyết định level người khác, quyền cao nhất trong Event, unlock tất cả tier nạp tiền, đệ tử nhờ đánh giá lên cấp nhanh
+Level tụt (Demotion)	Lv61-90: thua 3 liên tiếp → -1 Lv; Lv91-100: thua 1 → -1 Lv; Lv101: không xử lý demotion
+Điều kiện event để lên level cao	Cần tham gia ≥1 event → mới được lên Lv61; ≥2 events (top30 ≥1) → Lv91; ≥3 events (top20 ≥2) → Lv100
+Event mở theo đợt	❗ Hiện tại đang mở luôn event lớn. Cần: event nhỏ mở theo lịch (đợt); chỉ khi tất cả event nhỏ kết thúc mới mở event lớn Cua Ma & Cua Thần
+Top1 event thưởng đặc biệt	Top1 bất kỳ event (Lv<101) → +10 level; Lv<11 mà top1 → danh hiệu "KaiKo Thiên Tài Tinh Tú" + điểm tích lũy
+Chọn phe (Cua Ma/Cua Thần)	Sau khi có 2 lệnh bài → mở tính năng chọn phe, debate tập thể giữa 2 phe, thưởng lớn + 1 người phe thắng đạt Lv101 + bảo kê 100 lần
+🟡 Ưu tiên trung bình (UX & social)
+Tính năng	Mô tả chi tiết
+Giới hạn bạn bè 100 người	❗ Cần giảm từ 500→100 trong logic validate
+Chat với bạn thân trong trận	Khi gặp topic khó (trong ranked), có thể chat 1 bạn thân miễn phí; non-best-friend tốn 50đ tích lũy (không ảnh hưởng leaderboard)
+Xem level cao hơn thì thấy level thấp hơn, không ngược lại	Khi xem profile người khác: Lv cao xem được danh hiệu+level của Lv thấp; Lv thấp không thấy chi tiết của Lv cao hơn
+30s auto-ready sau khi đối thủ ready	Nếu đối thủ ready mà mình không ready trong 30s → cảnh báo trừ 1đ tích lũy + tự động ready; nếu vẫn không vào → đối thủ thắng mặc định
+Chọn bạn debate (friend match)	Thi đấu với bạn bè → chỉ cộng EXP (không tăng level chính thức) hoặc max level tăng trong khoảng Lv1-11
+Streak lửa check-in	Hiển thị chuỗi lửa, mất nếu bỏ 1 ngày, đổi điểm tích lũy
+Huy hiệu chat thường xuyên	Tương tác với bạn thân để giữ "huy hiệu chat" (mất sau 1 ngày không tương tác)
+Huy hiệu bạn thân	Mất nếu không tương tác ≥30 ngày
+Giới hạn đổi avatar/frame	5 lần/ngày miễn phí; sau đó tốn điểm tích lũy
+Upload ảnh đại diện custom	Hiện chỉ dùng DiceBear, chưa cho upload ảnh thật
+🟢 Ưu tiên thấp (nâng cao)
+Tính năng	Mô tả chi tiết
+Nạp tiền (IAP)	⏳ Để cập nhật sau — skip 10 level (500k?), nhiều lần đổi avatar/frame, giữ streak
+Xem trận đấu live	Spectator mode, bình luận cộng đồng real-time
+Cộng đồng / Diễn đàn	Chat, call nhóm, 2 comment/ngày miễn phí; 500đ/comment sau đó
+Sticker & Icon phức tạp	Bộ sticker cao cấp (hiện chỉ có emoji đơn giản)
+Matchmaking chênh lệch ±1 mức	Ví dụ Lv31-61 chỉ gặp Lv11-91 (đã có ±10, cần map sang tier)
+Phân tích ngụy biện với trained model	Hiện dùng Gemini; có thể bổ sung model local đã train
+Kim cương tích lũy từ Event	Currency thứ 2 (diamond) nhận từ event
+📋✅ Đã làm — 4 cái cần fix NGAY
+Mức độ	Vấn đề
+🔴	Event lớn đang hiển thị/lock sai — phải ẩn hoàn toàn cho đến khi event nhỏ kết thúc -> Đã sửa (Lock)
+🔴	Giới hạn bạn bè vẫn là 500 — cần giảm xuống 100 -> Đã sửa (Max 100)
+🟡	Quy tắc lên level rất phức tạp — EXP hiện là công thức đơn giản, không có per-dimension tracking, best record, event participation requirement -> Đã cập nhật (Save match xử lý phức tạp)
+🟡	30s auto-ready timeout — chưa có penalty khi delay ready -> Đã sửa (Tự động sẵn sàng + trừ điểm)
+
+❌ Chưa làm — Tính năng lớn cần phát triển
+Đặc quyền Level 101 (giám khảo, ảnh hưởng điểm người khác)
+Top1 event → thưởng +10 level / danh hiệu Thiên Tài Tinh Tú
+Chọn phe Cua Ma/Cua Thần sau khi có 2 lệnh bài
+Chat với bạn thân trong trận
+View live match, cộng đồng/diễn đàn (Đã thêm UI cơ bản)y
