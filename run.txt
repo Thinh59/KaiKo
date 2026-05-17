@@ -6,3 +6,9 @@ uvicorn main:app --reload --port 8000
 cd frontend
 
 npm run dev
+
+pass database cloud:
+Kaiko@hcmus
+
+Neon:
+postgresql://neondb_owner:npg_S9WJvBcChV2N@ep-cool-dust-ao74kco7.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require

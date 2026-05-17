@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import { useUser, useAuth } from '@clerk/clerk-react'
+import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import HomePage from './components/HomePage'
 import AuthPage from './components/AuthPage'
 import Dashboard from './components/Dashboard'
@@ -217,6 +217,10 @@ function App() {
   }
 
   // --- RENDERS ---
+
+  if (window.location.pathname === '/sso-callback') {
+    return <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />;
+  }
 
   if (page === 'home') {
     return <HomePage onPlay={handlePlayNowClick} />

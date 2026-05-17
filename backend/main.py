@@ -12,14 +12,23 @@ from typing import Optional, List, Dict
 import asyncio
 import uuid
 import random
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import hashlib
 
 load_dotenv()
 
+# --- PostgreSQL connection helper ---
+def get_db():
+    url = os.getenv("DATABASE_URL", "postgresql://postgres:yourpassword@localhost:5432/kaiko")
+    conn = psycopg2.connect(url)
+    return conn
+
+
 app = FastAPI(title="KaiKo API")
 
 app.add_middleware(
+
     CORSMiddleware,
     allow_origins=["*"], # Bật CORS cho mọi origin
     allow_methods=["*"],
@@ -95,23 +104,20 @@ def load_model():
         genai.configure(api_key=api_key)
         print("✅ Gemini API configured")
 
-    # Init SQLite DB
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    # Init PostgreSQL DB
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             username TEXT PRIMARY KEY,
             password_hash TEXT NOT NULL,
-            nickname TEXT
+            nickname TEXT,
+            store_points INTEGER DEFAULT 0
         )
     ''')
-    try:
-        cursor.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
-    except sqlite3.OperationalError:
-        pass # Column already exists
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS match_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
             opponent TEXT NOT NULL,
             topic TEXT NOT NULL,
@@ -127,7 +133,7 @@ def load_model():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS friend_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             sender TEXT NOT NULL,
             receiver TEXT NOT NULL,
             UNIQUE(sender, receiver)
@@ -135,26 +141,16 @@ def load_model():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS friends (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user1 TEXT NOT NULL,
             user2 TEXT NOT NULL,
             debate_count INTEGER DEFAULT 0,
             UNIQUE(user1, user2)
         )
     ''')
-    # Add debate_count to friends if missing
-    try:
-        cursor.execute('ALTER TABLE friends ADD COLUMN debate_count INTEGER DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
-    # Add store_points to users if missing
-    try:
-        cursor.execute('ALTER TABLE users ADD COLUMN store_points INTEGER DEFAULT 0')
-    except sqlite3.OperationalError:
-        pass
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
             item_id TEXT NOT NULL,
             purchased_at TEXT NOT NULL,
@@ -163,7 +159,7 @@ def load_model():
     ''')
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'upcoming',
@@ -173,35 +169,58 @@ def load_model():
             created_at TEXT NOT NULL
         )
     ''')
-    cursor.execute('SELECT COUNT(*) FROM events')
-    if cursor.fetchone()[0] == 0:
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS event_participants (
+            id SERIAL PRIMARY KEY,
+            event_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            joined_at TEXT NOT NULL,
+            UNIQUE(event_id, username)
+        )
+    ''')
+    # Add missing columns safely (PostgreSQL style)
+    for col_sql in [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS store_points INTEGER DEFAULT 0",
+        "ALTER TABLE friends ADD COLUMN IF NOT EXISTS debate_count INTEGER DEFAULT 0",
+        "ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS submission_text TEXT",
+    ]:
+        try:
+            cursor.execute(col_sql)
+        except Exception:
+            conn.rollback()
+    cursor.execute('SELECT COUNT(*) as count FROM events')
+    if cursor.fetchone()['count'] == 0:
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        cursor.executemany('INSERT INTO events (title, description, status, event_type, reward, deadline, created_at) VALUES (?,?,?,?,?,?,?)', [
-            ('Bàn Luận: Trí Tuệ Nhân Tạo', 'Viết bài hoặc tham gia debate về AI. Top 20 nhận khung Người Tiên Phong.', 'open', 'small', 'Khung Avatar + 200 Điểm', '2026-05-20', now),
-            ('Bình Chọn Chủ Đề Hot', 'Đề xuất chủ đề tranh biện. Top 5 nhận 50 Điểm Tích Lũy.', 'upcoming', 'small', '50 Điểm Tích Lũy', '2026-05-24', now),
-            ('Đại Chiến Cua Ma & Cua Thần', 'Tranh biện tập thể. Phe thắng nhận đặc quyền Level 101!', 'locked', 'large', 'Level 101 + VIP', '2026-12-01', now),
-        ])
+        cursor.executemany(
+            'INSERT INTO events (title, description, status, event_type, reward, deadline, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s)',
+            [
+                ('Bàn Luận: Trí Tuệ Nhân Tạo', 'Viết bài hoặc tham gia debate về AI. Top 20 nhận khung Người Tiên Phong.', 'open', 'small', 'Khung Avatar + 200 Điểm', '2026-05-20', now),
+                ('Bình Chọn Chủ Đề Hot', 'Đề xuất chủ đề tranh biện. Top 5 nhận 50 Điểm Tích Lũy.', 'upcoming', 'small', '50 Điểm Tích Lũy', '2026-05-24', now),
+                ('Đại Chiến Cua Ma & Cua Thần', 'Tranh biện tập thể. Phe thắng nhận đặc quyền Level 101!', 'locked', 'large', 'Level 101 + VIP', '2026-12-01', now),
+            ]
+        )
     conn.commit()
     conn.close()
-    print('✅ SQLite DB ready')
+    print('✅ PostgreSQL DB ready')
 
 TRENDING_TOPICS = [
-    "TikTok có nên bị cấm cho trẻ em dưới 16 tuổi?",
-    "Có nên đánh thuế thu nhập với idol tóp tóp/streamer?",
-    "Làm việc từ xa (WFH) có hiệu quả hơn lên văn phòng?",
-    "Sự nghiệp hay tình yêu quan trọng hơn ở tuổi 25?",
-    "Bằng đại học có còn quan trọng trong thời đại AI?",
-    "ChatGPT có đang làm học sinh lười đi?",
-    "AI có nên được cấp quyền công dân không?",
-    "Giáo dục đại học có nên miễn phí cho tất cả mọi người?",
-    "Công nghệ có đang làm con người xa cách nhau hơn?",
-    "Mạng xã hội có lợi hay có hại cho dân chủ?",
-    "Thế hệ Gen Z có đang chịu quá nhiều áp lực đồng trang lứa?",
-    "Có nên ủng hộ văn hóa tẩy chay (Cancel Culture) trên MXH?",
-    "E-Sports có nên được công nhận như một môn thể thao Olympic?",
-    "Có nên cấm sử dụng điện thoại thông minh trong trường học?",
-    "Phẫu thuật thẩm mỹ có làm giảm giá trị thực của con người?"
+    "TikTok có nên bị cấm cho trẻ em dưới 16 tuổi%s",
+    "Có nên đánh thuế thu nhập với idol tóp tóp/streamer%s",
+    "Làm việc từ xa (WFH) có hiệu quả hơn lên văn phòng%s",
+    "Sự nghiệp hay tình yêu quan trọng hơn ở tuổi 25%s",
+    "Bằng đại học có còn quan trọng trong thời đại AI%s",
+    "ChatGPT có đang làm học sinh lười đi%s",
+    "AI có nên được cấp quyền công dân không%s",
+    "Giáo dục đại học có nên miễn phí cho tất cả mọi người%s",
+    "Công nghệ có đang làm con người xa cách nhau hơn%s",
+    "Mạng xã hội có lợi hay có hại cho dân chủ%s",
+    "Thế hệ Gen Z có đang chịu quá nhiều áp lực đồng trang lứa%s",
+    "Có nên ủng hộ văn hóa tẩy chay (Cancel Culture) trên MXH%s",
+    "E-Sports có nên được công nhận như một môn thể thao Olympic%s",
+    "Có nên cấm sử dụng điện thoại thông minh trong trường học%s",
+    "Phẫu thuật thẩm mỹ có làm giảm giá trị thực của con người%s"
 ]
 
 # --- WebSocket Matchmaking & Signaling ---
@@ -416,7 +435,7 @@ async def get_random_topic():
                 temperature=0.9,
             )
         )
-        prompt = "Hãy liệt kê 1 chủ đề tranh biện đang hot nhất trên mạng xã hội Việt Nam hôm nay. Chỉ trả về đúng 1 câu chủ đề ngắn gọn (dưới 15 chữ), không kèm thêm bất kỳ văn bản nào khác. Ví dụ: 'Có nên cấm học sinh dùng điện thoại trong trường?'"
+        prompt = "Hãy liệt kê 1 chủ đề tranh biện đang hot nhất trên mạng xã hội Việt Nam hôm nay. Chỉ trả về đúng 1 câu chủ đề ngắn gọn (dưới 15 chữ), không kèm thêm bất kỳ văn bản nào khác. Ví dụ: 'Có nên cấm học sinh dùng điện thoại trong trường%s'"
         response = await asyncio.to_thread(gemini.generate_content, prompt)
         topic = response.text.strip().replace('"', '')
         if len(topic) > 10:
@@ -435,33 +454,33 @@ def register(user: AuthInput):
     if not user.username or not user.password:
         return {"success": False, "error": "Vui lòng nhập đủ tên đăng nhập và mật khẩu"}
     
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     # Check if exists
-    cursor.execute("SELECT username FROM users WHERE username = ?", (user.username,))
+    cursor.execute("SELECT username FROM users WHERE username = %s", (user.username,))
     if cursor.fetchone():
         conn.close()
         return {"success": False, "error": "Tài khoản đã tồn tại"}
         
     pwd_hash = hashlib.sha256(user.password.encode()).hexdigest()
-    cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (user.username, pwd_hash))
+    cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user.username, pwd_hash))
     conn.commit()
     conn.close()
     return {"success": True, "message": "Đăng ký thành công"}
 
 @app.post("/login")
 def login(user: AuthInput):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     pwd_hash = hashlib.sha256(user.password.encode()).hexdigest()
     
-    cursor.execute("SELECT username FROM users WHERE username = ? AND password_hash = ?", (user.username, pwd_hash))
+    cursor.execute("SELECT username FROM users WHERE username = %s AND password_hash = %s", (user.username, pwd_hash))
     row = cursor.fetchone()
     conn.close()
     
     if row:
-        return {"success": True, "username": row[0]}
+        return {"success": True, "username": row['username']}
     else:
         return {"success": False, "error": "Sai tài khoản hoặc mật khẩu"}
 
@@ -471,38 +490,38 @@ class NicknameUpdate(BaseModel):
 
 @app.post("/set-nickname")
 def set_nickname(data: NicknameUpdate):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT username FROM users WHERE username = ?", (data.username,))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT username FROM users WHERE username = %s", (data.username,))
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO users (username, password_hash, nickname) VALUES (?, ?, ?)", (data.username, "clerk_auth", data.nickname))
+        cursor.execute("INSERT INTO users (username, password_hash, nickname) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (data.username, "clerk_auth", data.nickname))
     else:
-        cursor.execute("UPDATE users SET nickname = ? WHERE username = ?", (data.nickname, data.username))
+        cursor.execute("UPDATE users SET nickname = %s WHERE username = %s", (data.nickname, data.username))
     conn.commit()
     conn.close()
     return {"success": True}
 
 @app.get("/nicknames")
 def get_nicknames():
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT username, nickname FROM users WHERE nickname IS NOT NULL AND nickname != ''")
     rows = cursor.fetchall()
     conn.close()
-    return {"success": True, "nicknames": {row[0]: row[1] for row in rows}}
+    return {"success": True, "nicknames": {row['username']: row['nickname'] for row in rows}}
 
 @app.post("/save-match")
 def save_match(data: SaveMatch):
     """Lưu kết quả trận đấu vào lịch sử và cộng điểm tích lũy nếu thắng"""
     from datetime import datetime, timezone
     played_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
         INSERT INTO match_history
             (username, opponent, topic, mode, result,
              score_self, score_opp, fallacies_self, fallacies_opp, summary, played_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
         data.score_self, data.score_opp,
@@ -511,13 +530,13 @@ def save_match(data: SaveMatch):
     ))
     # Award store points on win (+5), draw (+1)
     if data.result == 'win':
-        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 5 WHERE username = ?", (data.username,))
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 5 WHERE username = %s", (data.username,))
     elif data.result == 'draw':
-        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 1 WHERE username = ?", (data.username,))
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 1 WHERE username = %s", (data.username,))
     # Increment debate_count between these two players if they're friends
     cursor.execute("""
         UPDATE friends SET debate_count = COALESCE(debate_count,0) + 1
-        WHERE (user1=? AND user2=?) OR (user1=? AND user2=?)
+        WHERE (user1=%s AND user2=%s) OR (user1=%s AND user2=%s)
     """, (data.username, data.opponent, data.opponent, data.username))
     conn.commit()
     conn.close()
@@ -532,23 +551,23 @@ class PurchaseRequest(BaseModel):
 def purchase_item(data: PurchaseRequest):
     """Mua vật phẩm bằng Điểm Tích Lũy"""
     from datetime import datetime, timezone
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     # Check if already owned
-    cursor.execute("SELECT id FROM user_items WHERE username=? AND item_id=?", (data.username, data.item_id))
+    cursor.execute("SELECT id FROM user_items WHERE username=%s AND item_id=%s", (data.username, data.item_id))
     if cursor.fetchone():
         conn.close()
         return {"success": False, "error": "Bạn đã sở hữu vật phẩm này rồi!"}
     # Check balance (backend store_points + we trust frontend for localStorage points)
-    cursor.execute("SELECT store_points FROM users WHERE username=?", (data.username,))
+    cursor.execute("SELECT store_points FROM users WHERE username=%s", (data.username,))
     row = cursor.fetchone()
-    current_points = row[0] if row and row[0] else 0
+    current_points = row['store_points'] if row and row['store_points'] else 0
     if current_points < data.price:
         conn.close()
         return {"success": False, "error": f"Không đủ điểm! Cần {data.price}, hiện có {current_points}."}
-    cursor.execute("UPDATE users SET store_points = store_points - ? WHERE username=?", (data.price, data.username))
+    cursor.execute("UPDATE users SET store_points = store_points - %s WHERE username=%s", (data.price, data.username))
     now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-    cursor.execute("INSERT INTO user_items (username, item_id, purchased_at) VALUES (?,?,?)", (data.username, data.item_id, now))
+    cursor.execute("INSERT INTO user_items (username, item_id, purchased_at) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (data.username, data.item_id, now))
     conn.commit()
     conn.close()
     return {"success": True, "remaining_points": current_points - data.price}
@@ -556,13 +575,13 @@ def purchase_item(data: PurchaseRequest):
 @app.get("/my-info/{username}")
 def get_my_info(username: str):
     """Lấy thông tin điểm số và vật phẩm của user"""
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT store_points FROM users WHERE username=?", (username,))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT store_points FROM users WHERE username=%s", (username,))
     row = cursor.fetchone()
-    store_points = row[0] if row and row[0] else 0
-    cursor.execute("SELECT item_id FROM user_items WHERE username=?", (username,))
-    items = [r[0] for r in cursor.fetchall()]
+    store_points = row['store_points'] if row and row['store_points'] else 0
+    cursor.execute("SELECT item_id FROM user_items WHERE username=%s", (username,))
+    items = [r['item_id'] for r in cursor.fetchall()]
     conn.close()
     return {"success": True, "store_points": store_points, "items": items}
 
@@ -572,25 +591,24 @@ class CheckinRequest(BaseModel):
 @app.post("/checkin")
 def server_checkin(data: CheckinRequest):
     """Server-side check-in: cộng 50 điểm vào store_points"""
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 50 WHERE username=?", (data.username,))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 50 WHERE username=%s", (data.username,))
     if cursor.rowcount == 0:
-        cursor.execute("INSERT OR IGNORE INTO users (username, password_hash, store_points) VALUES (?,?,?)", (data.username, 'clerk_auth', 50))
+        cursor.execute("INSERT INTO users (username, password_hash, store_points) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (data.username, 'clerk_auth', 50))
     conn.commit()
-    cursor.execute("SELECT store_points FROM users WHERE username=?", (data.username,))
+    cursor.execute("SELECT store_points FROM users WHERE username=%s", (data.username,))
     row = cursor.fetchone()
     conn.close()
-    return {"success": True, "store_points": row[0] if row else 50}
+    return {"success": True, "store_points": row['store_points'] if row else 50}
 
 @app.get("/events")
 def get_events():
     """Lấy danh sách sự kiện theo trạng thái"""
-    conn = sqlite3.connect("users.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("SELECT * FROM events ORDER BY event_type DESC, status ASC")
-    rows = [dict(r) for r in cursor.fetchall()]
+    rows = list(cursor.fetchall())
     conn.close()
     return {"success": True, "events": rows}
 
@@ -603,38 +621,105 @@ def admin_toggle_event(data: EventToggle):
     """Admin toggle trạng thái sự kiện"""
     if data.status not in ['open', 'upcoming', 'locked']:
         return {"success": False, "error": "Invalid status"}
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("UPDATE events SET status=? WHERE id=?", (data.status, data.event_id))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("UPDATE events SET status=%s WHERE id=%s", (data.status, data.event_id))
     conn.commit()
     conn.close()
     return {"success": True}
 
+class JoinEventRequest(BaseModel):
+    username: str
+    event_id: int
+
+@app.post("/join-event")
+def join_event(data: JoinEventRequest):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Check if event is open
+    cursor.execute("SELECT status FROM events WHERE id=%s", (data.event_id,))
+    event = cursor.fetchone()
+    if not event or event['status'] != 'open':
+        conn.close()
+        return {"success": False, "error": "Sự kiện không tồn tại hoặc chưa mở."}
+        
+    try:
+        cursor.execute("INSERT INTO event_participants (event_id, username, joined_at) VALUES (%s, %s, %s)", (data.event_id, data.username, now))
+        conn.commit()
+        success = True
+        error = ""
+    except Exception as e:
+        conn.rollback()
+        success = False
+        error = "Bạn đã tham gia sự kiện này rồi."
+    finally:
+        conn.close()
+    
+    if success:
+        return {"success": True}
+    else:
+        return {"success": False, "error": error}
+
+@app.get("/my-events/{username}")
+def get_my_events(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT event_id FROM event_participants WHERE username=%s", (username,))
+    rows = cursor.fetchall()
+    conn.close()
+    return {"success": True, "events": [row['event_id'] for row in rows]}
+
+class EventSubmission(BaseModel):
+    username: str
+    event_id: int
+    content: str
+
+@app.post("/submit-event")
+def submit_event(data: EventSubmission):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE event_participants SET submission_text = %s WHERE username = %s AND event_id = %s", (data.content, data.username, data.event_id))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/event-submission/{event_id}/{username}")
+def get_event_submission(event_id: int, username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT submission_text FROM event_participants WHERE username = %s AND event_id = %s", (username, event_id))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"success": True, "content": row['submission_text'] or ""}
+    return {"success": False, "error": "Not found"}
+
 @app.get("/history/{username}")
 def get_history(username: str, limit: int = 20):
     """Lấy lịch sử trận đấu của user"""
-    conn = sqlite3.connect("users.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
         SELECT id, opponent, topic, mode, result,
                score_self, score_opp, fallacies_self, fallacies_opp,
                summary, played_at
         FROM match_history
-        WHERE username = ?
+        WHERE username = %s
         ORDER BY played_at DESC
-        LIMIT ?
+        LIMIT %s
     """, (username, limit))
-    rows = [dict(r) for r in cursor.fetchall()]
+    rows = list(cursor.fetchall())
     conn.close()
     return {"success": True, "history": rows}
 
 @app.get("/leaderboard")
 def get_leaderboard(limit: int = 10):
     """Lấy bảng xếp hạng công bằng: Ưu tiên Thắng, sau đó là Hiệu năng trận đấu thực tế"""
-    conn = sqlite3.connect("users.db")
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     # Logic: 
     # 1. Chỉ tính điểm TB (avg_score) cho những trận có phát sinh điểm (score_self > 0)
@@ -650,9 +735,9 @@ def get_leaderboard(limit: int = 10):
         GROUP BY username
         HAVING total_matches > 0
         ORDER BY wins DESC, avg_score DESC
-        LIMIT ?
+        LIMIT %s
     """, (limit,))
-    rows = [dict(r) for r in cursor.fetchall()]
+    rows = list(cursor.fetchall())
     conn.close()
     
     # Fix giá trị null nếu user chưa có trận nào có điểm > 0
@@ -665,19 +750,19 @@ def get_leaderboard(limit: int = 10):
 # --- FRIENDS SYSTEM ---
 @app.get("/friends/{username}")
 def get_friends(username: str):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     # Lấy danh sách bạn bè kèm debate_count
     cursor.execute("""
-        SELECT CASE WHEN user1=? THEN user2 ELSE user1 END as friend,
+        SELECT CASE WHEN user1=%s THEN user2 ELSE user1 END as friend,
                COALESCE(debate_count, 0) as debate_count
-        FROM friends WHERE user1=? OR user2=?
+        FROM friends WHERE user1=%s OR user2=%s
     """, (username, username, username))
-    friends = [{"username": row[0], "debate_count": row[1]} for row in cursor.fetchall()]
+    friends = [{"username": row['friend'], "debate_count": row['debate_count']} for row in cursor.fetchall()]
     
     # Lấy lời mời kết bạn (những người gửi cho username)
-    cursor.execute("SELECT sender FROM friend_requests WHERE receiver = ?", (username,))
-    requests = [row[0] for row in cursor.fetchall()]
+    cursor.execute("SELECT sender FROM friend_requests WHERE receiver = %s", (username,))
+    requests = [row['sender'] for row in cursor.fetchall()]
     conn.close()
     
     return {"success": True, "friends": friends, "requests": requests}
@@ -688,11 +773,11 @@ def send_friend_request(data: FriendAction):
     if data.user == data.target:
         return {"success": False, "error": "Không thể tự kết bạn"}
         
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     # Kiểm tra target có tồn tại không
-    cursor.execute("SELECT username FROM users WHERE username = ?", (data.target,))
+    cursor.execute("SELECT username FROM users WHERE username = %s", (data.target,))
     if not cursor.fetchone():
         conn.close()
         return {"success": False, "error": "Người chơi không tồn tại"}
@@ -700,49 +785,51 @@ def send_friend_request(data: FriendAction):
     # Kiểm tra đã là bạn chưa
     cursor.execute("""
         SELECT id FROM friends 
-        WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+        WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
     """, (data.user, data.target, data.target, data.user))
     if cursor.fetchone():
         conn.close()
         return {"success": False, "error": "Đã là bạn bè"}
         
     try:
-        cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (?, ?)", (data.user, data.target))
+        cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (%s, %s) ON CONFLICT (sender, receiver) DO NOTHING", (data.user, data.target))
         conn.commit()
-    except sqlite3.IntegrityError:
-        pass # Đã gửi rồi
+    except Exception as e:
+        print("Lỗi gửi lời mời:", e)
+        conn.rollback()
     conn.close()
     return {"success": True}
 
 @app.post("/accept-friend")
 def accept_friend(data: FriendAction):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM friend_requests WHERE sender = ? AND receiver = ?", (data.target, data.user))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("DELETE FROM friend_requests WHERE sender = %s AND receiver = %s", (data.target, data.user))
     try:
-        cursor.execute("INSERT INTO friends (user1, user2) VALUES (?, ?)", (data.user, data.target))
+        cursor.execute("INSERT INTO friends (user1, user2) VALUES (%s, %s) ON CONFLICT (user1, user2) DO NOTHING", (data.user, data.target))
         conn.commit()
-    except:
-        pass
+    except Exception as e:
+        print("Lỗi kết bạn:", e)
+        conn.rollback()
     conn.close()
     return {"success": True}
 
 @app.post("/decline-friend")
 def decline_friend(data: FriendAction):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM friend_requests WHERE sender = ? AND receiver = ?", (data.target, data.user))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("DELETE FROM friend_requests WHERE sender = %s AND receiver = %s", (data.target, data.user))
     conn.commit()
     conn.close()
     return {"success": True}
 
 @app.post("/remove-friend")
 def remove_friend(data: FriendAction):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
         DELETE FROM friends 
-        WHERE (user1 = ? AND user2 = ?) OR (user1 = ? AND user2 = ?)
+        WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
     """, (data.user, data.target, data.target, data.user))
     conn.commit()
     conn.close()

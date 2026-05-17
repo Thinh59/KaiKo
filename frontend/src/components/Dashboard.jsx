@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { useUser } from '@clerk/clerk-react'
 
@@ -94,8 +94,74 @@ function HistoryRow({ match, onClick }) {
   )
 }
 
+const EventWorkspaceModal = ({ event, onClose, username }) => {
+  const [loading, setLoading] = useState(true);
+  const editorRef = useRef(null);
+
+  useEffect(() => {
+    // fetch existing submission
+    axios.get(`${API_BASE}/event-submission/${event.id}/${encodeURIComponent(username)}`)
+      .then(res => {
+        if (res.data.success && res.data.content) {
+          if (editorRef.current) editorRef.current.innerHTML = res.data.content;
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [event.id, username]);
+
+  const handleFormat = (command) => {
+    document.execCommand(command, false, null);
+    if (editorRef.current) editorRef.current.focus();
+  };
+
+  const handleSave = async () => {
+    const htmlContent = editorRef.current.innerHTML;
+    try {
+      const res = await axios.post(`${API_BASE}/submit-event`, { username, event_id: event.id, content: htmlContent });
+      if (res.data.success) {
+        alert('Đã lưu bài viết thành công!');
+        onClose();
+      }
+    } catch(e) {
+      alert('Lỗi lưu bài!');
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: 'var(--bg-primary)', width: '90%', maxWidth: '800px', borderRadius: '16px', padding: '24px', border: '1px solid var(--accent-primary)', display: 'flex', flexDirection: 'column', height: '80vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>📝 Trình Soạn Thảo: {event.title}</h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+        </div>
+        
+        {loading ? <p style={{ color: 'var(--text-secondary)' }}>Đang tải...</p> : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', display: 'flex', gap: '10px', borderRadius: '8px 8px 0 0', border: '1px solid var(--border-light)', borderBottom: 'none' }}>
+              <button onClick={() => handleFormat('bold')} style={{ fontWeight: 'bold', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>B</button>
+              <button onClick={() => handleFormat('italic')} style={{ fontStyle: 'italic', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>I</button>
+              <button onClick={() => handleFormat('underline')} style={{ textDecoration: 'underline', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>U</button>
+              <button onClick={() => handleFormat('insertUnorderedList')} style={{ padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>• Danh sách</button>
+            </div>
+            <div
+              ref={editorRef}
+              contentEditable
+              style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '0 0 8px 8px', border: '1px solid var(--border-light)', color: '#fff', outline: 'none', fontSize: '1.1rem', lineHeight: '1.6' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', gap: '10px' }}>
+              <button onClick={onClose} className="btn-secondary" style={{ padding: '10px 20px' }}>Hủy</button>
+              <button onClick={handleSave} className="btn-primary" style={{ padding: '10px 20px' }}>Lưu Bài Viết</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [activeTab, setActiveTab] = useState('home')
+  const [activeEvent, setActiveEvent] = useState(null)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
@@ -103,7 +169,6 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0, total: 0, avgScore: 0 })
 
   const { user } = useUser()
-  const avatarUrl = user?.imageUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username
 
   const [avatarFrame, setAvatarFrame] = useState(localStorage.getItem('kaiko_frame') || 'none')
   const [hasCheckedIn, setHasCheckedIn] = useState(localStorage.getItem('kaiko_checkin_' + username) === new Date().toLocaleDateString('vi-VN'))
@@ -119,7 +184,47 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [serverPoints, setServerPoints] = useState(0)
   const [myItems, setMyItems] = useState([])
   const [events, setEvents] = useState([])
+  const [joinedEvents, setJoinedEvents] = useState([])
   const [selectedAvatar, setSelectedAvatar] = useState(localStorage.getItem('kaiko_avatar_' + username) || '')
+  const [selectedBadges, setSelectedBadges] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kaiko_badges_' + username) || '[]') } catch { return [] }
+  })
+
+  // All badge-type items with their image mappings
+  const RANK_BADGE_CATALOG = [
+    { id: 'rank_1',  image: '/assets/badges/crab_baby.png',     name: 'Cua Non (Lv 1+)',    minLevel: 1  },
+    { id: 'rank_11', image: '/assets/badges/crab_walker.png',   name: 'Cua Gắt (Lv 11+)',   minLevel: 11 },
+    { id: 'rank_31', image: '/assets/badges/crab_keyboard.png', name: 'Cua Cùm (Lv 31+)',   minLevel: 31 },
+    { id: 'rank_61', image: '/assets/badges/crab_judge.png',    name: 'Thư Giãn (Lv 61+)',  minLevel: 61 },
+    { id: 'rank_91', image: '/assets/badges/crab_king.png',     name: 'Idol Cua (Lv 91+)',   minLevel: 91 },
+  ]
+  const BADGE_CATALOG = [
+    { id: 'title_best',     image: '/assets/badges/HHKhoeNhatBien.png',  name: 'Khỏe Nhất Biển' },
+    { id: 'title_genius',   image: '/assets/badges/title_genus.png',      name: 'Thiên Tài Tinh Tú' },
+    { id: 'title_banthan',  image: '/assets/badges/HHBanThan.png',        name: 'Bạn Thân Cua' },
+    { id: 'title_kaikonew', image: '/assets/badges/HHKaiKoMoiNhu.png',   name: 'KaiKo Mới Này' },
+    { id: 'rename_card',    image: '/assets/badges/rename_card.png',      name: 'Thẻ Biệt Danh' },
+    { id: 'avatar_crab_gold', image: '/assets/badges/avatar_crab_gold.png', name: 'Cua Hoàng Đế' },
+  ]
+
+  const toggleBadge = (id) => {
+    setSelectedBadges(prev => {
+      let next
+      if (prev.includes(id)) {
+        next = prev.filter(b => b !== id)
+      } else {
+        if (prev.length >= 5) return prev // max 5
+        next = [...prev, id]
+      }
+      localStorage.setItem('kaiko_badges_' + username, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const [showBadgeSelector, setShowBadgeSelector] = useState(false)
+
+  const avatarUrl = selectedAvatar || user?.imageUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username
+
   const displayUsername = globalNicknames[username] || nickname || username
   const getDisplayName = (u) => globalNicknames[u] || u
 
@@ -144,6 +249,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     } catch(e) {}
   }, [])
 
+  const loadMyEvents = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/my-events/${encodeURIComponent(username)}`)
+      if (res.data.success) setJoinedEvents(res.data.events || [])
+    } catch(e) {}
+  }, [username, isGuest])
+
   const handleCheckIn = async () => {
     if (!hasCheckedIn) {
       localStorage.setItem('kaiko_checkin_' + username, new Date().toLocaleDateString('vi-VN'))
@@ -161,6 +274,25 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
         setExtraPoints(newExtra)
         alert('Điểm danh thành công! Bạn nhận được 50 Điểm Tích Lũy.')
       }
+    }
+  }
+
+  const handleJoinEvent = async (eventId, title) => {
+    if (isGuest) {
+      alert('Vui lòng đăng nhập để tham gia sự kiện!')
+      return
+    }
+    if (!window.confirm(`Bạn có muốn tham gia sự kiện: ${title}?`)) return
+    try {
+      const res = await axios.post(`${API_BASE}/join-event`, { username, event_id: eventId })
+      if (res.data.success) {
+        alert('🎉 Đã đăng ký tham gia sự kiện thành công!')
+        loadMyEvents()
+      } else {
+        alert(`❌ ${res.data.error}`)
+      }
+    } catch(e) {
+      alert('Lỗi kết nối máy chủ!')
     }
   }
 
@@ -229,7 +361,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     setSelectedUser(targetName)
     setSelectedUserStats(null)
     try {
-        const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(targetName)}`)
+        const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(targetName)}?limit=1000`)
         if (res.data.success) {
             const h = res.data.history
             const wins   = h.filter(m => m.result === 'win').length
@@ -251,19 +383,30 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     localStorage.setItem('kaiko_frame', e.target.value)
   }
 
+  const frameFileMap = {
+    wood: 'wood.png',
+    silver: 'silver.png',
+    gold: 'gold.png',
+    diamond: 'diamond.png',
+    fire: 'fire.png',
+    diamond_plus: 'KimCuongPlus.png',
+  }
+
   const frameStyles = {
     none: { border: 'none' },
     wood: { border: '5px solid #8B4513', boxShadow: '0 0 10px #8B4513' },
     silver: { border: '5px solid #C0C0C0', boxShadow: '0 0 15px #C0C0C0' },
     gold: { border: '5px solid #FFD700', boxShadow: '0 0 20px #FFD700' },
-    diamond: { border: '5px solid #00FFFF', boxShadow: '0 0 25px #00FFFF', filter: 'drop-shadow(0 0 10px #00FFFF)' }
+    diamond: { border: '5px solid #00FFFF', boxShadow: '0 0 25px #00FFFF', filter: 'drop-shadow(0 0 10px #00FFFF)' },
+    diamond_plus: { border: '5px solid #a855f7', boxShadow: '0 0 30px #a855f7, 0 0 10px #00FFFF', filter: 'drop-shadow(0 0 12px #a855f7)' },
+    fire: { border: '5px solid #f97316', boxShadow: '0 0 25px #ef4444, 0 0 10px #fbbf24', filter: 'drop-shadow(0 0 8px #f97316)' },
   }
 
   const loadHistory = useCallback(async () => {
     if (isGuest) return
     setHistoryLoading(true)
     try {
-      const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(username)}`)
+      const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(username)}?limit=1000`)
       if (res.data.success) {
         const h = res.data.history
         setHistory(h)
@@ -332,9 +475,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     if (activeTab === 'home' || activeTab === 'history') loadHistory()
     if (activeTab === 'leaderboard') loadLeaderboard()
     if (activeTab === 'friends') loadFriends()
-    if (activeTab === 'events') loadEvents()
+    if (activeTab === 'events') { loadEvents(); loadMyEvents(); }
     if (activeTab === 'store' || activeTab === 'home') loadMyInfo()
-  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyInfo])
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo])
 
   // Polling for friend requests every 5 seconds
   useEffect(() => {
@@ -355,11 +498,11 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   ]
 
   const getRankInfo = (level) => {
-    if (level < 11) return { title: 'KaiKo Ngang Như Cua Non', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)', icon: '🦀' }
-    if (level < 31) return { title: 'KaiKo Mượt Nhưng Cua Gắt', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: '🌊' }
-    if (level < 61) return { title: 'KaiKo Ngon Như Cua Cùm', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', icon: '🔥' }
-    if (level < 91) return { title: 'KaiKo Nhưng Thư Giãn', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', icon: '🧘' }
-    return { title: 'KaiKo Sáng Rực Như Idol Cua Hoàng Đế', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', icon: '👑' }
+    if (level < 11) return { title: 'KaiKo Ngang Như Cua Non', color: '#9ca3af', bg: 'rgba(156, 163, 175, 0.1)', icon: '🦀', badgeImage: '/assets/badges/crab_baby.png' }
+    if (level < 31) return { title: 'KaiKo Mượt Nhưng Cua Gắt', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: '🌊', badgeImage: '/assets/badges/crab_walker.png' }
+    if (level < 61) return { title: 'KaiKo Ngon Như Cua Cùm', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', icon: '🔥', badgeImage: '/assets/badges/crab_keyboard.png' }
+    if (level < 91) return { title: 'KaiKo Nhưng Thư Giãn', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', icon: '🧘', badgeImage: '/assets/badges/crab_judge.png' }
+    return { title: 'KaiKo Sáng Rực Như Idol Cua Hoàng Đế', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', icon: '👑', badgeImage: '/assets/badges/crab_king.png' }
   }
 
   const currentLevel = isGuest ? 1 : (stats.level || 1)
@@ -421,7 +564,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
             border: activeTab === 'home' ? 'none' : '1px solid rgba(251, 146, 60, 0.2)',
             flex: 1,
             display: 'flex',
-            flexDirection: 'column'
+            flexDirection: 'column',
+            overflowY: 'auto',
+            maxHeight: 'calc(100vh - 200px)'
           }}>
 
           {activeTab !== 'home' && (
@@ -439,7 +584,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
 
           {/* HOME (SẢNH CHÍNH) */}
           {activeTab === 'home' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: '1rem', flex: 1 }}>
               
               <div style={{ marginBottom: '3rem', position: 'relative', display: 'inline-block' }}>
                 <div style={{ position: 'absolute', top: '-15px', right: '-15px', zIndex: 10 }}>
@@ -474,7 +619,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 
                 {!isGuest && (
                   <div style={{ marginTop: '20px', color: 'var(--text-secondary)' }}>
-                    ⭐ Điểm Tích Lũy (Mua sắm): <strong style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{stats.points || 0}</strong>
+                    ⭐ Điểm Tích Lũy (Mua sắm): <strong style={{ color: '#fbbf24', fontSize: '1.2rem' }}>{serverPoints}</strong>
                   </div>
                 )}
               </div>
@@ -672,45 +817,124 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           {/* PROFILE */}
           {activeTab === 'profile' && (
             <div style={{ padding: '2rem', textAlign: 'center' }}>
-              <div style={{ marginBottom: '2rem', position: 'relative', display: 'inline-block' }}>
+
+              <div style={{ marginBottom: '1rem', position: 'relative', display: 'inline-block', width: '150px', height: '150px' }}>
                 <img 
                   src={avatarUrl} 
                   alt="Avatar" 
                   style={{ 
-                    width: '150px', height: '150px', borderRadius: '50%', objectFit: 'cover',
+                    width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover',
                     ...frameStyles[avatarFrame]
                   }} 
                 />
+                {avatarFrame !== 'none' && (
+                  <img
+                    src={`/assets/frames/${frameFileMap[avatarFrame] || avatarFrame + '.png'}`}
+                    alt="Frame Overlay"
+                    style={{
+                      position: 'absolute',
+                      top: '-15%',
+                      left: '-15%',
+                      width: '130%',
+                      height: '130%',
+                      pointerEvents: 'none',
+                      zIndex: 10
+                    }}
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                )}
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Khung Avatar:</label>
-                <select value={avatarFrame} onChange={handleFrameChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                  <option value="none">Không có</option>
-                  <option value="wood" disabled={currentLevel < 11}>Khung Gỗ (Yêu cầu Lv 11)</option>
-                  <option value="silver" disabled={currentLevel < 31}>Khung Bạc (Yêu cầu Lv 31)</option>
-                  <option value="gold" disabled={currentLevel < 61}>Khung Vàng (Yêu cầu Lv 61)</option>
-                  <option value="diamond" disabled={currentLevel < 91}>Khung Kim Cương (Yêu cầu Lv 91)</option>
-                </select>
+              <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div>
+                  <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Khung Avatar:</label>
+                  <select value={avatarFrame} onChange={handleFrameChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                    <option value="none">Không có</option>
+                    <option value="wood" disabled={currentLevel < 11}>Khung Gỗ (Yêu cầu Lv 11)</option>
+                    <option value="silver" disabled={currentLevel < 31}>Khung Bạc (Yêu cầu Lv 31)</option>
+                    <option value="gold" disabled={currentLevel < 61}>Khung Vàng (Yêu cầu Lv 61)</option>
+                    <option value="diamond" disabled={currentLevel < 91}>Khung Kim Cương (Yêu cầu Lv 91)</option>
+                    {myItems.includes('frame_fire') && <option value="fire">Khung Cua Lửa (Store)</option>}
+                    {myItems.includes('frame_diamond_plus') && <option value="diamond_plus">Khung Kim Cương Plus (Store)</option>}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Avatar:</label>
+                  <select value={selectedAvatar} onChange={(e) => { setSelectedAvatar(e.target.value); localStorage.setItem('kaiko_avatar_' + username, e.target.value); }} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                    <option value="">Ảnh Mặc định (Bottts)</option>
+                    <option value="/assets/avatars/CuaDoTruyenThong.png">Cua Đỏ Truyền Thống</option>
+                    <option value="/assets/avatars/CuaXanh.png">Cua Xanh Học Giả</option>
+                    {myItems.includes('avatar_crab_gold') && <option value="/assets/badges/avatar_crab_gold.png">Cua Hoàng Đế (Vật phẩm Store)</option>}
+                  </select>
+                </div>
               </div>
 
               <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '0.5rem', textShadow: '0 2px 10px rgba(255,255,255,0.1)' }}>Hồ sơ của {getDisplayName(username)}</h2>
               <div style={{ display: 'inline-block', background: rank.bg, color: rank.color, padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '1.5rem', border: `1px solid ${rank.color}` }}>
-                {rank.icon} Level {currentLevel} - {rank.title}
+                <span style={{ marginRight: '8px' }}>{rank.icon}</span> 
+                Level {currentLevel} - {rank.title}
               </div>
 
               {!isGuest && (
-                <div style={{ width: '350px', margin: '0 auto 3rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
+                <div style={{ width: '350px', margin: '0 auto 1.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
                   <div style={{ width: `${stats.exp || 0}%`, background: 'linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%)', height: '100%', transition: 'width 1s ease-in-out' }}></div>
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                     {stats.exp || 0} / 100 EXP (Tới cấp tiếp theo)
                   </div>
                 </div>
               )}
+
+              {/* Huy hiệu rank lớn — chỉ hiện khi chưa có showcase */}
+              {(() => {
+                const displayBadges = selectedBadges.map(id => [...RANK_BADGE_CATALOG, ...BADGE_CATALOG].find(b => b.id === id)).filter(Boolean)
+                if (!isGuest && displayBadges.length > 0) return null
+                return (
+                  <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                    <img src={rank.badgeImage} alt="Rank Badge" style={{ height: '140px', width: 'auto', maxWidth: '350px', objectFit: 'contain', filter: 'drop-shadow(0 4px 15px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
+                  </div>
+                )
+              })()}
+
+              {/* === HUY HIỆU SHOWCASE === */}
+              {!isGuest && (() => {
+                const allAvailable = [
+                  ...RANK_BADGE_CATALOG.filter(b => currentLevel >= b.minLevel),
+                  ...BADGE_CATALOG.filter(b => myItems.includes(b.id))
+                ]
+                const allById = Object.fromEntries(allAvailable.map(b => [b.id, b]))
+                const displayBadges = selectedBadges.map(id => allById[id]).filter(Boolean)
+                return (
+                  <div style={{ marginBottom: '2rem' }}>
+                    {/* Hàng showcase to, 96px */}
+                    {displayBadges.length > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '1.2rem' }}>
+                        {displayBadges.map(b => (
+                          <div key={b.id} title={b.name} style={{ textAlign: 'center' }}>
+                            <img src={b.image} alt={b.name} style={{ height: '96px', width: '96px', objectFit: 'contain', filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' }} onError={(e) => { e.target.style.display='none' }} />
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '96px' }}>{b.name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Nút mở chọn huy hiệu */}
+                    {allAvailable.length > 0 && (
+                      <div style={{ textAlign: 'center' }}>
+                        <button
+                          onClick={() => setShowBadgeSelector(true)}
+                          style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
+                        >
+                          🏅 Chọn Huy Hiệu Hiển Thị ({selectedBadges.length}/5)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
               
               {!isGuest && (
                 <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '2.5rem', border: `1px solid #f59e0b` }}>
-                  ⭐ Điểm Tích Lũy (Mua Sắm): {stats.points || 0}
+                  ⭐ Điểm Tích Lũy (Mua Sắm): {serverPoints}
                 </div>
               )}
 
@@ -808,7 +1032,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                     </div>
                   </div>
                   )
-                })}}
+                })}
               </div>
             </div>
           )}
@@ -845,14 +1069,22 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>{ev.description}</p>
                             {ev.reward && <div style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>🎁 {ev.reward}</div>}
                           </div>
-                          <button
-                            className={isOpen ? 'btn-primary' : 'btn-secondary'}
-                            disabled={!isOpen}
-                            onClick={() => isOpen ? alert('Tính năng tham gia sự kiện đang được phát triển!') : null}
-                            style={{ marginTop: '1.5rem', width: '100%', opacity: isOpen ? 1 : 0.5, cursor: isOpen ? 'pointer' : 'not-allowed' }}
-                          >
-                            {isOpen ? 'Tham gia ngay' : isUpcoming ? 'Chưa mở' : 'Đã kết thúc'}
-                          </button>
+                          {(() => {
+                            const hasJoined = joinedEvents.includes(ev.id)
+                            return (
+                              <button
+                                className={hasJoined || (isOpen && !hasJoined) ? 'btn-primary' : 'btn-secondary'}
+                                disabled={(!isOpen && !hasJoined)}
+                                onClick={() => {
+                                  if (hasJoined) setActiveEvent(ev)
+                                  else if (isOpen) handleJoinEvent(ev.id, ev.title)
+                                }}
+                                style={{ marginTop: '1.5rem', width: '100%', opacity: (isOpen || hasJoined) ? 1 : 0.5, cursor: (isOpen || hasJoined) ? 'pointer' : 'not-allowed', background: hasJoined ? '#10b981' : '', color: hasJoined ? '#fff' : '' }}
+                              >
+                                {hasJoined ? '✅ Vào Sự Kiện' : isOpen ? 'Tham gia ngay' : isUpcoming ? 'Chưa mở' : 'Đã kết thúc'}
+                              </button>
+                            )
+                          })()}
                         </div>
                       )
                     })}
@@ -877,11 +1109,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{ev.description}</p>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '600px', margin: '0 auto' }}>
                         <div style={{ background: 'rgba(139,92,246,0.1)', border: '2px solid #8b5cf6', borderRadius: '20px', padding: '2rem' }}>
-                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem' }}>👻</div>
+                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                            <img src="/assets/mascots/ghost.png" alt="Cua Ma" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
+                            <div style={{ display: 'none' }}>👻</div>
+                          </div>
                           <h3 style={{ color: '#8b5cf6' }}>Phe Cua Ma</h3>
                         </div>
                         <div style={{ background: 'rgba(234,179,8,0.1)', border: '2px solid #eab308', borderRadius: '20px', padding: '2rem' }}>
-                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem' }}>😇</div>
+                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                            <img src="/assets/mascots/god.png" alt="Cua Thần" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
+                            <div style={{ display: 'none' }}>😇</div>
+                          </div>
                           <h3 style={{ color: '#eab308' }}>Phe Cua Thần</h3>
                         </div>
                       </div>
@@ -901,19 +1139,24 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
                 {[
-                  { id: 'frame_fire', name: 'Khung Cua Lửa', price: 1500, icon: '🔥', desc: 'Hiệu ứng cháy sáng quanh Avatar. Mở khóa frame "fire" trong hồ sơ.' },
-                  { id: 'rename_card', name: 'Thẻ Đổi Nickname', price: 500, icon: '🎫', desc: 'Cho phép đổi Biệt Danh không giới hạn 1 lần. (Mặc định đã miễn phí)' },
-                  { id: 'title_best', name: 'Danh Hiệu: Khỏe Nhất Biển', price: 5000, icon: '👑', desc: 'Hiển thị huy hiệu vàng đặc biệt kế bên tên trong leaderboard và phòng debate.' },
-                  { id: 'frame_diamond_plus', name: 'Khung Kim Cương Plus', price: 2000, icon: '💎', desc: 'Phiên bản nâng cấp của Khung Kim Cương với hiệu ứng pulse. Yêu cầu Lv 61+.' },
-                  { id: 'avatar_crab_gold', name: 'Avatar Cua Hoàng Đế', price: 800, icon: '🦀', desc: 'Avatar cua vàng độc quyền. Dùng trong hồ sơ cá nhân.' },
-                  { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
+                  { id: 'frame_fire', name: 'Khung Cua Lửa', price: 1500, icon: '🔥', image: 'fire.png', isFrame: true, desc: 'Hiệu ứng cháy sáng quanh Avatar. Mở khóa frame "fire" trong hồ sơ.' },
+                  { id: 'rename_card', name: 'Thẻ Đổi Nickname', price: 500, icon: '🎫', image: 'rename_card.png', isFrame: false, desc: 'Cho phép đổi Biệt Danh không giới hạn 1 lần. (Mặc định đã miễn phí)' },
+                  { id: 'title_best', name: 'Danh Hiệu: Khỏe Nhất Biển', price: 5000, icon: '👑', image: 'HHKhoeNhatBien.png', isFrame: false, desc: 'Hiển thị huy hiệu vàng đặc biệt kế bên tên trong leaderboard và phòng debate.' },
+                  { id: 'frame_diamond_plus', name: 'Khung Kim Cương Plus', price: 2000, icon: '💎', image: 'KimCuongPlus.png', isFrame: true, desc: 'Phiên bản nâng cấp của Khung Kim Cương với hiệu ứng pulse. Yêu cầu Lv 61+.' },
+                  { id: 'avatar_crab_gold', name: 'Avatar Cua Hoàng Đế', price: 800, icon: '🦀', image: 'avatar_crab_gold.png', isFrame: false, desc: 'Avatar cua vàng độc quyền. Dùng trong hồ sơ cá nhân.' },
+                  { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', image: 'title_genus.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
+                  { id: 'title_banthan', name: 'Danh Hiệu: Bạn Thân Cua', price: 1200, icon: '🦀', image: 'HHBanThan.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người yêu cộng đồng KaiKo.' },
+                  { id: 'title_kaikonew', name: 'Danh Hiệu: KaiKo Mới Này', price: 800, icon: '🌟', image: 'HHKaiKoMoiNhu.png', isFrame: false, desc: 'Danh hiệu chào mừng người mới gia nhập KaiKo.' },
                 ].map(item => {
                   const owned = myItems.includes(item.id)
                   const canAfford = serverPoints >= item.price
                   return (
                     <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
                       {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
-                      <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>{item.icon}</div>
+                      <div style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
+                        <img src={item.isFrame ? `/assets/frames/${item.image}` : `/assets/badges/${item.image}`} alt={item.name} style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; if (e.target.nextSibling) e.target.nextSibling.style.display='block' }} />
+                        <div style={{ display: 'none' }}>{item.icon}</div>
+                      </div>
                       <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{item.name}</h3>
                       <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.2rem', flex: 1 }}>{item.desc}</p>
                       <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: canAfford || owned ? '#fbbf24' : '#ef4444', marginBottom: '1rem' }}>{item.price} ⭐</div>
@@ -1003,7 +1246,50 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           <div style={{ background: 'var(--bg-primary)', padding: '2rem', borderRadius: '24px', width: '90%', maxWidth: '500px', border: '1px solid rgba(251, 146, 60, 0.5)', position: 'relative' }} onClick={e => e.stopPropagation()}>
             <button onClick={() => setSelectedUser(null)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
             <div style={{ textAlign: 'center' }}>
-              <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`} alt="Avatar" style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', marginBottom: '10px' }} />
+              <div style={{ marginBottom: '1rem', position: 'relative', display: 'inline-block', width: '100px', height: '100px' }}>
+                {(() => {
+                  let theirAvatar = (selectedUser === username) ? selectedAvatar : localStorage.getItem('kaiko_avatar_' + selectedUser)
+                  let theirFrame = (selectedUser === username) ? avatarFrame : localStorage.getItem('kaiko_frame_' + selectedUser)
+                  
+                  // Tự động gán avatar/khung xịn cho các tài khoản giả lập/chưa set
+                  if (!theirAvatar && selectedUser !== username && selectedUserStats) {
+                    if (selectedUserStats.level >= 91) theirAvatar = '/assets/badges/avatar_crab_gold.png'
+                    else if (selectedUserStats.level >= 61) theirAvatar = '/assets/avatars/CuaXanh.png'
+                    else if (selectedUserStats.level >= 11) theirAvatar = '/assets/avatars/CuaDoTruyenThong.png'
+                  }
+                  
+                  if (!theirFrame && selectedUser !== username && selectedUserStats) {
+                    if (selectedUserStats.level >= 91) theirFrame = 'diamond_plus'
+                    else if (selectedUserStats.level >= 61) theirFrame = 'gold'
+                    else if (selectedUserStats.level >= 31) theirFrame = 'silver'
+                    else if (selectedUserStats.level >= 11) theirFrame = 'wood'
+                    else theirFrame = 'none'
+                  }
+                  
+                  if (!theirFrame) theirFrame = 'none'
+                  
+                  return (
+                    <>
+                      <img 
+                        src={theirAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`} 
+                        alt="Avatar" 
+                        style={{ 
+                          width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.1)',
+                          ...(frameStyles[theirFrame] || {})
+                        }} 
+                      />
+                      {theirFrame !== 'none' && (
+                        <img
+                          src={`/assets/frames/${frameFileMap[theirFrame] || theirFrame + '.png'}`}
+                          alt="Frame Overlay"
+                          style={{ position: 'absolute', top: '-15%', left: '-15%', width: '130%', height: '130%', pointerEvents: 'none', zIndex: 10 }}
+                          onError={(e) => { e.target.style.display = 'none' }}
+                        />
+                      )}
+                    </>
+                  )
+                })()}
+              </div>
               <h2 style={{ margin: '0 0 5px', color: 'var(--text-primary)' }}>{getDisplayName(selectedUser)}</h2>
               <div style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>@{selectedUser}</div>
               
@@ -1013,8 +1299,40 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 <p style={{ color: '#ef4444' }}>Không thể tải thông tin người chơi này.</p>
               ) : (
                 <>
+                  {/* Huy hiệu showcase của bạn bè */}
+                  {(() => {
+                    try {
+                      const theirBadges = JSON.parse(localStorage.getItem('kaiko_badges_' + selectedUser) || '[]')
+                      const allCatalog = [...RANK_BADGE_CATALOG, ...BADGE_CATALOG]
+                      let display = theirBadges.map(id => allCatalog.find(b => b.id === id)).filter(Boolean)
+                      
+                      // Nếu họ chưa set showcase badge nào, tự động lấy các huy hiệu Rank họ đã đạt được (tối đa 5 cái gần nhất)
+                      if (display.length === 0 && selectedUserStats?.level) {
+                        display = RANK_BADGE_CATALOG.filter(b => selectedUserStats.level >= b.minLevel).slice(-5).reverse()
+                      }
+                      
+                      if (display.length > 0) {
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                            {display.map(b => (
+                              <div key={b.id} title={b.name}>
+                                <img src={b.image} alt={b.name} style={{ height: '60px', width: '60px', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      }
+                    } catch {}
+                    
+                    // Nếu không có huy hiệu showcase thì hiện huy hiệu rank mặc định
+                    return (
+                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+                        <img src={getRankInfo(selectedUserStats.level).badgeImage} alt="Rank Badge" style={{ height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
+                      </div>
+                    )
+                  })()}
                   <div style={{ display: 'inline-block', background: getRankInfo(selectedUserStats.level).bg, color: getRankInfo(selectedUserStats.level).color, padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '1.5rem', border: `1px solid ${getRankInfo(selectedUserStats.level).color}50` }}>
-                    {getRankInfo(selectedUserStats.level).icon} Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
+                    <span style={{ marginRight: '8px' }}>{getRankInfo(selectedUserStats.level).icon}</span> Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div>
@@ -1031,7 +1349,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                     </div>
                   </div>
                   <div style={{ marginTop: '15px', fontSize: '1.1rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                    ⭐ Điểm Tích Lũy: {selectedUserStats.exp}
+                    ⭐ Điểm Kinh Nghiệm (EXP): {selectedUserStats.exp}
                   </div>
                 </>
               )}
@@ -1039,7 +1357,64 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           </div>
         </div>
       )}
+      
+      {activeEvent && <EventWorkspaceModal event={activeEvent} onClose={() => setActiveEvent(null)} username={username} />}
 
+      {/* === MODAL CHỌN HUY HIỆU === */}
+      {showBadgeSelector && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowBadgeSelector(false)}>
+          <div style={{ background: 'var(--bg-primary)', borderRadius: '20px', width: '90%', maxWidth: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', border: '1px solid rgba(168,85,247,0.4)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '1.2rem 1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 'bold', color: 'var(--text-primary)', fontSize: '1.1rem' }}>🏅 Chọn Huy Hiệu Hiển Thị</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Tối đa 5 — Đã chọn: {selectedBadges.length}/5</div>
+              </div>
+              <button onClick={() => setShowBadgeSelector(false)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: '1rem 1.5rem', flex: 1 }}>
+              {(() => {
+                const allAvailable = [
+                  ...RANK_BADGE_CATALOG.filter(b => currentLevel >= b.minLevel),
+                  ...BADGE_CATALOG.filter(b => myItems.includes(b.id))
+                ]
+                // Group into rows of 3
+                const rows = []
+                for (let i = 0; i < allAvailable.length; i += 3) rows.push(allAvailable.slice(i, i + 3))
+                return rows.map((row, ri) => (
+                  <div key={ri} style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                    {row.map(b => {
+                      const active = selectedBadges.includes(b.id)
+                      const disabled = !active && selectedBadges.length >= 5
+                      return (
+                        <div
+                          key={b.id}
+                          onClick={() => !disabled && toggleBadge(b.id)}
+                          style={{
+                            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+                            padding: '12px 8px', borderRadius: '12px', cursor: disabled ? 'not-allowed' : 'pointer',
+                            border: active ? '2px solid #a855f7' : '2px solid rgba(255,255,255,0.08)',
+                            background: active ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.03)',
+                            opacity: disabled ? 0.4 : 1, transition: 'all 0.2s'
+                          }}
+                        >
+                          <img src={b.image} alt={b.name} style={{ height: '72px', width: '72px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none' }} />
+                          <div style={{ fontSize: '0.75rem', color: active ? '#a855f7' : 'var(--text-secondary)', textAlign: 'center', fontWeight: active ? 'bold' : 'normal' }}>{b.name}</div>
+                          {active && <div style={{ fontSize: '0.65rem', background: '#a855f7', color: '#fff', borderRadius: '10px', padding: '1px 8px' }}>✓ Đang hiển</div>}
+                        </div>
+                      )
+                    })}
+                    {/* Đệm ô trống nếu hàng không đủ 3 */}
+                    {row.length < 3 && Array(3 - row.length).fill(0).map((_, i) => <div key={'empty' + i} style={{ flex: 1 }} />)}
+                  </div>
+                ))
+              })()}
+            </div>
+            <div style={{ padding: '0.8rem 1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'right' }}>
+              <button onClick={() => setShowBadgeSelector(false)} className="btn-primary" style={{ padding: '8px 24px' }}>Xong</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
