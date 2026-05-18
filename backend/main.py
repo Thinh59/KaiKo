@@ -244,6 +244,16 @@ def load_model():
     ''')
 
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS mentorship_requests (
+            id SERIAL PRIMARY KEY,
+            master TEXT NOT NULL,
+            disciple TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(master, disciple)
+        )
+    ''')
+
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS community_posts (
             id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
@@ -1513,7 +1523,11 @@ def request_mentorship(data: MentorshipRequest):
     now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     
     try:
-        cursor.execute("INSERT INTO mentorship (master, disciple, start_date) VALUES (%s, %s, %s)", (data.master, data.disciple, now))
+        cursor.execute("SELECT id FROM mentorship WHERE (master=%s AND disciple=%s) OR (master=%s AND disciple=%s)", (data.master, data.disciple, data.disciple, data.master))
+        if cursor.fetchone():
+            return {"success": False, "error": "Đã có quan hệ sư đồ!"}
+            
+        cursor.execute("INSERT INTO mentorship_requests (master, disciple, created_at) VALUES (%s, %s, %s)", (data.master, data.disciple, now))
         # Create notification for master
         cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
                        (data.master, "mentorship", f"{data.disciple} muốn bái bạn làm sư phụ!", now))
@@ -1523,11 +1537,42 @@ def request_mentorship(data: MentorshipRequest):
     except Exception as e:
         conn.rollback()
         success = False
-        error = "Đã có quan hệ sư đồ hoặc lỗi hệ thống."
+        error = "Đã gửi yêu cầu bái sư trước đó hoặc có lỗi."
     finally:
         conn.close()
         
     return {"success": success, "error": error}
+
+@app.post("/mentorship/accept")
+def accept_mentorship(data: MentorshipRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        cursor.execute("DELETE FROM mentorship_requests WHERE master=%s AND disciple=%s", (data.master, data.disciple))
+        cursor.execute("INSERT INTO mentorship (master, disciple, start_date) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (data.master, data.disciple, now))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+    return {"success": True}
+
+@app.post("/mentorship/decline")
+def decline_mentorship(data: MentorshipRequest):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM mentorship_requests WHERE master=%s AND disciple=%s", (data.master, data.disciple))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+    return {"success": True}
 
 @app.get("/mentorship/{username}")
 def get_mentorship(username: str):
@@ -1539,8 +1584,11 @@ def get_mentorship(username: str):
     # Check if they are a disciple
     cursor.execute("SELECT * FROM mentorship WHERE disciple=%s", (username,))
     masters = cursor.fetchall()
+    # Check requests
+    cursor.execute("SELECT disciple FROM mentorship_requests WHERE master=%s", (username,))
+    requests = [r['disciple'] for r in cursor.fetchall()]
     conn.close()
-    return {"success": True, "disciples": disciples, "masters": masters}
+    return {"success": True, "disciples": disciples, "masters": masters, "requests": requests}
 
 
 

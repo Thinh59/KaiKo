@@ -287,7 +287,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [achievements, setAchievements] = useState([])
   const [fallacyStats, setFallacyStats] = useState({})
-  const [mentorData, setMentorData] = useState({ masters: [], disciples: [] })
+  const [mentorData, setMentorData] = useState({ masters: [], disciples: [], requests: [] })
   const [mentorInput, setMentorInput] = useState('')
   const [historyFilter, setHistoryFilter] = useState('all')
 
@@ -635,7 +635,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
     try {
       const res = await axios.get(`${API_BASE}/mentorship/${encodeURIComponent(username)}`)
       if (res.data.success) {
-        setMentorData({ masters: res.data.masters, disciples: res.data.disciples })
+        setMentorData({ masters: res.data.masters, disciples: res.data.disciples, requests: res.data.requests || [] })
       }
     } catch (e) {}
   }, [username, isGuest])
@@ -781,39 +781,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
               )}
             </button>
 
-            {/* Dropdown */}
-            {showNotifications && (
-              <div className="glass-panel animate-fade-in" style={{ position: 'fixed', top: 'auto', right: '16px', marginTop: '0', width: '320px', background: 'var(--bg-primary)', border: '1px solid var(--border-light)', borderRadius: '12px', zIndex: 9999, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.7)' }}>
-                <div style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Thông Báo</span>
-                  <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>✖</button>
-                </div>
-                <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Không có thông báo nào.</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div 
-                        key={n.id} 
-                        style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: n.is_read ? 'transparent' : 'rgba(168,85,247,0.1)', cursor: 'pointer' }}
-                        onClick={async () => {
-                          if (!n.is_read) {
-                            await axios.post(`${API_BASE}/notifications/read/${n.id}`);
-                            loadNotifications();
-                            loadMyInfo();
-                          }
-                          // Nếu là lời mời bái sư, mở tab mentor
-                          if (n.type === 'mentorship') setActiveTab('mentor');
-                        }}
-                      >
-                        <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{n.message}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(n.created_at + 'Z').toLocaleString('vi-VN')}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+
           </div>
 
           <button
@@ -1443,11 +1411,12 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                                   {hasJoined ? '📝 Sửa Bài' : isOpen ? 'Tham gia' : isUpcoming ? 'Chưa mở' : 'Đã đóng'}
                                 </button>
                                 <button
-                                  className="btn-secondary"
+                                  className={isOpen ? "btn-secondary" : "btn-secondary disabled"}
+                                  disabled={!isOpen}
                                   onClick={() => setActiveVotingEvent(ev)}
-                                  style={{ flex: 1, border: '1px solid #fbbf24', color: '#fbbf24' }}
+                                  style={{ flex: 1, border: '1px solid #fbbf24', color: '#fbbf24', opacity: isOpen ? 1 : 0.5, cursor: isOpen ? 'pointer' : 'not-allowed' }}
                                 >
-                                  👍 Bình chọn
+                                  {isOpen ? '👍 Bình chọn' : '🔒 Đóng bình chọn'}
                                 </button>
                               </div>
                             )
@@ -1672,6 +1641,30 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       mentorData.disciples.map(d => <div key={d.id} style={{ color: '#fff', marginTop: '5px' }}>👶 {d.disciple} {d.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
                     }
                   </div>
+                  {mentorData.requests && mentorData.requests.length > 0 && (
+                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                      <strong style={{ color: '#ef4444' }}>Yêu Cầu Bái Sư:</strong>
+                      {mentorData.requests.map(reqDisciple => (
+                        <div key={reqDisciple} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', marginTop: '10px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                          <span style={{ color: '#fff' }}>👶 {reqDisciple}</span>
+                          <div style={{ display: 'flex', gap: '5px' }}>
+                            <button onClick={async () => {
+                              try {
+                                await axios.post(`${API_BASE}/mentorship/accept`, { master: username, disciple: reqDisciple });
+                                loadMentorship();
+                              } catch(e) {}
+                            }} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Nhận</button>
+                            <button onClick={async () => {
+                              try {
+                                await axios.post(`${API_BASE}/mentorship/decline`, { master: username, disciple: reqDisciple });
+                                loadMentorship();
+                              } catch(e) {}
+                            }} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Từ chối</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1824,6 +1817,22 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                   <div style={{ marginTop: '15px', fontSize: '1.1rem', color: '#f59e0b', fontWeight: 'bold' }}>
                     ⭐ Điểm Kinh Nghiệm (EXP): {selectedUserStats.exp}
                   </div>
+                  {selectedUser !== username && !isGuest && (
+                    <div style={{ marginTop: '20px' }}>
+                      <button 
+                        onClick={async () => {
+                          try {
+                            const res = await axios.post(`${API_BASE}/mentorship/request`, { master: selectedUser, disciple: username });
+                            if (res.data.success) { alert('Đã gửi lời bái sư!'); }
+                            else { alert(res.data.error); }
+                          } catch(e) { alert('Lỗi kết nối'); }
+                        }}
+                        style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        🎓 Xin Bái Sư
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1889,6 +1898,61 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           </div>
         </div>
       )}
+      
+      {/* Global Navigation (Bottom Left) */}
+      <div style={{ position: 'fixed', bottom: '20px', left: '20px', display: 'flex', gap: '10px', zIndex: 9999 }}>
+        <button 
+          onClick={() => setActiveTab('home')}
+          style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+          title="Trang chủ"
+        >
+          🏠
+        </button>
+        {activeTab !== 'home' && (
+          <button 
+            onClick={() => setActiveTab('home')}
+            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
+            title="Quay lại"
+          >
+            ↩️
+          </button>
+        )}
+      </div>
+
+      {/* Notifications Dropdown (Moved to root level to avoid stacking context issues) */}
+      {showNotifications && (
+        <div className="glass-panel animate-fade-in" style={{ position: 'fixed', top: '80px', right: '16px', marginTop: '10px', width: '320px', background: 'var(--bg-primary)', border: '1px solid var(--border-light)', borderRadius: '12px', zIndex: 999999, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.7)' }}>
+          <div style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Thông Báo</span>
+            <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>✖</button>
+          </div>
+          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Không có thông báo nào.</div>
+            ) : (
+              notifications.map(n => (
+                <div 
+                  key={n.id} 
+                  style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: n.is_read ? 'transparent' : 'rgba(168,85,247,0.1)', cursor: 'pointer' }}
+                  onClick={async () => {
+                    if (!n.is_read) {
+                      await axios.post(`${API_BASE}/notifications/read/${n.id}`);
+                      loadNotifications();
+                      loadMyInfo();
+                    }
+                    // Nếu là lời mời bái sư, mở tab mentor
+                    if (n.type === 'mentorship') setActiveTab('mentor');
+                  }}
+                >
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: '4px' }}>{n.message}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{new Date(n.created_at + 'Z').toLocaleString('vi-VN')}</div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
