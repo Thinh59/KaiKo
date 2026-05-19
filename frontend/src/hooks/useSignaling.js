@@ -57,7 +57,7 @@ export function useSignaling(playerName) {
     }
   }, [playerName])
 
-  const findMatch = (mode, displayName) => {
+  const findMatch = (mode, displayName, level = 1, visibility = 'private') => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setMatchInfo(null)
       setRoomError(null)
@@ -65,15 +65,17 @@ export function useSignaling(playerName) {
       socketRef.current.send(JSON.stringify({
         type: 'find_match',
         mode: mode,
-        playerName: displayName || playerName
+        playerName: displayName || playerName,
+        level,
+        visibility
       }))
     }
   }
 
-  const createRoom = () => {
+  const createRoom = (visibility = 'private') => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setRoomError(null)
-      socketRef.current.send(JSON.stringify({ type: 'create_room' }))
+      socketRef.current.send(JSON.stringify({ type: 'create_room', visibility }))
     }
   }
 
@@ -93,6 +95,11 @@ export function useSignaling(playerName) {
 
   const registerHandler = useCallback((type, handler) => {
     onMessageHandlers.current[type] = handler
+    return () => {
+      if (onMessageHandlers.current[type] === handler) {
+        delete onMessageHandlers.current[type]
+      }
+    }
   }, [])
 
   const sendMessage = useCallback((msg) => {

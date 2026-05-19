@@ -28,7 +28,7 @@ export default function HomePage({ onPlay }) {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop") center/cover no-repeat',
+      background: 'url("/assets/backgrounds/homepage_splash.jpg") center/cover no-repeat, url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop") center/cover no-repeat',
       position: 'relative',
       padding: '2rem'
     }}>

@@ -33,7 +33,7 @@ function speakText(text, onEnd) {
   window.speechSynthesis.speak(utter)
 }
 
-export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName, onFinish, registerHandler, sendMessage, onCancel }) {
+export default function DebateRoom({ roomData, roomInfo, mode, username, remotePlayerName, onFinish, registerHandler, sendMessage, onCancel }) {
   // ── State ────────────────────────────────────────────────────────────────
   const [isRunning, setIsRunning] = useState(false)
   const [isScoring, setIsScoring] = useState(false)
@@ -53,6 +53,9 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
   const [loadingHint, setLoadingHint] = useState(false)
   const [mediaGranted, setMediaGranted] = useState(false)
   const [floatingEmojis, setFloatingEmojis] = useState([])
+  const [bestFriends, setBestFriends] = useState([])
+  const [selectedHelper, setSelectedHelper] = useState('')
+  const [requestingHelp, setRequestingHelp] = useState(false)
 
   const spawnEmoji = useCallback((emoji, side = 'right') => {
     const id = Date.now() + Math.random()
@@ -117,6 +120,37 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
       setMediaGranted(true)
     } catch (e) {
       alert("Lỗi cấp quyền hoặc không tìm thấy thiết bị!")
+    }
+  }
+
+  useEffect(() => {
+    if (!username || username.startsWith('Guest_') || !mode?.includes('1v1')) return
+    axios.get(`${API_BASE}/friends/${encodeURIComponent(username)}`)
+      .then(res => {
+        if (res.data.success) {
+          const helpers = (res.data.friends || []).filter(f => (f.debate_count || 0) >= 50)
+          setBestFriends(helpers)
+          if (helpers[0]) setSelectedHelper(helpers[0].username)
+        }
+      })
+      .catch(() => {})
+  }, [username, mode])
+
+  const handleRequestBestFriendHelp = async () => {
+    if (!selectedHelper) return
+    setRequestingHelp(true)
+    try {
+      const res = await axios.post(`${API_BASE}/request-help`, {
+        from_user: username,
+        to_user: selectedHelper,
+        topic: roomData.topic,
+        mode
+      })
+      showNotification(res.data.success ? '🆘 Đã gửi lời nhờ trợ giúp tới bạn thân.' : (res.data.error || 'Không gửi được lời nhờ trợ giúp'), res.data.success ? 'success' : 'warning')
+    } catch (err) {
+      showNotification('Không gửi được lời nhờ trợ giúp.', 'error')
+    } finally {
+      setRequestingHelp(false)
     }
   }
 
@@ -455,7 +489,11 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
           scores: res.data.scores,
           playerA: roomData.playerA,
           playerB: remotePlayerName || roomData.playerB,
-          topic: roomData.topic
+          topic: roomData.topic,
+          rawUsernameA: roomData.rawUsernameA,
+          rawUsernameB: roomData.rawUsernameB,
+          transcript_a: finalTranscriptA,
+          transcript_b: finalTranscriptB
         })
       } else {
         alert('Lỗi chấm điểm: ' + (res.data.error || 'Không xác định'))
@@ -644,6 +682,19 @@ export default function DebateRoom({ roomData, roomInfo, mode, remotePlayerName,
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {bestFriends.length > 0 && mode?.includes('1v1') && (
+            <div className="glass-panel" style={{ padding: '14px', border: '1px solid rgba(16,185,129,0.25)' }}>
+              <div style={{ color: '#6ee7b7', fontWeight: '800', marginBottom: '10px' }}>🆘 Nhờ Bạn thân trợ giúp</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={selectedHelper} onChange={e => setSelectedHelper(e.target.value)} style={{ flex: 1, background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '9px' }}>
+                  {bestFriends.map(f => <option key={f.username} value={f.username}>{f.username}</option>)}
+                </select>
+                <button onClick={handleRequestBestFriendHelp} disabled={requestingHelp} className="btn-primary" style={{ padding: '9px 12px', borderRadius: '8px', whiteSpace: 'nowrap' }}>
+                  {requestingHelp ? 'Đang gửi...' : 'Gửi SOS'}
+                </button>
+              </div>
+            </div>
+          )}
           {/* ── Controls Bar ── */}
           <ControlsBar
             timeLeft={timeLeft}

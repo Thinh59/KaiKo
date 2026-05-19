@@ -327,3 +327,30 @@ Top1 event → thưởng +10 level / danh hiệu Thiên Tài Tinh Tú
 Chọn phe Cua Ma/Cua Thần sau khi có 2 lệnh bài
 Chat với bạn thân trong trận
 View live match, cộng đồng/diễn đàn (Đã thêm UI cơ bản)y
+
+
+
+🌐 Giai đoạn 2: Xây dựng Cộng Đồng (Giữ chân người chơi)
+Backend đã có sẵn các bảng community_posts, post_comments. Giờ chỉ cần làm Frontend.
+
+Diễn Đàn Cộng Đồng: Triển khai giao diện cho tab Cộng đồng (đăng bài, comment, like).
+Tính năng Hỗ trợ từ Bạn thân: Cho phép nhắn tin nhờ bạn thân trợ giúp khi gặp topic khó trong lúc leo rank.
+Xem Live (Spectator Mode): Cho phép người ngoài vào xem các phòng đang thi đấu (đặc biệt là các trận của Level cao).
+⚖️ Giai đoạn 3: Nâng cấp Hệ thống Level & Đặc quyền (Tính cạnh tranh)
+Phần này cần can thiệp sâu vào thuật toán tính level.
+
+Hệ thống đánh giá chéo (Review/Comment): Sau trận đấu, người chơi có thể đánh giá nhau. Đánh giá tốt từ người cấp cao giúp lên level nhanh.
+Quyền lực của Level 101 (Giám khảo): Cho phép người Level 101 can thiệp vào điểm số của người khác, hoặc "bảo kê" đệ tử lên cấp nhanh.
+🔥 Giai đoạn 4: Mega Events (Sự kiện quy mô lớn)
+Hệ thống Chọn Phe (Cua Ma vs Cua Thần).
+Tranh biện tập thể (Team Debate): Trận đấu nhiều người tham gia cùng lúc.
+Hệ thống Lệnh Bài Chỉ Huy cho Top 1 Event.
+💰 Giai đoạn 5: Kinh tế & Nạp thẻ (Monetization)
+Làm cuối cùng để tránh gây cản trở trong quá trình test các tính năng trên.
+
+Giới hạn số lượt đổi Avatar, Khung, số lượt Comment mỗi ngày (hiện tại đang để free vô hạn).
+Tích hợp cổng nạp tiền (hoặc giả lập nạp tiền bằng Điểm Tích Lũy) để mua thêm lượt, giữ chuỗi điểm danh, lên cấp 10 nhanh.
+Tại sao đây là thứ tự hợp lý?
+
+Đi từ Cá nhân ➔ Cộng đồng ➔ Cạnh tranh ➔ Sự kiện ➔ Kiếm tiền.
+Backend của bạn đã có sẵn rất nhiều nền móng (như bảng friends, community_posts), nên Giai đoạn 1 và 2 sẽ hoàn thành rất nhanh và giúp App trông "có sức sống" ngay lập tức.

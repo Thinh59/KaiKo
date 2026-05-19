@@ -224,14 +224,14 @@ function App() {
       setPage(info.mode === 'text_solo' ? 'text_debate' : 'debate')
     } else if (info.mode === 'custom_create') {
       setPage('waiting')
-      createRoom()
+      createRoom(info.visibility || 'private')
     } else if (info.mode === 'custom_join') {
       setPage('waiting')
       joinRoom(info.roomCode)
     } else {
       setPage('waiting')
       const localNick = localStorage.getItem('kaiko_nickname_' + username)
-      findMatch(info.mode, localNick && localNick.trim() ? localNick.trim() : username)
+      findMatch(info.mode, localNick && localNick.trim() ? localNick.trim() : username, 1, info.visibility || 'private')
     }
   }
 
@@ -254,7 +254,7 @@ function App() {
         const resultStr = winner === result.playerA ? 'win'
           : winner === result.playerB ? 'lose' : 'draw'
 
-        await axios.post(`${API_BASE}/save-match`, {
+        const saveRes = await axios.post(`${API_BASE}/save-match`, {
           username:       result.rawUsernameA || result.playerA,
           opponent:       result.rawUsernameB || result.playerB,
           topic:          result.topic ?? '',
@@ -268,6 +268,9 @@ function App() {
           transcript_self: result.transcript_a ?? '',
           transcript_opp:  result.transcript_b ?? '',
         })
+        if (saveRes.data.success) {
+          setDebateResult(prev => prev ? { ...prev, matchId: saveRes.data.match_id, newLevel: saveRes.data.level } : prev)
+        }
       } catch (err) {
         console.warn('Không lưu được lịch sử:', err.message)
       }
@@ -380,6 +383,7 @@ function App() {
         roomData={roomData}
         roomInfo={currentMatch}
         mode={mode}
+        username={username}
         remotePlayerName={roomData.playerB}
         onFinish={handleDebateFinish}
         registerHandler={registerHandler}

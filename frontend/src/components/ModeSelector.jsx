@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 export default function ModeSelector({ onSelect }) {
+  const [visibility, setVisibility] = useState(null) // 'private' | 'public'
   const [format, setFormat] = useState(null) // 'video' | 'chat'
   const [showCustomOptions, setShowCustomOptions] = useState(false)
   const [roomCodeInput, setRoomCodeInput] = useState('')
@@ -10,20 +11,61 @@ export default function ModeSelector({ onSelect }) {
     const finalMode = format === 'chat' ? (mode === 'solo_ai' ? 'text_solo' : mode === '1v1' ? 'text_1v1' : 'text_custom') : mode;
     
     if (mode === 'custom_create') {
-      onSelect({ mode: format === 'chat' ? 'text_custom_create' : 'custom_create' })
+      onSelect({ mode: format === 'chat' ? 'text_custom_create' : 'custom_create', visibility })
     } else if (mode === 'custom_join') {
-      onSelect({ mode: format === 'chat' ? 'text_custom_join' : 'custom_join', roomCode: roomCodeInput.trim() })
+      onSelect({ mode: format === 'chat' ? 'text_custom_join' : 'custom_join', roomCode: roomCodeInput.trim(), visibility })
     } else {
-      onSelect({ mode: finalMode })
+      onSelect({ mode: finalMode, visibility })
     }
+  }
+
+  if (!visibility) {
+    return (
+      <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '800px', padding: '3rem 2.5rem', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Quyền xem trận đấu</h1>
+          <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '3rem' }}>Bạn muốn cộng đồng có thể vào xem trận này không?</p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div
+              onClick={() => setVisibility('private')}
+              style={{ padding: '3rem', background: 'rgba(16, 185, 129, 0.05)', border: '2px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.3s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'; e.currentTarget.style.transform = 'translateY(-5px)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16, 185, 129, 0.05)'; e.currentTarget.style.transform = 'translateY(0)' }}
+            >
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
+              <h3 style={{ fontSize: '1.8rem', color: '#10b981', marginBottom: '10px' }}>Private</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>Chỉ người chơi trong phòng thấy trận đấu. Cộng đồng không xem live được.</p>
+            </div>
+
+            <div
+              onClick={() => setVisibility('public')}
+              style={{ padding: '3rem', background: 'rgba(239, 68, 68, 0.05)', border: '2px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.3s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; e.currentTarget.style.transform = 'translateY(-5px)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)'; e.currentTarget.style.transform = 'translateY(0)' }}
+            >
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🌐</div>
+              <h3 style={{ fontSize: '1.8rem', color: '#ef4444', marginBottom: '10px' }}>Public</h3>
+              <p style={{ color: 'var(--text-secondary)' }}>Cộng đồng có thể vào tab Xem Live để theo dõi transcript và reaction.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (!format) {
     return (
       <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-        <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '800px', padding: '3rem 2.5rem', textAlign: 'center' }}>
+        <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '800px', padding: '3rem 2.5rem', textAlign: 'center', position: 'relative' }}>
+          <button
+            onClick={() => setVisibility(null)}
+            style={{ position: 'absolute', top: '20px', left: '20px', background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '1.1rem' }}
+          >
+            ← Quay lại
+          </button>
           <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>Hình thức Tranh Biện</h1>
-          <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '3rem' }}>Bạn muốn tranh biện bằng cách nào?</p>
+          <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '3rem' }}>{visibility === 'public' ? 'Public' : 'Private'} · Bạn muốn tranh biện bằng cách nào?</p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
             <div

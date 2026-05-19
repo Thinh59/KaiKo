@@ -274,6 +274,34 @@ def load_model():
     ''')
 
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS match_reviews (
+            id SERIAL PRIMARY KEY,
+            match_id INTEGER NOT NULL,
+            reviewer TEXT NOT NULL,
+            reviewee TEXT NOT NULL,
+            rating INTEGER NOT NULL,
+            comment TEXT DEFAULT '',
+            reviewer_level INTEGER DEFAULT 1,
+            level_bonus INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            UNIQUE(match_id, reviewer, reviewee)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS judge_actions (
+            id SERIAL PRIMARY KEY,
+            judge TEXT NOT NULL,
+            target TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            score_delta INTEGER DEFAULT 0,
+            level_delta INTEGER DEFAULT 0,
+            reason TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_daily_comments (
             id SERIAL PRIMARY KEY,
             username TEXT NOT NULL,
@@ -341,6 +369,7 @@ class ConnectionManager:
         self.player_names: Dict[str, str] = {}  # client_id -> playerName
         self.waiting_players = {"1v1": [], "text_1v1": [], "2v2": []}
         self.rooms = {}
+        self.spectators: Dict[str, set[str]] = {}
         self.topics = TRENDING_TOPICS
 
     async def connect(self, websocket: WebSocket, client_id: str):
@@ -354,6 +383,10 @@ class ConnectionManager:
             del self.player_names[client_id]
         for mode in self.waiting_players:
             self.waiting_players[mode] = [p for p in self.waiting_players[mode] if p["id"] != client_id]
+        for room_id in list(self.spectators.keys()):
+            self.spectators[room_id].discard(client_id)
+            if not self.spectators[room_id]:
+                del self.spectators[room_id]
 
     async def notify_opponent_disconnected(self, client_id: str):
         """Find opponent in any room and notify them that this player disconnected."""
@@ -380,8 +413,39 @@ class ConnectionManager:
                 except:
                     pass
 
-    async def matchmake(self, client_id: str, player_name: str, mode: str, level: int = 1):
+    def find_room_for_players(self, *client_ids: str):
+        for room_id, room in self.rooms.items():
+            players = room.get("players", [])
+            if any(cid in players for cid in client_ids if cid):
+                return room_id
+        return None
+
+    async def broadcast_to_spectators(self, room_id: str, payload: dict):
+        for cid in list(self.spectators.get(room_id, set())):
+            if cid in self.active_connections:
+                try:
+                    await self.send_personal_message(json.dumps({
+                        "type": "spectator_event",
+                        "roomId": room_id,
+                        "event": payload
+                    }), cid)
+                except:
+                    pass
+
+    async def matchmake(self, client_id: str, player_name: str, mode: str, level: int = 1, visibility: str = "private"):
+        username = client_id.rsplit("_", 1)[0]
+        try:
+            conn = get_db()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor.execute("SELECT COALESCE(level_real, 1) as level FROM users WHERE username=%s", (username,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                level = row["level"] or level
+        except Exception:
+            pass
         self.player_names[client_id] = player_name
+        visibility = "public" if visibility == "public" else "private"
         print(f"🔍 Player '{player_name}' (Lv.{level}, {client_id}) is searching for a {mode} match...")
         queue = self.waiting_players.get(mode)
         if queue is None:
@@ -408,7 +472,17 @@ class ConnectionManager:
             topic = random.choice(self.topics)
             self.rooms[room_id] = {
                 "players": [client_id, opponent_id],
-                "topic": topic
+                "topic": topic,
+                "mode": mode,
+                "visibility": visibility,
+                "player_names": {
+                    client_id: player_name,
+                    opponent_id: opponent_name
+                },
+                "levels": {
+                    client_id: level,
+                    opponent_id: opponent_info.get("level", 1)
+                }
             }
             # Báo cho client_id (guest - người join)
             await self.send_personal_message(json.dumps({
@@ -438,6 +512,27 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+def public_room_snapshot(room_id: str, room: dict):
+    players = room.get("players", [])
+    names = room.get("player_names", {})
+    levels = room.get("levels", {})
+    return {
+        "roomId": room_id,
+        "topic": room.get("topic", "Chủ đề ngẫu nhiên"),
+        "mode": room.get("mode", "1v1"),
+        "players": [
+            {
+                "id": pid,
+                "name": names.get(pid, pid.rsplit("_", 1)[0]),
+                "level": levels.get(pid, 1)
+            }
+            for pid in players
+        ],
+        "spectators": len(manager.spectators.get(room_id, set())),
+        "visibility": room.get("visibility", "private"),
+        "isHighLevel": max([levels.get(pid, 1) for pid in players] or [1]) >= 31
+    }
+
 @app.websocket("/ws/{client_id}")
 async def websocket_endpoint(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
@@ -449,13 +544,17 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
             msg_type = message.get("type")
             
             if msg_type == "find_match":
-                await manager.matchmake(client_id, message.get("playerName"), message.get("mode", "1v1"))
+                await manager.matchmake(client_id, message.get("playerName"), message.get("mode", "1v1"), message.get("level", 1), message.get("visibility", "private"))
                 
             elif msg_type == "create_room":
                 room_code = str(random.randint(10000, 99999))
                 manager.rooms[room_code] = {
                     "players": [client_id],
-                    "topic": random.choice(manager.topics)
+                    "topic": random.choice(manager.topics),
+                    "mode": "custom",
+                    "visibility": "public" if message.get("visibility") == "public" else "private",
+                    "player_names": {client_id: client_id.rsplit("_", 1)[0]},
+                    "levels": {client_id: 1}
                 }
                 await manager.send_personal_message(json.dumps({
                     "type": "room_created",
@@ -468,6 +567,8 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                     opponent_id = manager.rooms[room_code]["players"][0]
                     topic = manager.rooms[room_code]["topic"]
                     manager.rooms[room_code]["players"].append(client_id)
+                    manager.rooms[room_code].setdefault("player_names", {})[client_id] = client_id.rsplit("_", 1)[0]
+                    manager.rooms[room_code].setdefault("levels", {})[client_id] = 1
                     
                     # Notify Guest
                     await manager.send_personal_message(json.dumps({
@@ -490,7 +591,21 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng không tồn tại hoặc đã đầy!"
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "chat_msg", "chat"]:
+            elif msg_type == "spectate_room":
+                room_id = message.get("roomId")
+                if room_id in manager.rooms and manager.rooms[room_id].get("visibility") == "public":
+                    manager.spectators.setdefault(room_id, set()).add(client_id)
+                    await manager.send_personal_message(json.dumps({
+                        "type": "spectator_joined",
+                        "roomId": room_id,
+                        "room": public_room_snapshot(room_id, manager.rooms[room_id])
+                    }), client_id)
+                else:
+                    await manager.send_personal_message(json.dumps({
+                        "type": "error",
+                        "message": "Phòng live không còn tồn tại."
+                    }), client_id)
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn
@@ -507,8 +622,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         conn.close()
                         
                         if target_id == 'global':
-                            # Global chat: send to everyone
-                            for ws in manager.active_connections.values():
+                            # Global chat: send to everyone except the sender connection.
+                            # The sender already appends the message optimistically.
+                            for cid, ws in manager.active_connections.items():
+                                if cid == client_id:
+                                    continue
                                 try:
                                     await ws.send_text(json.dumps(message))
                                 except:
@@ -517,6 +635,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             await manager.send_message_to_username(json.dumps(message), target_id)
                     else:
                         await manager.send_personal_message(json.dumps(message), target_id)
+                    if msg_type in ["transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "chat_msg"]:
+                        room_id = manager.find_room_for_players(client_id, target_id)
+                        if room_id:
+                            await manager.broadcast_to_spectators(room_id, message)
                     
     except WebSocketDisconnect:
         await manager.notify_opponent_disconnected(client_id)
@@ -569,6 +691,90 @@ class SaveMatch(BaseModel):
 class FriendAction(BaseModel):
     user: str
     target: str
+
+class CommunityPostInput(BaseModel):
+    username: str
+    content: str
+
+class CommunityCommentInput(BaseModel):
+    username: str
+    content: str
+
+class HelpRequestInput(BaseModel):
+    from_user: str
+    to_user: str
+    topic: str
+    mode: str = "1v1"
+
+class MatchReviewInput(BaseModel):
+    reviewer: str
+    reviewee: str
+    rating: int
+    comment: str = ""
+    match_id: Optional[int] = None
+
+class JudgeScoreInput(BaseModel):
+    judge: str
+    target: str
+    score_delta: int
+    reason: str = ""
+
+class JudgeProtectInput(BaseModel):
+    judge: str
+    disciple: str
+    reason: str = ""
+
+def resolve_public_user_identifier(cursor, identifier: str, viewer: str | None = None):
+    """Resolve a public user identifier without exposing usernames for nicknamed users."""
+    value = (identifier or "").strip()
+    if not value:
+        return None
+    if viewer and value == viewer:
+        return viewer
+    cursor.execute("SELECT username FROM users WHERE nickname = %s", (value,))
+    row = cursor.fetchone()
+    if row:
+        return row['username']
+    cursor.execute("""
+        SELECT username FROM users
+        WHERE username = %s AND (nickname IS NULL OR nickname = '')
+    """, (value,))
+    row = cursor.fetchone()
+    return row['username'] if row else None
+
+def get_user_level(cursor, username: str) -> int:
+    cursor.execute("SELECT COALESCE(level_real, 1) as level FROM users WHERE username=%s", (username,))
+    row = cursor.fetchone()
+    return row["level"] if row and row["level"] else 1
+
+def apply_level_delta(cursor, username: str, delta: int):
+    if not username or username == "ai_bot" or username.startswith("Guest_") or delta == 0:
+        return None
+    cursor.execute("""
+        UPDATE users
+        SET level_real = LEAST(101, GREATEST(1, COALESCE(level_real, 1) + %s))
+        WHERE username=%s
+        RETURNING level_real
+    """, (delta, username))
+    row = cursor.fetchone()
+    if not row:
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, level_real) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+            (username, "clerk_auth", max(1, min(101, 1 + delta)))
+        )
+        return max(1, min(101, 1 + delta))
+    return row["level_real"]
+
+def review_level_bonus(reviewer_level: int, rating: int) -> int:
+    if rating < 4:
+        return 0
+    if reviewer_level >= 101:
+        return 3
+    if reviewer_level >= 91:
+        return 2
+    if reviewer_level >= 61:
+        return 1
+    return 0
 
 class TextAnalyzeInput(BaseModel):
     text: str
@@ -702,6 +908,7 @@ def save_match(data: SaveMatch):
              fallacies_list_self, fallacies_list_opp, summary, played_at,
              transcript_self, transcript_opp)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
         data.score_self, data.score_opp,
@@ -710,6 +917,7 @@ def save_match(data: SaveMatch):
         data.summary, played_at,
         data.transcript_self, data.transcript_opp
     ))
+    match_id = cursor.fetchone()['id']
     
     # Phân biệt điểm theo loại: Video/Solo win=5, Chat win=3; Video draw=1, Chat draw=0
     is_chat = data.mode.startswith('text_')
@@ -813,7 +1021,7 @@ def save_match(data: SaveMatch):
         
     conn.commit()
     conn.close()
-    return {"success": True}
+    return {"success": True, "match_id": match_id, "level": new_level}
 
 class PurchaseRequest(BaseModel):
     username: str
@@ -1147,25 +1355,30 @@ def get_friends(username: str):
 
 @app.post("/friend-request")
 def send_friend_request(data: FriendAction):
-    if data.user == data.target:
+    target_username = (data.target or "").strip()
+    if data.user == target_username:
         return {"success": False, "error": "Không thể tự kết bạn"}
         
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     # Kiểm tra target có tồn tại không
-    cursor.execute("SELECT username FROM users WHERE username = %s", (data.target,))
-    if not cursor.fetchone():
+    target_username = resolve_public_user_identifier(cursor, target_username, data.user)
+    if not target_username:
         conn.close()
         return {"success": False, "error": "Người chơi không tồn tại"}
         
     # Check giới hạn 100 bạn bè
+    if data.user == target_username:
+        conn.close()
+        return {"success": False, "error": "Không thể tự kết bạn"}
+
     cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (data.user, data.user))
     if cursor.fetchone()['count'] >= 100:
         conn.close()
         return {"success": False, "error": "Bạn đã đạt giới hạn tối đa 100 bạn bè."}
         
-    cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (data.target, data.target))
+    cursor.execute("SELECT COUNT(id) as count FROM friends WHERE user1 = %s OR user2 = %s", (target_username, target_username))
     if cursor.fetchone()['count'] >= 100:
         conn.close()
         return {"success": False, "error": "Người này đã đạt giới hạn tối đa 100 bạn bè."}
@@ -1174,13 +1387,13 @@ def send_friend_request(data: FriendAction):
     cursor.execute("""
         SELECT id FROM friends 
         WHERE (user1 = %s AND user2 = %s) OR (user1 = %s AND user2 = %s)
-    """, (data.user, data.target, data.target, data.user))
+    """, (data.user, target_username, target_username, data.user))
     if cursor.fetchone():
         conn.close()
         return {"success": False, "error": "Đã là bạn bè"}
         
     try:
-        cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (%s, %s) ON CONFLICT (sender, receiver) DO NOTHING", (data.user, data.target))
+        cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (%s, %s) ON CONFLICT (sender, receiver) DO NOTHING", (data.user, target_username))
         conn.commit()
     except Exception as e:
         print("Lỗi gửi lời mời:", e)
@@ -1562,6 +1775,159 @@ def get_notifications(username: str):
     conn.close()
     return {"success": True, "notifications": rows}
 
+# --- COMMUNITY FORUM ---
+@app.get("/community-posts")
+def get_community_posts(limit: int = 30):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT p.id, p.username, p.content, p.created_at, COALESCE(p.likes, 0) as likes,
+                   COALESCE(u.nickname, '') as nickname,
+                   COUNT(c.id) as comment_count
+            FROM community_posts p
+            LEFT JOIN users u ON u.username = p.username
+            LEFT JOIN post_comments c ON c.post_id = p.id
+            GROUP BY p.id, u.nickname
+            ORDER BY p.id DESC
+            LIMIT %s
+        """, (limit,))
+        posts = [dict(row) for row in cursor.fetchall()]
+        for post in posts:
+            cursor.execute("""
+                SELECT c.id, c.post_id, c.username, c.content, c.created_at,
+                       COALESCE(u.nickname, '') as nickname
+                FROM post_comments c
+                LEFT JOIN users u ON u.username = c.username
+                WHERE c.post_id=%s
+                ORDER BY c.id ASC
+                LIMIT 50
+            """, (post["id"],))
+            post["comments"] = [dict(row) for row in cursor.fetchall()]
+        return {"success": True, "posts": posts}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/community-posts")
+def create_community_post(data: CommunityPostInput):
+    content = data.content.strip()
+    if not content:
+        return {"success": False, "error": "Nội dung bài viết không được để trống"}
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO community_posts (username, content, created_at, likes)
+            VALUES (%s, %s, %s, 0)
+            RETURNING id, username, content, created_at, likes
+        """, (data.username, content[:1000], now))
+        post = dict(cursor.fetchone())
+        conn.commit()
+        post["comments"] = []
+        post["comment_count"] = 0
+        return {"success": True, "post": post}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/community-posts/{post_id}/like")
+def like_community_post(post_id: int):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("UPDATE community_posts SET likes = COALESCE(likes, 0) + 1 WHERE id=%s RETURNING likes", (post_id,))
+        row = cursor.fetchone()
+        conn.commit()
+        if not row:
+            return {"success": False, "error": "Bài viết không tồn tại"}
+        return {"success": True, "likes": row["likes"]}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/community-posts/{post_id}/comments")
+def create_post_comment(post_id: int, data: CommunityCommentInput):
+    content = data.content.strip()
+    if not content:
+        return {"success": False, "error": "Nội dung bình luận không được để trống"}
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("SELECT id FROM community_posts WHERE id=%s", (post_id,))
+        if not cursor.fetchone():
+            return {"success": False, "error": "Bài viết không tồn tại"}
+        cursor.execute("""
+            INSERT INTO post_comments (post_id, username, content, created_at)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id, post_id, username, content, created_at
+        """, (post_id, data.username, content[:500], now))
+        comment = dict(cursor.fetchone())
+        conn.commit()
+        return {"success": True, "comment": comment}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.get("/live-rooms")
+def get_live_rooms():
+    rooms = []
+    for room_id, room in manager.rooms.items():
+        if room.get("visibility") != "public":
+            continue
+        players = room.get("players", [])
+        if len(players) < 2:
+            continue
+        if not all(pid in manager.active_connections for pid in players):
+            continue
+        rooms.append(public_room_snapshot(room_id, room))
+    rooms.sort(key=lambda r: (not r["isHighLevel"], -max([p["level"] for p in r["players"]] or [1])))
+    return {"success": True, "rooms": rooms}
+
+@app.post("/request-help")
+async def request_help(data: HelpRequestInput):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("""
+            SELECT id FROM friends
+            WHERE ((user1=%s AND user2=%s) OR (user1=%s AND user2=%s))
+              AND COALESCE(debate_count, 0) >= 50
+        """, (data.from_user, data.to_user, data.to_user, data.from_user))
+        if not cursor.fetchone():
+            return {"success": False, "error": "Chỉ có thể nhờ Bạn thân đã debate cùng ít nhất 50 trận."}
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        text = f"🆘 {data.from_user} cần bạn thân trợ giúp topic: {data.topic}"
+        cursor.execute("INSERT INTO chat_messages (sender, target, message, created_at) VALUES (%s, %s, %s, %s)",
+                       (data.from_user, data.to_user, text, now))
+        cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                       (data.to_user, "help_request", text, now))
+        conn.commit()
+        await manager.send_message_to_username(json.dumps({
+            "type": "chat",
+            "target": data.to_user,
+            "sender": data.from_user,
+            "text": text
+        }), data.to_user)
+        return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
 @app.post("/notifications/read/{notif_id}")
 def mark_notification_read(notif_id: int):
     conn = get_db()
@@ -1570,6 +1936,119 @@ def mark_notification_read(notif_id: int):
     conn.commit()
     conn.close()
     return {"success": True}
+
+# --- MATCH REVIEW & LEVEL PRIVILEGES ---
+@app.post("/match-review")
+def submit_match_review(data: MatchReviewInput):
+    if data.reviewer == data.reviewee:
+        return {"success": False, "error": "Không thể tự đánh giá chính mình"}
+    if data.reviewee == "ai_bot" or data.reviewee.startswith("Guest_"):
+        return {"success": False, "error": "Không thể đánh giá tài khoản này"}
+    rating = max(1, min(5, data.rating))
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        match_id = data.match_id
+        if not match_id:
+            cursor.execute("""
+                SELECT id FROM match_history
+                WHERE (username=%s AND opponent=%s) OR (username=%s AND opponent=%s)
+                ORDER BY id DESC
+                LIMIT 1
+            """, (data.reviewer, data.reviewee, data.reviewee, data.reviewer))
+            row = cursor.fetchone()
+            if not row:
+                return {"success": False, "error": "Không tìm thấy trận đấu để đánh giá"}
+            match_id = row["id"]
+
+        reviewer_level = get_user_level(cursor, data.reviewer)
+        bonus = review_level_bonus(reviewer_level, rating)
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO match_reviews (match_id, reviewer, reviewee, rating, comment, reviewer_level, level_bonus, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (match_id, data.reviewer, data.reviewee, rating, data.comment.strip()[:500], reviewer_level, bonus, now))
+        new_level = apply_level_delta(cursor, data.reviewee, bonus) if bonus > 0 else get_user_level(cursor, data.reviewee)
+        if bonus > 0:
+            cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                           (data.reviewee, "review", f"Đánh giá tốt từ người Lv.{reviewer_level} giúp bạn tăng {bonus} level!", now))
+        conn.commit()
+        return {"success": True, "level_bonus": bonus, "new_level": new_level}
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        return {"success": False, "error": "Bạn đã đánh giá người này cho trận đấu này rồi"}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/judge/adjust-score")
+def judge_adjust_score(data: JudgeScoreInput):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        judge_level = get_user_level(cursor, data.judge)
+        if judge_level < 101:
+            return {"success": False, "error": "Chỉ Level 101 mới có quyền Giám khảo"}
+        delta = max(-10, min(10, data.score_delta))
+        cursor.execute("""
+            UPDATE match_history
+            SET score_self = LEAST(100, GREATEST(0, score_self + %s))
+            WHERE id = (
+                SELECT id FROM match_history WHERE username=%s ORDER BY id DESC LIMIT 1
+            )
+            RETURNING id, score_self
+        """, (delta, data.target))
+        row = cursor.fetchone()
+        if not row:
+            return {"success": False, "error": "Không tìm thấy trận gần nhất của người chơi"}
+        level_delta = 1 if delta >= 5 else (-1 if delta <= -5 else 0)
+        new_level = apply_level_delta(cursor, data.target, level_delta) if level_delta else get_user_level(cursor, data.target)
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO judge_actions (judge, target, action_type, score_delta, level_delta, reason, created_at)
+            VALUES (%s, %s, 'adjust_score', %s, %s, %s, %s)
+        """, (data.judge, data.target, delta, level_delta, data.reason.strip()[:500], now))
+        cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                       (data.target, "judge", f"Giám khảo Lv.101 {data.judge} đã điều chỉnh điểm trận gần nhất của bạn ({delta:+d}).", now))
+        conn.commit()
+        return {"success": True, "match_id": row["id"], "score": row["score_self"], "level_delta": level_delta, "new_level": new_level}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/judge/protect-disciple")
+def judge_protect_disciple(data: JudgeProtectInput):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        judge_level = get_user_level(cursor, data.judge)
+        if judge_level < 101:
+            return {"success": False, "error": "Chỉ Level 101 mới có quyền bảo kê"}
+        cursor.execute("SELECT id FROM mentorship WHERE master=%s AND disciple=%s AND is_graduated=FALSE", (data.judge, data.disciple))
+        if not cursor.fetchone():
+            return {"success": False, "error": "Người này không phải đệ tử đang theo học của bạn"}
+        new_level = apply_level_delta(cursor, data.disciple, 2)
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO judge_actions (judge, target, action_type, level_delta, reason, created_at)
+            VALUES (%s, %s, 'protect_disciple', 2, %s, %s)
+        """, (data.judge, data.disciple, data.reason.strip()[:500], now))
+        cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                       (data.disciple, "judge", f"Sư phụ Lv.101 {data.judge} đã bảo kê, giúp bạn tăng 2 level.", now))
+        conn.commit()
+        return {"success": True, "new_level": new_level}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
 
 # --- MENTORSHIP ---
 class MentorshipRequest(BaseModel):

@@ -14,6 +14,9 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
   const [fallacySpeaker, setFallacySpeaker] = useState('')
   const [fallaciesA, setFallaciesA] = useState([])
   const [fallaciesB, setFallaciesB] = useState([])
+  const [bestFriends, setBestFriends] = useState([])
+  const [selectedHelper, setSelectedHelper] = useState('')
+  const [requestingHelp, setRequestingHelp] = useState(false)
   
   // Custom alerts for excellent or off_topic
   const [systemAlert, setSystemAlert] = useState(null)
@@ -27,6 +30,39 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isAiThinking, systemAlert])
+
+  useEffect(() => {
+    if (!username || username.startsWith('Guest_') || !mode?.includes('1v1')) return
+    axios.get(`${API_BASE}/friends/${encodeURIComponent(username)}`)
+      .then(res => {
+        if (res.data.success) {
+          const helpers = (res.data.friends || []).filter(f => (f.debate_count || 0) >= 50)
+          setBestFriends(helpers)
+          if (helpers[0]) setSelectedHelper(helpers[0].username)
+        }
+      })
+      .catch(() => {})
+  }, [username, mode])
+
+  const handleRequestBestFriendHelp = async () => {
+    if (!selectedHelper) return
+    setRequestingHelp(true)
+    try {
+      const res = await axios.post(`${API_BASE}/request-help`, {
+        from_user: username,
+        to_user: selectedHelper,
+        topic: roomData.topic,
+        mode
+      })
+      setSystemAlert({ type: res.data.success ? 'success' : 'warning', msg: res.data.success ? '🆘 Đã gửi lời nhờ trợ giúp tới bạn thân.' : (res.data.error || 'Không gửi được lời nhờ trợ giúp') })
+      setTimeout(() => setSystemAlert(null), 4000)
+    } catch (err) {
+      setSystemAlert({ type: 'warning', msg: 'Không gửi được lời nhờ trợ giúp.' })
+      setTimeout(() => setSystemAlert(null), 4000)
+    } finally {
+      setRequestingHelp(false)
+    }
+  }
 
   const handleInputChange = (e) => {
     setInput(e.target.value)
@@ -162,6 +198,8 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
           playerA: roomData.playerA,
           playerB: roomData.playerB,
           topic: roomData.topic,
+          rawUsernameA: roomData.rawUsernameA,
+          rawUsernameB: roomData.rawUsernameB,
           transcript_a: transcriptA,
           transcript_b: transcriptB
         })
@@ -195,7 +233,17 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
             <span style={{ color: '#a855f7', fontWeight: 'bold' }}>{roomData.playerB} (Phản Đối)</span>
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {bestFriends.length > 0 && mode?.includes('1v1') && (
+            <>
+              <select value={selectedHelper} onChange={e => setSelectedHelper(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '9px', maxWidth: '150px' }}>
+                {bestFriends.map(f => <option key={f.username} value={f.username}>{f.username}</option>)}
+              </select>
+              <button onClick={handleRequestBestFriendHelp} disabled={requestingHelp} className="btn-secondary" style={{ padding: '10px 14px', borderRadius: '8px', borderColor: 'rgba(16,185,129,0.5)', color: '#6ee7b7' }}>
+                {requestingHelp ? 'Đang gửi...' : '🆘 SOS'}
+              </button>
+            </>
+          )}
           <button onClick={onCancel} className="btn-secondary" style={{ padding: '10px 20px' }}>Thoát</button>
           <button onClick={handleEnd} className="btn-primary" disabled={isScoring} style={{ padding: '10px 20px', background: '#f59e0b', borderColor: '#f59e0b' }}>
             {isScoring ? 'Đang chấm...' : '🏁 Kết thúc & Chấm điểm'}

@@ -5,9 +5,9 @@ import { useUser } from '@clerk/clerk-react'
 const API_BASE = 'http://localhost:8000'
 
 const RESULT_META = {
-  win:  { label: 'Thắng',  color: '#10b981', bg: 'rgba(16,185,129,0.15)',  icon: '🏆' },
-  lose: { label: 'Thua',   color: '#ef4444', bg: 'rgba(239,68,68,0.15)',   icon: '💔' },
-  draw: { label: 'Hòa',    color: '#f59e0b', bg: 'rgba(245,158,11,0.15)',  icon: '🤝' },
+  win: { label: 'Thắng', color: '#10b981', bg: 'rgba(16,185,129,0.15)', icon: '🏆' },
+  lose: { label: 'Thua', color: '#ef4444', bg: 'rgba(239,68,68,0.15)', icon: '💔' },
+  draw: { label: 'Hòa', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)', icon: '🤝' },
 }
 
 function HistoryRow({ match, onClick }) {
@@ -46,8 +46,10 @@ function HistoryRow({ match, onClick }) {
       </div>
 
       <div>
-        <p style={{ margin: 0, color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.95rem',
-          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px' }}>
+        <p style={{
+          margin: 0, color: 'var(--text-primary)', fontWeight: '600', fontSize: '0.95rem',
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '400px'
+        }}>
           {match.topic || '(Không có chủ đề)'}
         </p>
         <p style={{ margin: '3px 0 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
@@ -124,7 +126,7 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
         alert('Đã lưu bài viết thành công!');
         onClose();
       }
-    } catch(e) {
+    } catch (e) {
       alert('Lỗi lưu bài!');
     }
   };
@@ -136,7 +138,7 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
           <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>📝 Trình Soạn Thảo: {event.title}</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
         </div>
-        
+
         {loading ? <p style={{ color: 'var(--text-secondary)' }}>Đang tải...</p> : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', display: 'flex', gap: '10px', borderRadius: '8px 8px 0 0', border: '1px solid var(--border-light)', borderBottom: 'none' }}>
@@ -177,7 +179,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
       if (res.data.success) {
         setSubmissions(res.data.submissions);
       }
-    } catch(e) {}
+    } catch (e) { }
     setLoading(false);
   };
 
@@ -190,7 +192,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
       } else {
         alert(res.data.error || 'Lỗi bình chọn!');
       }
-    } catch(e) {
+    } catch (e) {
       alert('Lỗi kết nối!');
     }
   };
@@ -202,7 +204,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
           <h2 style={{ margin: 0, color: 'var(--text-primary)' }}>👍 Bình chọn: {event.title}</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
         </div>
-        
+
         {loading ? <p style={{ color: 'var(--text-secondary)' }}>Đang tải danh sách bài viết...</p> : (
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', paddingRight: '10px' }}>
             {submissions.length === 0 ? (
@@ -216,10 +218,10 @@ const EventVotingModal = ({ event, onClose, username }) => {
                       <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>@{sub.username}</div>
                       <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>⭐ {sub.votes} Votes</div>
                     </div>
-                    <div 
-                      style={{ 
-                        color: 'var(--text-primary)', 
-                        maxHeight: isExpanded ? 'none' : '60px', 
+                    <div
+                      style={{
+                        color: 'var(--text-primary)',
+                        maxHeight: isExpanded ? 'none' : '60px',
                         overflow: 'hidden',
                         position: 'relative',
                         whiteSpace: 'pre-wrap'
@@ -250,6 +252,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
 
 export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler }) {
   const [activeTab, setActiveTab] = useState('home')
+  const [showDailyQuests, setShowDailyQuests] = useState(false)
   const [activeEvent, setActiveEvent] = useState(null)
   const [activeVotingEvent, setActiveVotingEvent] = useState(null)
   const [history, setHistory] = useState([])
@@ -281,7 +284,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [selectedBadges, setSelectedBadges] = useState(() => {
     try { return JSON.parse(localStorage.getItem('kaiko_badges_' + username) || '[]') } catch { return [] }
   })
-  
+
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -307,7 +310,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   useEffect(() => {
     axios.get(`${API_BASE}/server-announcements`).then(r => {
       if (r.data.success) setServerAnnouncements(r.data.announcements)
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   // Rotate ticker every 6s
@@ -321,7 +324,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   useEffect(() => {
     axios.get(`${API_BASE}/chat-messages/global`).then(r => {
       if (r.data.success) setGlobalMessages(r.data.messages.map(m => ({ ...m, timestamp: m.timestamp })))
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   // Load friends chat preview
@@ -329,7 +332,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     if (isGuest) return
     axios.get(`${API_BASE}/chat-friends-preview/${username}`).then(r => {
       if (r.data.success) setFriendsChatPreview(r.data.data)
-    }).catch(() => {})
+    }).catch(() => { })
   }
 
   // Load conversation with a specific friend from DB
@@ -338,7 +341,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (r.data.success) {
         setChatMessages(prev => ({ ...prev, [friend]: r.data.messages }))
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }
 
   useEffect(() => {
@@ -385,18 +388,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
   // All badge-type items with their image mappings
   const RANK_BADGE_CATALOG = [
-    { id: 'rank_1',  image: '/assets/badges/crab_baby.png',     name: 'Cua Non (Lv 1+)',    minLevel: 1  },
-    { id: 'rank_11', image: '/assets/badges/crab_walker.png',   name: 'Cua Gắt (Lv 11+)',   minLevel: 11 },
-    { id: 'rank_31', image: '/assets/badges/crab_keyboard.png', name: 'Cua Cùm (Lv 31+)',   minLevel: 31 },
-    { id: 'rank_61', image: '/assets/badges/crab_judge.png',    name: 'Thư Giãn (Lv 61+)',  minLevel: 61 },
-    { id: 'rank_91', image: '/assets/badges/crab_king.png',     name: 'Idol Cua (Lv 91+)',   minLevel: 91 },
+    { id: 'rank_1', image: '/assets/badges/crab_baby.png', name: 'Cua Non (Lv 1+)', minLevel: 1 },
+    { id: 'rank_11', image: '/assets/badges/crab_walker.png', name: 'Cua Gắt (Lv 11+)', minLevel: 11 },
+    { id: 'rank_31', image: '/assets/badges/crab_keyboard.png', name: 'Cua Cùm (Lv 31+)', minLevel: 31 },
+    { id: 'rank_61', image: '/assets/badges/crab_judge.png', name: 'Thư Giãn (Lv 61+)', minLevel: 61 },
+    { id: 'rank_91', image: '/assets/badges/crab_king.png', name: 'Idol Cua (Lv 91+)', minLevel: 91 },
   ]
   const BADGE_CATALOG = [
-    { id: 'title_best',     image: '/assets/badges/HHKhoeNhatBien.png',  name: 'Khỏe Nhất Biển' },
-    { id: 'title_genius',   image: '/assets/badges/title_genus.png',      name: 'Thiên Tài Tinh Tú' },
-    { id: 'title_banthan',  image: '/assets/badges/HHBanThan.png',        name: 'Bạn Thân Cua' },
-    { id: 'title_kaikonew', image: '/assets/badges/HHKaiKoMoiNhu.png',   name: 'KaiKo Mới Này' },
-    { id: 'rename_card',    image: '/assets/badges/rename_card.png',      name: 'Thẻ Biệt Danh' },
+    { id: 'title_best', image: '/assets/badges/HHKhoeNhatBien.png', name: 'Khỏe Nhất Biển' },
+    { id: 'title_genius', image: '/assets/badges/title_genus.png', name: 'Thiên Tài Tinh Tú' },
+    { id: 'title_banthan', image: '/assets/badges/HHBanThan.png', name: 'Bạn Thân Cua' },
+    { id: 'title_kaikonew', image: '/assets/badges/HHKaiKoMoiNhu.png', name: 'KaiKo Mới Này' },
+    { id: 'rename_card', image: '/assets/badges/rename_card.png', name: 'Thẻ Biệt Danh' },
     { id: 'avatar_crab_gold', image: '/assets/badges/avatar_crab_gold.png', name: 'Cua Hoàng Đế' },
   ]
 
@@ -444,14 +447,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           localStorage.setItem('kaiko_frame', res.data.frame)
         }
       }
-    } catch(e) {}
+    } catch (e) { }
   }, [username, isGuest])
 
   const loadEvents = useCallback(async () => {
     try {
       const res = await axios.get(`${API_BASE}/events`)
       if (res.data.success) setEvents(res.data.events)
-    } catch(e) {}
+    } catch (e) { }
   }, [])
 
   const loadMyEvents = useCallback(async () => {
@@ -459,7 +462,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     try {
       const res = await axios.get(`${API_BASE}/my-events/${encodeURIComponent(username)}`)
       if (res.data.success) setJoinedEvents(res.data.events || [])
-    } catch(e) {}
+    } catch (e) { }
   }, [username, isGuest])
 
   const handleCheckIn = async () => {
@@ -472,7 +475,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           setServerPoints(res.data.store_points)
           alert(`Điểm danh thành công! +50 Điểm Tích Lũy. Tổng: ${res.data.store_points} điểm.`)
         }
-      } catch(e) {
+      } catch (e) {
         // fallback localStorage
         const newExtra = extraPoints + 50
         localStorage.setItem('kaiko_extra_points_' + username, newExtra.toString())
@@ -496,7 +499,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       } else {
         alert(`❌ ${res.data.error}`)
       }
-    } catch(e) {
+    } catch (e) {
       alert('Lỗi kết nối máy chủ!')
     }
   }
@@ -543,14 +546,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     try {
       await axios.post(`${API_BASE}/accept-friend`, { user: username, target: requester })
       loadFriends()
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const handleDeclineRequest = async (requester) => {
     try {
       await axios.post(`${API_BASE}/decline-friend`, { user: username, target: requester })
       loadFriends()
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const handleRemoveFriend = async (friendName) => {
@@ -558,7 +561,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       try {
         await axios.post(`${API_BASE}/remove-friend`, { user: username, target: friendName })
         loadFriends()
-      } catch (e) {}
+      } catch (e) { }
     }
   }
 
@@ -566,21 +569,21 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     setSelectedUser(targetName)
     setSelectedUserStats(null)
     try {
-        const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(targetName)}?limit=1000`)
-        if (res.data.success) {
-            const h = res.data.history
-            const wins   = h.filter(m => m.result === 'win').length
-            const losses = h.filter(m => m.result === 'lose').length
-            const draws  = h.filter(m => m.result === 'draw').length
-            const exp = wins * 10 + draws * 2 - losses * 2
-            const finalExp = Math.max(0, exp)
-            const calculatedLevel = Math.floor(finalExp / 100) + 1
-            const level = Math.min(calculatedLevel, 101)
-            const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
-            setSelectedUserStats({ wins, losses, draws, total: h.length, level, avgScore, exp: finalExp })
-        }
+      const res = await axios.get(`${API_BASE}/history/${encodeURIComponent(targetName)}?limit=1000`)
+      if (res.data.success) {
+        const h = res.data.history
+        const wins = h.filter(m => m.result === 'win').length
+        const losses = h.filter(m => m.result === 'lose').length
+        const draws = h.filter(m => m.result === 'draw').length
+        const exp = wins * 10 + draws * 2 - losses * 2
+        const finalExp = Math.max(0, exp)
+        const calculatedLevel = Math.floor(finalExp / 100) + 1
+        const level = Math.min(calculatedLevel, 101)
+        const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
+        setSelectedUserStats({ wins, losses, draws, total: h.length, level, avgScore, exp: finalExp })
+      }
     } catch (e) {
-        setSelectedUserStats({ error: true })
+      setSelectedUserStats({ error: true })
     }
   }
 
@@ -588,14 +591,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     const val = e.target.value
     setAvatarFrame(val)
     localStorage.setItem('kaiko_frame', val)
-    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: selectedAvatar, frame: val }).catch(()=>{})
+    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: selectedAvatar, frame: val }).catch(() => { })
   }
 
   const handleAvatarChange = async (e) => {
     const val = e.target.value
     setSelectedAvatar(val)
     localStorage.setItem('kaiko_avatar_' + username, val)
-    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: val, frame: avatarFrame }).catch(()=>{})
+    if (!isGuest) await axios.post(`${API_BASE}/update-profile`, { username, avatar: val, frame: avatarFrame }).catch(() => { })
   }
 
   const frameFileMap = {
@@ -626,16 +629,16 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         const h = res.data.history
         setHistory(h)
         // Tính stats
-        const wins   = h.filter(m => m.result === 'win').length
+        const wins = h.filter(m => m.result === 'win').length
         const losses = h.filter(m => m.result === 'lose').length
-        const draws  = h.filter(m => m.result === 'draw').length
+        const draws = h.filter(m => m.result === 'draw').length
         const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
-        
+
         // Tính toán EXP thực tế (Chat thấp hơn Video)
         // Video/Solo: win=10, draw=2, lose=-2 | Chat: win=7, draw=1, lose=-1
         const exp = h.reduce((acc, m) => {
           const isChat = m.mode?.startsWith('text_')
-          if (m.result === 'win')  return acc + (isChat ? 7 : 10)
+          if (m.result === 'win') return acc + (isChat ? 7 : 10)
           if (m.result === 'draw') return acc + (isChat ? 1 : 2)
           if (m.result === 'lose') return acc + (isChat ? -1 : -2)
           return acc
@@ -648,7 +651,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         // Điểm mua sắm cũng phân biệt: Video win=5, Chat win=3
         const shopPoints = h.reduce((acc, m) => {
           const isChat = m.mode?.startsWith('text_')
-          if (m.result === 'win')  return acc + (isChat ? 3 : 5)
+          if (m.result === 'win') return acc + (isChat ? 3 : 5)
           if (m.result === 'draw') return acc + (isChat ? 0 : 1)
           return acc
         }, 0)
@@ -682,7 +685,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (res.data.success) {
         setGlobalNicknames(res.data.nicknames)
       }
-    } catch(err) {}
+    } catch (err) { }
   }, [])
 
   useEffect(() => {
@@ -698,7 +701,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         .then(() => {
           setGlobalNicknames(prev => ({ ...prev, [username]: localNick.trim() }))
         })
-        .catch(() => {})
+        .catch(() => { })
     }
   }, [username, isGuest])
 
@@ -709,7 +712,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (res.data.success) {
         setNotifications(res.data.notifications)
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [username, isGuest])
 
   const loadFallacyStats = useCallback(async () => {
@@ -719,7 +722,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (res.data.success) {
         setFallacyStats(res.data.stats)
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [username, isGuest])
 
   const loadMentorship = useCallback(async () => {
@@ -729,7 +732,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (res.data.success) {
         setMentorData({ masters: res.data.masters, disciples: res.data.disciples, requests: res.data.requests || [] })
       }
-    } catch (e) {}
+    } catch (e) { }
   }, [username, isGuest])
 
   useEffect(() => {
@@ -750,16 +753,16 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   }, [loadFriends, isGuest])
 
   const TABS = [
-    { id: 'profile',    icon: '👤', label: 'Hồ sơ', color: '#a855f7' },
-    { id: 'history',    icon: '📋', label: 'Lịch sử', color: '#3b82f6' },
-    { id: 'leaderboard',icon: '🏆', label: 'BXH', color: '#f59e0b' },
-    { id: 'friends',    icon: '👥', label: 'Bạn bè', color: '#10b981' },
-    { id: 'events',     icon: '🎉', label: 'Sự kiện', color: '#ec4899' },
-    { id: 'store',      icon: '🛒', label: 'Cửa hàng', color: '#eab308' },
-    { id: 'stats',      icon: '📊', label: 'Thống Kê', color: '#ef4444' },
-    { id: 'mentor',     icon: '🎓', label: 'Bái Sư', color: '#8b5cf6' },
-    { id: 'community',  icon: '🌐', label: 'Cộng Đồng', color: '#14b8a6' },
-    { id: 'live',       icon: '📺', label: 'Xem Live', color: '#ef4444' },
+    { id: 'profile', icon: '👤', label: 'Hồ sơ', color: '#a855f7', image: '/assets/icons/icon_profile.png' },
+    { id: 'history', icon: '📋', label: 'Lịch sử', color: '#3b82f6', image: '/assets/icons/icon_history.png' },
+    { id: 'leaderboard', icon: '🏆', label: 'BXH', color: '#f59e0b', image: '/assets/icons/icon_leaderboard.png' },
+    { id: 'friends', icon: '👥', label: 'Bạn bè', color: '#10b981', image: '/assets/icons/icon_friends.png' },
+    { id: 'events', icon: '🎉', label: 'Sự kiện', color: '#ec4899', image: '/assets/icons/icon_events.png' },
+    { id: 'store', icon: '🛒', label: 'Cửa hàng', color: '#eab308', image: '/assets/icons/icon_store.png' },
+    { id: 'stats', icon: '📊', label: 'Thống Kê', color: '#ef4444', image: '/assets/icons/icon_stats.png' },
+    { id: 'mentor', icon: '🎓', label: 'Bái Sư', color: '#8b5cf6', image: '/assets/icons/icon_mentor.png' },
+    { id: 'community', icon: '🌐', label: 'Cộng Đồng', color: '#14b8a6', image: '/assets/icons/icon_community.png' },
+    { id: 'live', icon: '📺', label: 'Xem Live', color: '#ef4444', image: '/assets/icons/icon_live.png' },
   ]
 
   const getRankInfo = (level) => {
@@ -891,10 +894,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
         {/* Right: Logout & Notifications */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          
+
           {/* Notification Bell */}
           <div style={{ position: 'relative' }}>
-            <button 
+            <button
               onClick={() => { setShowNotifications(!showNotifications); loadNotifications(); }}
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', position: 'relative' }}
             >
@@ -923,10 +926,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
 
         {/* ── Content ── */}
-        <div className="glass-panel animate-fade-in" style={{ 
-          padding: activeTab === 'home' ? '2rem' : '1.5rem', 
-          minHeight: '600px', 
-          display: 'flex', 
+        <div className="glass-panel animate-fade-in" style={{
+          padding: activeTab === 'home' ? '2rem' : '1.5rem',
+          minHeight: '600px',
+          display: 'flex',
           flexDirection: 'column'
         }}>
           {/* Lớp nền con lồng bên trong */}
@@ -942,496 +945,649 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
             maxHeight: 'calc(100vh - 200px)'
           }}>
 
-          {activeTab !== 'home' && (
-            <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
-              <button 
-                onClick={() => setActiveTab('home')}
-                style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
-                onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-              >
-                ← Về Sảnh
-              </button>
-            </div>
-          )}
-
-          {/* HOME (SẢNH CHÍNH) */}
-          {activeTab === 'home' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingTop: '0.5rem' }}>
-
-              {/* ── Row 1: PLAY button (full width hero) ── */}
-              <div style={{ position: 'relative', textAlign: 'center' }}>
-                {/* Ambient glow behind button */}
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
+            {activeTab !== 'home' && (
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
                 <button
-                  onClick={onPlay}
-                  className="btn-primary play-btn-ring"
-                  style={{
-                    padding: '20px 90px', fontSize: '2rem', borderRadius: 'var(--radius-full)',
-                    letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'var(--font-heading)',
-                    boxShadow: '0 0 40px rgba(239,68,68,0.5), 0 8px 32px rgba(245,158,11,0.3)',
-                    position: 'relative', zIndex: 1
-                  }}
+                  onClick={() => setActiveTab('home')}
+                  style={{ background: 'transparent', color: 'var(--text-secondary)', border: 'none', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
                 >
-                  🎮 CHƠI NGAY
+                  ← Về Sảnh
                 </button>
               </div>
+            )}
 
-              {/* ── Row 2: Daily Quest + Check-in streak ── */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', alignItems: 'stretch' }}>
-                {/* Daily Quest card */}
-                <div className="daily-quest-card" style={{ padding: '1rem 1.4rem', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ fontSize: '2rem', flexShrink: 0 }}>📋</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', color: 'var(--text-primary)', fontSize: '0.95rem', letterSpacing: '0.05em', marginBottom: '6px' }}>NHIỆM VỤ HÔM NAY</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {[
-                        { label: 'Thắng 3 trận', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
-                        { label: 'Điểm danh hôm nay', reward: '+50 pts', done: hasCheckedIn },
-                      ].map((q, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: q.done ? '#10b981' : 'rgba(0,0,0,0.15)', border: `2px solid ${q.done ? '#10b981' : 'rgba(217,119,6,0.4)'}`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
-                            {q.done && '✓'}
-                          </div>
-                          <span style={{ fontSize: '0.82rem', color: q.done ? 'var(--text-secondary)' : 'var(--text-primary)', textDecoration: q.done ? 'line-through' : 'none', flex: 1 }}>{q.label}</span>
-                          <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{q.reward}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {/* Check-in button */}
-                <button
-                  onClick={handleCheckIn}
-                  disabled={hasCheckedIn}
-                  style={{
-                    background: hasCheckedIn ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f59e0b, #ef4444)',
-                    color: hasCheckedIn ? '#10b981' : '#fff',
-                    border: hasCheckedIn ? '1px solid rgba(16,185,129,0.4)' : 'none',
-                    borderRadius: 'var(--radius-lg)', padding: '0 1.5rem',
-                    cursor: hasCheckedIn ? 'not-allowed' : 'pointer',
-                    fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem',
-                    boxShadow: hasCheckedIn ? 'none' : '0 4px 20px rgba(245,158,11,0.45)',
-                    transition: 'all 0.25s', minWidth: '120px', flexDirection: 'column', gap: '4px'
-                  }}
-                >
-                  <div style={{ fontSize: '1.5rem' }}>{hasCheckedIn ? '✅' : '🎁'}</div>
-                  <div>{hasCheckedIn ? 'Đã Điểm Danh' : 'Điểm Danh'}</div>
-                </button>
-              </div>
+            {/* HOME (SẢNH CHÍNH) */}
+            {activeTab === 'home' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingTop: '0.5rem' }}>
 
-              {/* ── Row 3: Asymmetric nav grid ── */}
-              {/* Layout: [Profile TALL] [3-col grid: History, Rank, Store / Friend, Event, Guide] */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-                {/* Profile card — tall */}
-                {(() => {
-                  const profileTab = TABS.find(t => t.id === 'profile')
-                  return (
-                    <div
-                      className="nav-card"
-                      onClick={() => setActiveTab('profile')}
+                {/* ── Row 1: Hero Play Zone ── */}
+                <div style={{
+                  position: 'relative', textAlign: 'center',
+                  background: 'linear-gradient(135deg, rgba(180,70,10,0.22) 0%, rgba(245,158,11,0.14) 50%, rgba(239,68,68,0.18) 100%)',
+                  border: '1px solid rgba(245,158,11,0.4)',
+                  borderRadius: '20px', padding: '1.8rem 2rem',
+                  overflow: 'hidden',
+                }}>
+                  {/* Corner decorations */}
+                  <span style={{ position: 'absolute', top: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
+                  <span style={{ position: 'absolute', top: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
+                  <span style={{ position: 'absolute', bottom: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
+                  <span style={{ position: 'absolute', bottom: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
+                  
+                  {/* Quick stats & Streak */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+                    {!isGuest ? (
+                      <div style={{ display: 'flex', gap: '16px' }}>
+                        <span style={{ color: '#10b981', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '1px' }}>🏆 {stats.wins || 0}W</span>
+                        <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '0.8rem', alignSelf: 'center' }}>vs</span>
+                        <span style={{ color: '#ef4444', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '1px' }}>{stats.losses || 0}L 💔</span>
+                        {checkinStreak > 0 && <span style={{ color: '#f59e0b', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem' }}>🔥 {checkinStreak} ngày</span>}
+                      </div>
+                    ) : <div />}
+                    
+                    {/* Check-in button inside Hero zone */}
+                    <button
+                      onClick={handleCheckIn}
+                      disabled={hasCheckedIn}
                       style={{
-                        background: `linear-gradient(145deg, ${profileTab.color}22, ${profileTab.color}08)`,
-                        border: `1px solid ${profileTab.color}50`,
-                        borderRadius: '20px', padding: '2rem 1.5rem',
-                        cursor: 'pointer', textAlign: 'center',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '12px', minHeight: '200px',
-                        boxShadow: `0 4px 20px ${profileTab.color}25`
+                        background: hasCheckedIn ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                        color: hasCheckedIn ? '#10b981' : '#fff',
+                        border: hasCheckedIn ? '1px solid rgba(16,185,129,0.4)' : 'none',
+                        borderRadius: 'var(--radius-lg)', padding: '6px 16px',
+                        cursor: hasCheckedIn ? 'not-allowed' : 'pointer',
+                        fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.85rem',
+                        boxShadow: hasCheckedIn ? 'none' : '0 4px 15px rgba(245,158,11,0.4)',
+                        transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '6px'
                       }}
                     >
-                      <div className="nav-card-icon" style={{ fontSize: '3.5rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}60)` }}>{profileTab.icon}</div>
-                      <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '1.3rem', color: profileTab.color, letterSpacing: '0.05em' }}>{profileTab.label.toUpperCase()}</div>
-                      {!isGuest && (
-                        <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '3px 12px', fontSize: '0.75rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)' }}>
-                          LV {currentLevel} · {rank.title}
+                      <span>{hasCheckedIn ? '✅' : '🎁'}</span>
+                      <span>{hasCheckedIn ? 'Đã Điểm Danh' : 'Điểm Danh'}</span>
+                    </button>
+                  </div>
+                  
+                  {/* Ambient glow behind button */}
+                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
+                  
+                  <button
+                    onClick={onPlay}
+                    className="btn-primary play-btn-ring"
+                    style={{
+                      padding: '16px 72px', fontSize: '1.8rem', borderRadius: 'var(--radius-full)',
+                      letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'var(--font-heading)',
+                      boxShadow: '0 0 40px rgba(239,68,68,0.5), 0 8px 32px rgba(245,158,11,0.3)',
+                      position: 'relative', zIndex: 1
+                    }}
+                  >
+                    🎮 CHƠI NGAY
+                  </button>
+                </div>
+
+                {/* ── Divider ── */}
+                <img src="/assets/ui/divider.png" alt="" className="game-divider"
+                  onError={e => { e.target.style.display = 'none' }} />
+
+                {/* ── Row 2: Nav Grid ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '1.2rem' }}>
+                  
+                  {/* Left Column: Profile Card + Scroll Quest Button */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                    {/* Profile card — tall */}
+                    {(() => {
+                      const profileTab = TABS.find(t => t.id === 'profile')
+                      return (
+                        <div
+                          className="nav-card"
+                          onClick={() => setActiveTab('profile')}
+                          style={{
+                            background: 'transparent',
+                            borderRadius: '20px', padding: '1.2rem 1rem',
+                            cursor: 'pointer', textAlign: 'center',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: '10px', minHeight: '200px', flex: 1
+                          }}
+                        >
+                          {profileTab.image
+                            ? <img src={profileTab.image} alt={profileTab.label}
+                                style={{ width: '6rem', height: '6rem', objectFit: 'contain', filter: `drop-shadow(0 4px 14px ${profileTab.color}90)` }}
+                                onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
+                            : null
+                          }
+                          <div className="nav-card-icon" style={{ fontSize: '4rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}70)`, display: profileTab.image ? 'none' : 'block' }}>{profileTab.icon}</div>
+                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.72rem', color: '#92400e', letterSpacing: '0.04em' }}>{profileTab.label.toUpperCase()}</div>
+                          {!isGuest && (
+                            <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '3px 12px', fontSize: '0.72rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)', border: `1px solid ${profileTab.color}40` }}>
+                              LV {currentLevel}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+
+                    {/* Quest scroll button */}
+                    <div
+                      onClick={() => setShowDailyQuests(true)}
+                      style={{
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        border: '3px double #78350f',
+                        borderRadius: '16px',
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        boxShadow: '0 6px 16px rgba(120,53,15,0.25)',
+                        transition: 'transform 0.25s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      <span style={{ fontSize: '1.4rem' }}>📜</span>
+                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.78rem', color: '#78350f', letterSpacing: '0.04em' }}>
+                        NHIỆM VỤ HÀNG NGÀY
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Grid of other tabs */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)', gap: '0.6rem' }}>
+                    {TABS.filter(t => t.id !== 'profile').map((tab) => (
+                      <div
+                        key={tab.id}
+                        className="nav-card"
+                        onClick={() => setActiveTab(tab.id)}
+                        style={{
+                          background: 'transparent',
+                          borderRadius: '14px',
+                          cursor: 'pointer', textAlign: 'center',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                          gap: '4px', padding: '0.4rem',
+                        }}
+                      >
+                        {tab.image
+                          ? <img src={tab.image} alt={tab.label} className="nav-card-icon"
+                              style={{ width: '4.4rem', height: '4.4rem', objectFit: 'contain', filter: `drop-shadow(0 3px 10px ${tab.color}80)` }}
+                              onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
+                          : null
+                        }
+                        <div className="nav-card-icon" style={{ fontSize: '3.5rem', lineHeight: 1, filter: `drop-shadow(0 3px 8px ${tab.color}70)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
+                        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.72rem', color: '#92400e', letterSpacing: '0.04em', lineHeight: 1.2 }}>{tab.label.toUpperCase()}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                </div>
+
+                {/* ── Daily Quests Scroll Modal ── */}
+                {showDailyQuests && (
+                  <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', zIndex: 1000,
+                    backdropFilter: 'blur(4px)'
+                  }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                      border: '8px double #78350f',
+                      borderRadius: '20px',
+                      padding: '2rem',
+                      width: '90%',
+                      maxWidth: '420px',
+                      boxShadow: '0 20px 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(120,53,15,0.15)',
+                      position: 'relative',
+                      color: '#78350f',
+                      fontFamily: 'var(--font-heading)'
+                    }}>
+                      {/* Decorative Scroll Handles */}
+                      <div style={{
+                        position: 'absolute', top: '-15px', left: '8%', right: '8%',
+                        height: '10px', background: '#78350f', borderRadius: '5px'
+                      }} />
+                      <div style={{
+                        position: 'absolute', bottom: '-15px', left: '8%', right: '8%',
+                        height: '10px', background: '#78350f', borderRadius: '5px'
+                      }} />
+
+                      <h3 style={{
+                        textAlign: 'center', margin: '0 0 1.5rem',
+                        fontSize: '1.3rem', fontWeight: '900',
+                        letterSpacing: '2px', borderBottom: '2px dashed #78350f',
+                        paddingBottom: '0.5rem'
+                      }}>
+                        📜 CUỘN GIẤY NHIỆM VỤ
+                      </h3>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '2rem' }}>
+                        {[
+                          { label: 'Thắng 3 trận đấu', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
+                          { label: 'Điểm danh ngày hôm nay', reward: '+50 pts', done: hasCheckedIn },
+                        ].map((q, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '12px',
+                              opacity: q.done ? 0.45 : 1,
+                              transition: 'opacity 0.25s',
+                              fontSize: '0.95rem',
+                              fontWeight: '700'
+                            }}
+                          >
+                            {/* Custom Checkbox */}
+                            <div style={{
+                              width: '22px',
+                              height: '22px',
+                              border: '2.5px solid #78350f',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '14px',
+                              fontWeight: '900',
+                              color: '#78350f',
+                              background: q.done ? 'rgba(120,53,15,0.1)' : 'transparent',
+                              flexShrink: 0
+                            }}>
+                              {q.done && '✓'}
+                            </div>
+                            
+                            {/* Quest Text */}
+                            <div style={{ flex: 1 }}>
+                              <div>{q.label}</div>
+                              <div style={{ fontSize: '0.78rem', opacity: 0.85, fontWeight: '600' }}>
+                                Phần thưởng: <span style={{ color: '#c2410c' }}>{q.reward}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => setShowDailyQuests(false)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 0',
+                          background: '#78350f',
+                          color: '#fef3c7',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: '800',
+                          cursor: 'pointer',
+                          letterSpacing: '1px',
+                          fontFamily: 'var(--font-heading)',
+                          boxShadow: '0 4px 10px rgba(120,53,15,0.3)',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#92400e'}
+                        onMouseLeave={e => e.currentTarget.style.background = '#78350f'}
+                      >
+                        ĐÓNG CUỘN GIẤY
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* HISTORY */}
+            {activeTab === 'history' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
+                  <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>📋 Lịch sử trận đấu</h2>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <select
+                      value={historyFilter}
+                      onChange={e => setHistoryFilter(e.target.value)}
+                      style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(0,0,0,0.4)', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer' }}
+                    >
+                      <option value="all">Tất cả loại</option>
+                      <option value="video">🎥 Video Debate</option>
+                      <option value="chat">💬 Chat Debate</option>
+                      <option value="solo_ai">🤖 Solo AI</option>
+                    </select>
+                    {!isGuest && (
+                      <button onClick={loadHistory} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        🔄 Làm mới
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {isGuest ? (
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+                    <p style={{ fontSize: '1.2rem' }}>Lịch sử chỉ được lưu với tài khoản đã đăng ký.</p>
+                    <p>Đăng xuất và tạo tài khoản để theo dõi tiến trình của bạn!</p>
+                  </div>
+                ) : historyLoading ? (
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '2rem', animation: 'fadeIn 1s infinite alternate' }}>⏳</div>
+                    <p>Đang tải lịch sử...</p>
+                  </div>
+                ) : history.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
+                    <p style={{ fontSize: '1.2rem' }}>Chưa có trận đấu nào được ghi lại.</p>
+                    <p>Hãy chơi một trận và kết quả sẽ tự động lưu tại đây!</p>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Stats mini */}
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                      {[
+                        { label: `${stats.wins} Thắng`, color: '#10b981' },
+                        { label: `${stats.losses} Thua`, color: '#ef4444' },
+                        { label: `${stats.draws} Hòa`, color: '#f59e0b' },
+                        { label: `TB ${stats.avgScore} điểm`, color: 'var(--accent-primary)' },
+                      ].map(s => (
+                        <span key={s.label} style={{ background: `${s.color}20`, color: s.color, border: `1px solid ${s.color}50`, borderRadius: 'var(--radius-full)', padding: '4px 14px', fontSize: '0.88rem', fontWeight: '600' }}>
+                          {s.label}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Header row */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 80px 80px', gap: '12px', padding: '8px 20px', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'center' }}>Lỗi</span><span style={{ textAlign: 'right' }}>ID</span>
+                    </div>
+
+                    {(historyFilter === 'all'
+                      ? history
+                      : history.filter(m => {
+                        if (historyFilter === 'chat') return m.mode?.startsWith('text_')
+                        if (historyFilter === 'video') return !m.mode?.startsWith('text_') && m.mode !== 'solo_ai'
+                        if (historyFilter === 'solo_ai') return m.mode === 'solo_ai'
+                        return true
+                      })
+                    ).map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LEADERBOARD */}
+            {activeTab === 'leaderboard' && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>🏆 Bảng xếp hạng ELO (Wins)</h2>
+                  <button onClick={loadLeaderboard} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
+                    🔄 Làm mới
+                  </button>
+                </div>
+
+                {leaderboardLoading ? (
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '2rem', animation: 'fadeIn 1s infinite alternate' }}>⏳</div>
+                    <p>Đang tải bảng xếp hạng...</p>
+                  </div>
+                ) : leaderboard.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
+                    <p>Chưa có dữ liệu người chơi.</p>
+                  </div>
+                ) : (
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      <span style={{ textAlign: 'center' }}>Top</span>
+                      <span>Người chơi</span>
+                      <span style={{ textAlign: 'center' }}>Trận</span>
+                      <span style={{ textAlign: 'center' }}>Thắng</span>
+                      <span style={{ textAlign: 'right' }}>Điểm TB</span>
+                    </div>
+                    {leaderboard.map((user, idx) => (
+                      <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
+                        <div style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : 'var(--text-secondary)' }}>
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                        </div>
+                        <div
+                          onClick={() => handleViewUser(user.username)}
+                          style={{ fontWeight: '600', color: username === user.username ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '1.05rem', cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                          {getDisplayName(user.username)} {username === user.username && '(Bạn)'}
+                        </div>
+                        <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{user.total_matches}</div>
+                        <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold' }}>{user.wins}</div>
+                        <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.avg_score)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GUIDE */}
+            {activeTab === 'guide' && (
+              <div>
+                <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>📖 Hướng dẫn sử dụng</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {[
+                    { step: '1', title: 'Chọn chế độ chơi', desc: 'Solo AI (thi đấu với Gemini) hoặc 1v1 (ghép cặp với người chơi khác).' },
+                    { step: '2', title: 'Bật Camera & Microphone', desc: 'Cho phép trình duyệt truy cập để AI phân tích giọng nói và phát hiện ngụy biện.' },
+                    { step: '3', title: 'Bắt đầu lượt của bạn', desc: 'Bấm "Bắt đầu" và trình bày lập luận. Mỗi lượt tối đa 90 giây.' },
+                    { step: '4', title: 'AI phân tích real-time', desc: 'Hệ thống nhận diện giọng nói và bắt lỗi ngụy biện ngay trong lúc bạn nói.' },
+                    { step: '5', title: 'Chuyển lượt / Kết thúc', desc: 'Bấm "Chuyển lượt" để nhường quyền. Bấm "Kết thúc" khi cả hai đã phát biểu xong.' },
+                    { step: '6', title: 'Nhận kết quả chấm điểm', desc: 'AI Gemini chấm điểm theo Logic, Phong thái, Giọng nói, Phản biện và hiển thị gợi ý cải thiện.' },
+                  ].map(item => (
+                    <div key={item.step} style={{ display: 'flex', gap: '16px', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-md)', padding: '16px 20px', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '1rem', flexShrink: 0 }}>{item.step}</div>
+                      <div>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{item.title}</strong>
+                        <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.93rem' }}>{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SETTINGS */}
+            {activeTab === 'settings' && (
+              <div>
+                <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>⚙️ Cài đặt</h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Tài khoản</h4>
+                    <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Tên đăng nhập:</p>
+                    <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }} />
+                    {isGuest && <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '8px 0 0' }}>⚠️ Tài khoản khách — lịch sử không được lưu.</p>}
+                  </div>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Thiết bị & Quyền</h4>
+                    <p style={{ color: 'var(--text-secondary)', margin: '0 0 12px' }}>Camera và Microphone cần được cấp quyền để ứng dụng hoạt động tốt.</p>
+                    <button
+                      onClick={() => navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(() => alert('✅ Quyền đã được cấp!')).catch(() => alert('❌ Bị từ chối. Kiểm tra cài đặt trình duyệt.'))}
+                      style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 20px', cursor: 'pointer' }}
+                    >
+                      🔐 Kiểm tra quyền Camera & Mic
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PROFILE */}
+            {activeTab === 'profile' && (
+              <div style={{ padding: '2rem', textAlign: 'center' }}>
+
+                <div style={{ marginBottom: '1rem', position: 'relative', display: 'inline-block', width: '150px', height: '150px' }}>
+                  <img
+                    src={avatarUrl}
+                    alt="Avatar"
+                    style={{
+                      width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover',
+                      ...frameStyles[avatarFrame]
+                    }}
+                  />
+                  {avatarFrame !== 'none' && (
+                    <img
+                      src={`/assets/frames/${frameFileMap[avatarFrame] || avatarFrame + '.png'}`}
+                      alt="Frame Overlay"
+                      style={{
+                        position: 'absolute',
+                        top: '-15%',
+                        left: '-15%',
+                        width: '130%',
+                        height: '130%',
+                        pointerEvents: 'none',
+                        zIndex: 10
+                      }}
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                  )}
+                </div>
+
+                <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Khung Avatar:</label>
+                    <select value={avatarFrame} onChange={handleFrameChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                      <option value="none">Không có</option>
+                      <option value="wood" disabled={currentLevel < 11}>Khung Gỗ (Yêu cầu Lv 11)</option>
+                      <option value="silver" disabled={currentLevel < 31}>Khung Bạc (Yêu cầu Lv 31)</option>
+                      <option value="gold" disabled={currentLevel < 61}>Khung Vàng (Yêu cầu Lv 61)</option>
+                      <option value="diamond" disabled={currentLevel < 91}>Khung Kim Cương (Yêu cầu Lv 91)</option>
+                      {myItems.includes('frame_fire') && <option value="fire">Khung Cua Lửa (Store)</option>}
+                      {myItems.includes('frame_diamond_plus') && <option value="diamond_plus">Khung Kim Cương Plus (Store)</option>}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Avatar:</label>
+                    <select value={selectedAvatar} onChange={handleAvatarChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                      <option value="">Ảnh Mặc định (Bottts)</option>
+                      <option value="/assets/avatars/CuaDoTruyenThong.png">Cua Đỏ Truyền Thống</option>
+                      <option value="/assets/avatars/CuaXanh.png">Cua Xanh Học Giả</option>
+                      {myItems.includes('avatar_crab_gold') && <option value="/assets/badges/avatar_crab_gold.png">Cua Hoàng Đế (Vật phẩm Store)</option>}
+                    </select>
+                  </div>
+                </div>
+
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '0.5rem', textShadow: '0 2px 10px rgba(255,255,255,0.1)' }}>Hồ sơ của {getDisplayName(username)}</h2>
+                <div style={{ display: 'inline-block', background: rank.bg, color: rank.color, padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '1.5rem', border: `1px solid ${rank.color}` }}>
+                  <span style={{ marginRight: '8px' }}>{rank.icon}</span>
+                  Level {currentLevel} - {rank.title}
+                </div>
+
+                {!isGuest && (
+                  <div style={{ width: '350px', margin: '0 auto 1.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
+                    <div style={{ width: `${stats.exp || 0}%`, background: 'linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%)', height: '100%', transition: 'width 1s ease-in-out' }}></div>
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
+                      {stats.exp || 0} / 100 EXP (Tới cấp tiếp theo)
+                    </div>
+                  </div>
+                )}
+
+                {/* Huy hiệu rank lớn — chỉ hiện khi chưa có showcase */}
+                {(() => {
+                  const displayBadges = selectedBadges.map(id => [...RANK_BADGE_CATALOG, ...BADGE_CATALOG].find(b => b.id === id)).filter(Boolean)
+                  if (!isGuest && displayBadges.length > 0) return null
+                  return (
+                    <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+                      <img src={rank.badgeImage} alt="Rank Badge" style={{ height: '140px', width: 'auto', maxWidth: '350px', objectFit: 'contain', filter: 'drop-shadow(0 4px 15px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display = 'none' }} />
+                    </div>
+                  )
+                })()}
+
+                {/* === HUY HIỆU SHOWCASE === */}
+                {!isGuest && (() => {
+                  const allAvailable = [
+                    ...RANK_BADGE_CATALOG.filter(b => currentLevel >= b.minLevel),
+                    ...BADGE_CATALOG.filter(b => myItems.includes(b.id))
+                  ]
+                  const allById = Object.fromEntries(allAvailable.map(b => [b.id, b]))
+                  const displayBadges = selectedBadges.map(id => allById[id]).filter(Boolean)
+                  return (
+                    <div style={{ marginBottom: '2rem' }}>
+                      {/* Hàng showcase to, 96px */}
+                      {displayBadges.length > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '1.2rem' }}>
+                          {displayBadges.map(b => (
+                            <div key={b.id} title={b.name} style={{ textAlign: 'center' }}>
+                              <img src={b.image} alt={b.name} style={{ height: '96px', width: '96px', objectFit: 'contain', filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' }} onError={(e) => { e.target.style.display = 'none' }} />
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '96px' }}>{b.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Nút mở chọn huy hiệu */}
+                      {allAvailable.length > 0 && (
+                        <div style={{ textAlign: 'center' }}>
+                          <button
+                            onClick={() => setShowBadgeSelector(true)}
+                            style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
+                          >
+                            🏅 Chọn Huy Hiệu Hiển Thị ({selectedBadges.length}/5)
+                          </button>
                         </div>
                       )}
                     </div>
                   )
                 })()}
 
-                {/* Grid of other tabs */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)', gap: '1rem' }}>
-                  {TABS.filter(t => t.id !== 'profile').map((tab, idx) => (
-                    <div
-                      key={tab.id}
-                      className="nav-card"
-                      onClick={() => setActiveTab(tab.id)}
-                      style={{
-                        background: `linear-gradient(145deg, ${tab.color}18, ${tab.color}06)`,
-                        border: `1px solid ${tab.color}40`,
-                        borderRadius: '16px', padding: '1.2rem 1rem',
-                        cursor: 'pointer', textAlign: 'center',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        gap: '8px', boxShadow: `0 2px 12px ${tab.color}15`
-                      }}
-                    >
-                      <div className="nav-card-icon" style={{ fontSize: '2.2rem', filter: `drop-shadow(0 3px 8px ${tab.color}50)` }}>{tab.icon}</div>
-                      <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.88rem', color: tab.color, letterSpacing: '0.04em' }}>{tab.label.toUpperCase()}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                {!isGuest && (
+                  <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '2.5rem', border: `1px solid #f59e0b` }}>
+                    ⭐ Điểm Tích Lũy (Mua Sắm): {serverPoints}
+                  </div>
+                )}
 
-            </div>
-          )}
-
-          {/* HISTORY */}
-          {activeTab === 'history' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
-                <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>📋 Lịch sử trận đấu</h2>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <select
-                    value={historyFilter}
-                    onChange={e => setHistoryFilter(e.target.value)}
-                    style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(0,0,0,0.4)', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer' }}
-                  >
-                    <option value="all">Tất cả loại</option>
-                    <option value="video">🎥 Video Debate</option>
-                    <option value="chat">💬 Chat Debate</option>
-                    <option value="solo_ai">🤖 Solo AI</option>
-                  </select>
-                  {!isGuest && (
-                    <button onClick={loadHistory} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                      🔄 Làm mới
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {isGuest ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
-                  <p style={{ fontSize: '1.2rem' }}>Lịch sử chỉ được lưu với tài khoản đã đăng ký.</p>
-                  <p>Đăng xuất và tạo tài khoản để theo dõi tiến trình của bạn!</p>
-                </div>
-              ) : historyLoading ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
-                  <div style={{ fontSize: '2rem', animation: 'fadeIn 1s infinite alternate' }}>⏳</div>
-                  <p>Đang tải lịch sử...</p>
-                </div>
-              ) : history.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
-                  <p style={{ fontSize: '1.2rem' }}>Chưa có trận đấu nào được ghi lại.</p>
-                  <p>Hãy chơi một trận và kết quả sẽ tự động lưu tại đây!</p>
-                </div>
-              ) : (
-                <div>
-                  {/* Stats mini */}
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+                {!isGuest && stats.total > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', maxWidth: '800px', margin: '0 auto' }}>
                     {[
-                      { label: `${stats.wins} Thắng`, color: '#10b981' },
-                      { label: `${stats.losses} Thua`, color: '#ef4444' },
-                      { label: `${stats.draws} Hòa`, color: '#f59e0b' },
-                      { label: `TB ${stats.avgScore} điểm`, color: 'var(--accent-primary)' },
+                      { label: 'Trận đã chơi', value: stats.total, color: 'var(--accent-primary)', icon: '🎮' },
+                      { label: 'Chiến thắng', value: stats.wins, color: '#10b981', icon: '🏆' },
+                      { label: 'Thất bại', value: stats.losses, color: '#ef4444', icon: '💔' },
+                      { label: 'Điểm TB', value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
                     ].map(s => (
-                      <span key={s.label} style={{ background: `${s.color}20`, color: s.color, border: `1px solid ${s.color}50`, borderRadius: 'var(--radius-full)', padding: '4px 14px', fontSize: '0.88rem', fontWeight: '600' }}>
-                        {s.label}
-                      </span>
+                      <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{s.icon}</div>
+                        <div style={{ fontSize: '2.5rem', fontWeight: '800', color: s.color }}>{s.value}</div>
+                        <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '8px' }}>{s.label}</div>
+                      </div>
                     ))}
                   </div>
+                ) : (
+                  <p style={{ color: 'var(--text-secondary)' }}>Chưa có dữ liệu thống kê.</p>
+                )}
 
-                  {/* Header row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 80px 80px', gap: '12px', padding: '8px 20px', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                    <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'center' }}>Lỗi</span><span style={{ textAlign: 'right' }}>ID</span>
-                  </div>
-
-                  {(historyFilter === 'all'
-                    ? history
-                    : history.filter(m => {
-                        if (historyFilter === 'chat') return m.mode?.startsWith('text_')
-                        if (historyFilter === 'video') return !m.mode?.startsWith('text_') && m.mode !== 'solo_ai'
-                        if (historyFilter === 'solo_ai') return m.mode === 'solo_ai'
-                        return true
-                      })
-                  ).map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* LEADERBOARD */}
-          {activeTab === 'leaderboard' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>🏆 Bảng xếp hạng ELO (Wins)</h2>
-                <button onClick={loadLeaderboard} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                  🔄 Làm mới
-                </button>
-              </div>
-
-              {leaderboardLoading ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
-                  <div style={{ fontSize: '2rem', animation: 'fadeIn 1s infinite alternate' }}>⏳</div>
-                  <p>Đang tải bảng xếp hạng...</p>
-                </div>
-              ) : leaderboard.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
-                  <p>Chưa có dữ liệu người chơi.</p>
-                </div>
-              ) : (
-                <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                    <span style={{ textAlign: 'center' }}>Top</span>
-                    <span>Người chơi</span>
-                    <span style={{ textAlign: 'center' }}>Trận</span>
-                    <span style={{ textAlign: 'center' }}>Thắng</span>
-                    <span style={{ textAlign: 'right' }}>Điểm TB</span>
-                  </div>
-                  {leaderboard.map((user, idx) => (
-                    <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
-                      <div style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : 'var(--text-secondary)' }}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
-                      </div>
-                      <div 
-                        onClick={() => handleViewUser(user.username)}
-                        style={{ fontWeight: '600', color: username === user.username ? 'var(--accent-primary)' : 'var(--text-primary)', fontSize: '1.05rem', cursor: 'pointer', textDecoration: 'underline' }}
-                      >
-                        {getDisplayName(user.username)} {username === user.username && '(Bạn)'}
-                      </div>
-                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{user.total_matches}</div>
-                      <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold' }}>{user.wins}</div>
-                      <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.avg_score)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* GUIDE */}
-          {activeTab === 'guide' && (
-            <div>
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>📖 Hướng dẫn sử dụng</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                {[
-                  { step: '1', title: 'Chọn chế độ chơi', desc: 'Solo AI (thi đấu với Gemini) hoặc 1v1 (ghép cặp với người chơi khác).' },
-                  { step: '2', title: 'Bật Camera & Microphone', desc: 'Cho phép trình duyệt truy cập để AI phân tích giọng nói và phát hiện ngụy biện.' },
-                  { step: '3', title: 'Bắt đầu lượt của bạn', desc: 'Bấm "Bắt đầu" và trình bày lập luận. Mỗi lượt tối đa 90 giây.' },
-                  { step: '4', title: 'AI phân tích real-time', desc: 'Hệ thống nhận diện giọng nói và bắt lỗi ngụy biện ngay trong lúc bạn nói.' },
-                  { step: '5', title: 'Chuyển lượt / Kết thúc', desc: 'Bấm "Chuyển lượt" để nhường quyền. Bấm "Kết thúc" khi cả hai đã phát biểu xong.' },
-                  { step: '6', title: 'Nhận kết quả chấm điểm', desc: 'AI Gemini chấm điểm theo Logic, Phong thái, Giọng nói, Phản biện và hiển thị gợi ý cải thiện.' },
-                ].map(item => (
-                  <div key={item.step} style={{ display: 'flex', gap: '16px', background: 'rgba(255,255,255,0.04)', borderRadius: 'var(--radius-md)', padding: '16px 20px', border: '1px solid rgba(255,255,255,0.07)' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--accent-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '1rem', flexShrink: 0 }}>{item.step}</div>
-                    <div>
-                      <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{item.title}</strong>
-                      <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: '0.93rem' }}>{item.desc}</p>
+                {/* ACHIEVEMENTS */}
+                {!isGuest && achievements.length > 0 && (
+                  <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(16,185,129,0.05)', borderRadius: '16px', border: '1px solid rgba(16,185,129,0.2)' }}>
+                    <h3 style={{ margin: '0 0 1rem', color: '#10b981' }}>🏆 Thành Tích Đạt Được</h3>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
+                      {achievements.includes('first_win') && <span style={{ padding: '5px 12px', background: 'rgba(16,185,129,0.2)', color: '#10b981', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>⭐ Chiến thắng đầu tiên</span>}
+                      {achievements.includes('win_10') && <span style={{ padding: '5px 12px', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🌟 10 Trận Thắng</span>}
+                      {achievements.includes('perfect_logic') && <span style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🔥 Hoàn Mỹ Logic</span>}
+                      {achievements.includes('perfect_score') && <span style={{ padding: '5px 12px', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>💯 100 Điểm</span>}
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* SETTINGS */}
-          {activeTab === 'settings' && (
-            <div>
-              <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>⚙️ Cài đặt</h2>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Tài khoản</h4>
-                  <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Tên đăng nhập:</p>
-                  <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }} />
-                  {isGuest && <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '8px 0 0' }}>⚠️ Tài khoản khách — lịch sử không được lưu.</p>}
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Thiết bị & Quyền</h4>
-                  <p style={{ color: 'var(--text-secondary)', margin: '0 0 12px' }}>Camera và Microphone cần được cấp quyền để ứng dụng hoạt động tốt.</p>
-                  <button
-                    onClick={() => navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(() => alert('✅ Quyền đã được cấp!')).catch(() => alert('❌ Bị từ chối. Kiểm tra cài đặt trình duyệt.'))}
-                    style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 20px', cursor: 'pointer' }}
-                  >
-                    🔐 Kiểm tra quyền Camera & Mic
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* PROFILE */}
-          {activeTab === 'profile' && (
-            <div style={{ padding: '2rem', textAlign: 'center' }}>
-
-              <div style={{ marginBottom: '1rem', position: 'relative', display: 'inline-block', width: '150px', height: '150px' }}>
-                <img 
-                  src={avatarUrl} 
-                  alt="Avatar" 
-                  style={{ 
-                    width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover',
-                    ...frameStyles[avatarFrame]
-                  }} 
-                />
-                {avatarFrame !== 'none' && (
-                  <img
-                    src={`/assets/frames/${frameFileMap[avatarFrame] || avatarFrame + '.png'}`}
-                    alt="Frame Overlay"
-                    style={{
-                      position: 'absolute',
-                      top: '-15%',
-                      left: '-15%',
-                      width: '130%',
-                      height: '130%',
-                      pointerEvents: 'none',
-                      zIndex: 10
-                    }}
-                    onError={(e) => { e.target.style.display = 'none' }}
-                  />
                 )}
               </div>
+            )}
 
-              <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <div>
-                  <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Khung Avatar:</label>
-                  <select value={avatarFrame} onChange={handleFrameChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                    <option value="none">Không có</option>
-                    <option value="wood" disabled={currentLevel < 11}>Khung Gỗ (Yêu cầu Lv 11)</option>
-                    <option value="silver" disabled={currentLevel < 31}>Khung Bạc (Yêu cầu Lv 31)</option>
-                    <option value="gold" disabled={currentLevel < 61}>Khung Vàng (Yêu cầu Lv 61)</option>
-                    <option value="diamond" disabled={currentLevel < 91}>Khung Kim Cương (Yêu cầu Lv 91)</option>
-                    {myItems.includes('frame_fire') && <option value="fire">Khung Cua Lửa (Store)</option>}
-                    {myItems.includes('frame_diamond_plus') && <option value="diamond_plus">Khung Kim Cương Plus (Store)</option>}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ color: 'var(--text-secondary)', marginRight: '10px' }}>Đổi Avatar:</label>
-                  <select value={selectedAvatar} onChange={handleAvatarChange} style={{ padding: '8px', borderRadius: '8px', background: 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
-                    <option value="">Ảnh Mặc định (Bottts)</option>
-                    <option value="/assets/avatars/CuaDoTruyenThong.png">Cua Đỏ Truyền Thống</option>
-                    <option value="/assets/avatars/CuaXanh.png">Cua Xanh Học Giả</option>
-                    {myItems.includes('avatar_crab_gold') && <option value="/assets/badges/avatar_crab_gold.png">Cua Hoàng Đế (Vật phẩm Store)</option>}
-                  </select>
-                </div>
-              </div>
-
-              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '0.5rem', textShadow: '0 2px 10px rgba(255,255,255,0.1)' }}>Hồ sơ của {getDisplayName(username)}</h2>
-              <div style={{ display: 'inline-block', background: rank.bg, color: rank.color, padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '1.5rem', border: `1px solid ${rank.color}` }}>
-                <span style={{ marginRight: '8px' }}>{rank.icon}</span> 
-                Level {currentLevel} - {rank.title}
-              </div>
-
-              {!isGuest && (
-                <div style={{ width: '350px', margin: '0 auto 1.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
-                  <div style={{ width: `${stats.exp || 0}%`, background: 'linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%)', height: '100%', transition: 'width 1s ease-in-out' }}></div>
-                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
-                    {stats.exp || 0} / 100 EXP (Tới cấp tiếp theo)
+            {/* FRIENDS */}
+            {activeTab === 'friends' && (
+              <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                  <h2 style={{ fontSize: '2rem', color: 'var(--text-primary)', margin: 0 }}>👥 Danh Sách Bạn Bè</h2>
+                  <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '8px 16px', borderRadius: '20px', color: 'var(--accent-primary)', fontWeight: 'bold', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                    {friends.length} / 100
                   </div>
                 </div>
-              )}
 
-              {/* Huy hiệu rank lớn — chỉ hiện khi chưa có showcase */}
-              {(() => {
-                const displayBadges = selectedBadges.map(id => [...RANK_BADGE_CATALOG, ...BADGE_CATALOG].find(b => b.id === id)).filter(Boolean)
-                if (!isGuest && displayBadges.length > 0) return null
-                return (
-                  <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-                    <img src={rank.badgeImage} alt="Rank Badge" style={{ height: '140px', width: 'auto', maxWidth: '350px', objectFit: 'contain', filter: 'drop-shadow(0 4px 15px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
-                  </div>
-                )
-              })()}
-
-              {/* === HUY HIỆU SHOWCASE === */}
-              {!isGuest && (() => {
-                const allAvailable = [
-                  ...RANK_BADGE_CATALOG.filter(b => currentLevel >= b.minLevel),
-                  ...BADGE_CATALOG.filter(b => myItems.includes(b.id))
-                ]
-                const allById = Object.fromEntries(allAvailable.map(b => [b.id, b]))
-                const displayBadges = selectedBadges.map(id => allById[id]).filter(Boolean)
-                return (
-                  <div style={{ marginBottom: '2rem' }}>
-                    {/* Hàng showcase to, 96px */}
-                    {displayBadges.length > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '1.2rem' }}>
-                        {displayBadges.map(b => (
-                          <div key={b.id} title={b.name} style={{ textAlign: 'center' }}>
-                            <img src={b.image} alt={b.name} style={{ height: '96px', width: '96px', objectFit: 'contain', filter: 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' }} onError={(e) => { e.target.style.display='none' }} />
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px', maxWidth: '96px' }}>{b.name}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Nút mở chọn huy hiệu */}
-                    {allAvailable.length > 0 && (
-                      <div style={{ textAlign: 'center' }}>
-                        <button
-                          onClick={() => setShowBadgeSelector(true)}
-                          style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.4)', color: '#a855f7', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
-                        >
-                          🏅 Chọn Huy Hiệu Hiển Thị ({selectedBadges.length}/5)
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-              
-              {!isGuest && (
-                <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '8px 24px', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '2.5rem', border: `1px solid #f59e0b` }}>
-                  ⭐ Điểm Tích Lũy (Mua Sắm): {serverPoints}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '3rem' }}>
+                  <input
+                    type="text"
+                    value={friendInput}
+                    onChange={(e) => setFriendInput(e.target.value)}
+                    placeholder="Nhập tên người chơi để kết bạn..."
+                    style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1.1rem' }}
+                  />
+                  <button onClick={handleAddFriend} className="btn-primary" style={{ padding: '0 24px', borderRadius: '8px', fontWeight: 'bold' }}>
+                    Gửi Yêu Cầu
+                  </button>
                 </div>
-              )}
-
-              {!isGuest && stats.total > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px', maxWidth: '800px', margin: '0 auto' }}>
-                  {[
-                    { label: 'Trận đã chơi', value: stats.total, color: 'var(--accent-primary)', icon: '🎮' },
-                    { label: 'Chiến thắng',  value: stats.wins,  color: '#10b981', icon: '🏆' },
-                    { label: 'Thất bại',     value: stats.losses,color: '#ef4444', icon: '💔' },
-                    { label: 'Điểm TB',      value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
-                  ].map(s => (
-                    <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{s.icon}</div>
-                      <div style={{ fontSize: '2.5rem', fontWeight: '800', color: s.color }}>{s.value}</div>
-                      <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '8px' }}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ color: 'var(--text-secondary)' }}>Chưa có dữ liệu thống kê.</p>
-              )}
-
-              {/* ACHIEVEMENTS */}
-              {!isGuest && achievements.length > 0 && (
-                <div style={{ marginTop: '2rem', padding: '1.5rem', background: 'rgba(16,185,129,0.05)', borderRadius: '16px', border: '1px solid rgba(16,185,129,0.2)' }}>
-                  <h3 style={{ margin: '0 0 1rem', color: '#10b981' }}>🏆 Thành Tích Đạt Được</h3>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', justifyContent: 'center' }}>
-                    {achievements.includes('first_win') && <span style={{ padding: '5px 12px', background: 'rgba(16,185,129,0.2)', color: '#10b981', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>⭐ Chiến thắng đầu tiên</span>}
-                    {achievements.includes('win_10') && <span style={{ padding: '5px 12px', background: 'rgba(59,130,246,0.2)', color: '#3b82f6', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🌟 10 Trận Thắng</span>}
-                    {achievements.includes('perfect_logic') && <span style={{ padding: '5px 12px', background: 'rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>🔥 Hoàn Mỹ Logic</span>}
-                    {achievements.includes('perfect_score') && <span style={{ padding: '5px 12px', background: 'rgba(245,158,11,0.2)', color: '#f59e0b', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 'bold' }}>💯 100 Điểm</span>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* FRIENDS */}
-          {activeTab === 'friends' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2 style={{ fontSize: '2rem', color: 'var(--text-primary)', margin: 0 }}>👥 Danh Sách Bạn Bè</h2>
-                <div style={{ background: 'rgba(99, 102, 241, 0.1)', padding: '8px 16px', borderRadius: '20px', color: 'var(--accent-primary)', fontWeight: 'bold', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-                  {friends.length} / 100
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '3rem' }}>
-                <input 
-                  type="text" 
-                  value={friendInput}
-                  onChange={(e) => setFriendInput(e.target.value)}
-                  placeholder="Nhập tên người chơi để kết bạn..." 
-                  style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1.1rem' }}
-                />
-                <button onClick={handleAddFriend} className="btn-primary" style={{ padding: '0 24px', borderRadius: '8px', fontWeight: 'bold' }}>
-                  Gửi Yêu Cầu
-                </button>
-              </div>
 
                 {friendRequests?.length > 0 && (
                   <div style={{ marginBottom: '2rem' }}>
@@ -1453,382 +1609,382 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   </div>
                 )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Danh sách ({friends?.length || 0})</h3>
-                {!friends || friends.length === 0 ? (
-                  <p style={{ color: 'var(--text-secondary)' }}>Bạn chưa có người bạn nào.</p>
-                ) : friends.map(fobj => {
-                  const fname = typeof fobj === 'string' ? fobj : fobj.username || fobj
-                  const debateCount = fobj?.debate_count || 0
-                  const isBestFriend = debateCount >= 50
-                  return (
-                  <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isBestFriend ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: `1px solid ${isBestFriend ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => handleViewUser(fname)}>
-                      <div style={{ position: 'relative' }}>
-                        <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
-                        {isBestFriend && <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', fontSize: '1.1rem' }}>💚</div>}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {getDisplayName(fname)}
-                          {isBestFriend && <span style={{ fontSize: '0.75rem', background: '#10b981', color: '#fff', borderRadius: '12px', padding: '2px 8px' }}>Bạn Thân 💚</span>}
-                        </div>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{debateCount > 0 ? `Đã debate ${debateCount} trận cùng nhau` : 'Nhấn để xem hồ sơ'}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={() => setActiveChatUser(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', cursor: 'pointer', fontWeight: 'bold' }}>
-                        💬 Chat
-                      </button>
-                      <button onClick={() => handleRemoveFriend(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
-                        Xóa
-                      </button>
-                    </div>
-                  </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* EVENTS - Dynamic from API */}
-          {activeTab === 'events' && (
-            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
-              <div style={{ background: 'rgba(99,102,241,0.08)', padding: '1.5rem', borderRadius: '16px', border: '1px dashed var(--accent-primary)', marginBottom: '2rem', textAlign: 'left' }}>
-                <h3 style={{ color: 'var(--accent-primary)', margin: '0 0 8px 0' }}>📅 Lịch Trình</h3>
-                <ul style={{ color: 'var(--text-secondary)', margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
-                  <li><strong>Sự kiện Thường:</strong> Mở hàng tuần luân phiên (Thứ 2–5 và Thứ 6–CN).</li>
-                  <li><strong>Đại Chiến:</strong> Mở định kỳ đầu tháng 3 mỗi năm, sau khi event nhỏ kết thúc.</li>
-                </ul>
-              </div>
-
-              {/* Small events */}
-              {events.filter(e => e.event_type === 'small').length > 0 && (
-                <div style={{ marginBottom: '3rem' }}>
-                  <h2 style={{ fontSize: '2rem', color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>🎉 Sự Kiện Đang Diễn Ra</h2>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                    {events.filter(e => e.event_type === 'small').map(ev => {
-                      const isOpen = ev.status === 'open'
-                      const isUpcoming = ev.status === 'upcoming'
-                      return (
-                        <div key={ev.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: `1px solid ${isOpen ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                  <h3 style={{ color: 'var(--text-primary)', marginBottom: '0.5rem' }}>Danh sách ({friends?.length || 0})</h3>
+                  {!friends || friends.length === 0 ? (
+                    <p style={{ color: 'var(--text-secondary)' }}>Bạn chưa có người bạn nào.</p>
+                  ) : friends.map(fobj => {
+                    const fname = typeof fobj === 'string' ? fobj : fobj.username || fobj
+                    const debateCount = fobj?.debate_count || 0
+                    const isBestFriend = debateCount >= 50
+                    return (
+                      <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isBestFriend ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: `1px solid ${isBestFriend ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => handleViewUser(fname)}>
+                          <div style={{ position: 'relative' }}>
+                            <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+                            {isBestFriend && <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', fontSize: '1.1rem' }}>💚</div>}
+                          </div>
                           <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                              <span style={{ background: isOpen ? 'rgba(16,185,129,0.2)' : isUpcoming ? 'rgba(59,130,246,0.2)' : 'rgba(107,114,128,0.2)', color: isOpen ? '#10b981' : isUpcoming ? '#3b82f6' : '#6b7280', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                {isOpen ? '🟢 Đang mở' : isUpcoming ? '🔵 Sắp mở' : '⚫ Đã đóng'}
-                              </span>
-                              {ev.deadline && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Đến {ev.deadline}</span>}
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {getDisplayName(fname)}
+                              {isBestFriend && <span style={{ fontSize: '0.75rem', background: '#10b981', color: '#fff', borderRadius: '12px', padding: '2px 8px' }}>Bạn Thân 💚</span>}
                             </div>
-                            <h3 style={{ fontSize: '1.4rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{ev.title}</h3>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>{ev.description}</p>
-                            {ev.reward && <div style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>🎁 {ev.reward}</div>}
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{debateCount > 0 ? `Đã debate ${debateCount} trận cùng nhau` : 'Nhấn để xem hồ sơ'}</div>
                           </div>
-                          {(() => {
-                            const hasJoined = joinedEvents.includes(ev.id)
-                            return (
-                              <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
-                                <button
-                                  className={hasJoined || (isOpen && !hasJoined) ? 'btn-primary' : 'btn-secondary'}
-                                  disabled={(!isOpen && !hasJoined)}
-                                  onClick={() => {
-                                    if (hasJoined) setActiveEvent(ev)
-                                    else if (isOpen) handleJoinEvent(ev.id, ev.title)
-                                  }}
-                                  style={{ flex: 1, opacity: (isOpen || hasJoined) ? 1 : 0.5, cursor: (isOpen || hasJoined) ? 'pointer' : 'not-allowed', background: hasJoined ? '#10b981' : '', color: hasJoined ? '#fff' : '' }}
-                                >
-                                  {hasJoined ? '📝 Sửa Bài' : isOpen ? 'Tham gia' : isUpcoming ? 'Chưa mở' : 'Đã đóng'}
-                                </button>
-                                <button
-                                  className={isOpen ? "btn-secondary" : "btn-secondary disabled"}
-                                  disabled={!isOpen}
-                                  onClick={() => setActiveVotingEvent(ev)}
-                                  style={{ flex: 1, border: '1px solid #fbbf24', color: '#fbbf24', opacity: isOpen ? 1 : 0.5, cursor: isOpen ? 'pointer' : 'not-allowed' }}
-                                >
-                                  {isOpen ? '👍 Bình chọn' : '🔒 Đóng bình chọn'}
-                                </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => setActiveChatUser(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', cursor: 'pointer', fontWeight: 'bold' }}>
+                            💬 Chat
+                          </button>
+                          <button onClick={() => handleRemoveFriend(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* EVENTS - Dynamic from API */}
+            {activeTab === 'events' && (
+              <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%' }}>
+                <div style={{ background: 'rgba(99,102,241,0.08)', padding: '1.5rem', borderRadius: '16px', border: '1px dashed var(--accent-primary)', marginBottom: '2rem', textAlign: 'left' }}>
+                  <h3 style={{ color: 'var(--accent-primary)', margin: '0 0 8px 0' }}>📅 Lịch Trình</h3>
+                  <ul style={{ color: 'var(--text-secondary)', margin: 0, paddingLeft: '20px', lineHeight: '1.8' }}>
+                    <li><strong>Sự kiện Thường:</strong> Mở hàng tuần luân phiên (Thứ 2–5 và Thứ 6–CN).</li>
+                    <li><strong>Đại Chiến:</strong> Mở định kỳ đầu tháng 3 mỗi năm, sau khi event nhỏ kết thúc.</li>
+                  </ul>
+                </div>
+
+                {/* Small events */}
+                {events.filter(e => e.event_type === 'small').length > 0 && (
+                  <div style={{ marginBottom: '3rem' }}>
+                    <h2 style={{ fontSize: '2rem', color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>🎉 Sự Kiện Đang Diễn Ra</h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                      {events.filter(e => e.event_type === 'small').map(ev => {
+                        const isOpen = ev.status === 'open'
+                        const isUpcoming = ev.status === 'upcoming'
+                        return (
+                          <div key={ev.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: `1px solid ${isOpen ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <span style={{ background: isOpen ? 'rgba(16,185,129,0.2)' : isUpcoming ? 'rgba(59,130,246,0.2)' : 'rgba(107,114,128,0.2)', color: isOpen ? '#10b981' : isUpcoming ? '#3b82f6' : '#6b7280', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                  {isOpen ? '🟢 Đang mở' : isUpcoming ? '🔵 Sắp mở' : '⚫ Đã đóng'}
+                                </span>
+                                {ev.deadline && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Đến {ev.deadline}</span>}
                               </div>
-                            )
-                          })()}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Large event */}
-              {events.filter(e => e.event_type === 'large').map(ev => {
-                const isLocked = ev.status === 'locked'
-                return (
-                  <div key={ev.id} style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden', textAlign: 'center' }}>
-                    {isLocked && (
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                        <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
-                        <h3 style={{ fontSize: '1.8rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
-                        <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi tất cả sự kiện nhỏ kết thúc!</p>
-                      </div>
-                    )}
-                    <div style={{ filter: isLocked ? 'blur(4px)' : 'none', opacity: isLocked ? 0.5 : 1 }}>
-                      <h2 style={{ fontSize: '2.5rem', color: '#facc15', marginBottom: '1rem', textShadow: '0 4px 20px rgba(250,204,21,0.4)' }}>🎉 {ev.title} 🎉</h2>
-                      <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{ev.description}</p>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '600px', margin: '0 auto' }}>
-                        <div style={{ background: 'rgba(139,92,246,0.1)', border: '2px solid #8b5cf6', borderRadius: '20px', padding: '2rem' }}>
-                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                            <img src="/assets/mascots/CuaMa.png" alt="Cua Ma" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
-                            <div style={{ display: 'none' }}>👻</div>
+                              <h3 style={{ fontSize: '1.4rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{ev.title}</h3>
+                              <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1rem' }}>{ev.description}</p>
+                              {ev.reward && <div style={{ background: 'rgba(251,191,36,0.1)', color: '#fbbf24', padding: '8px 12px', borderRadius: '8px', fontSize: '0.85rem' }}>🎁 {ev.reward}</div>}
+                            </div>
+                            {(() => {
+                              const hasJoined = joinedEvents.includes(ev.id)
+                              return (
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '1.5rem' }}>
+                                  <button
+                                    className={hasJoined || (isOpen && !hasJoined) ? 'btn-primary' : 'btn-secondary'}
+                                    disabled={(!isOpen && !hasJoined)}
+                                    onClick={() => {
+                                      if (hasJoined) setActiveEvent(ev)
+                                      else if (isOpen) handleJoinEvent(ev.id, ev.title)
+                                    }}
+                                    style={{ flex: 1, opacity: (isOpen || hasJoined) ? 1 : 0.5, cursor: (isOpen || hasJoined) ? 'pointer' : 'not-allowed', background: hasJoined ? '#10b981' : '', color: hasJoined ? '#fff' : '' }}
+                                  >
+                                    {hasJoined ? '📝 Sửa Bài' : isOpen ? 'Tham gia' : isUpcoming ? 'Chưa mở' : 'Đã đóng'}
+                                  </button>
+                                  <button
+                                    className={isOpen ? "btn-secondary" : "btn-secondary disabled"}
+                                    disabled={!isOpen}
+                                    onClick={() => setActiveVotingEvent(ev)}
+                                    style={{ flex: 1, border: '1px solid #fbbf24', color: '#fbbf24', opacity: isOpen ? 1 : 0.5, cursor: isOpen ? 'pointer' : 'not-allowed' }}
+                                  >
+                                    {isOpen ? '👍 Bình chọn' : '🔒 Đóng bình chọn'}
+                                  </button>
+                                </div>
+                              )
+                            })()}
                           </div>
-                          <h3 style={{ color: '#8b5cf6' }}>Phe Cua Ma</h3>
-                        </div>
-                        <div style={{ background: 'rgba(234,179,8,0.1)', border: '2px solid #eab308', borderRadius: '20px', padding: '2rem' }}>
-                          <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
-                            <img src="/assets/mascots/CuaThan.png" alt="Cua Thần" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }} />
-                            <div style={{ display: 'none' }}>😇</div>
-                          </div>
-                          <h3 style={{ color: '#eab308' }}>Phe Cua Thần</h3>
-                        </div>
-                      </div>
+                        )
+                      })}
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* CỬA HÀNG - Real purchase logic */}
-          {activeTab === 'store' && (
-            <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
-              <h2 style={{ fontSize: '3rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>🛒 Cửa Hàng KaiKo</h2>
-              <div style={{ display: 'inline-block', background: 'rgba(251,191,36,0.1)', border: '1px solid #fbbf24', borderRadius: '12px', padding: '8px 24px', marginBottom: '2.5rem', color: '#fbbf24', fontWeight: 'bold', fontSize: '1.2rem' }}>
-                ⭐ Điểm Tích Lũy: {serverPoints}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-                {[
-                  { id: 'frame_fire', name: 'Khung Cua Lửa', price: 1500, icon: '🔥', image: 'fire.png', isFrame: true, desc: 'Hiệu ứng cháy sáng quanh Avatar. Mở khóa frame "fire" trong hồ sơ.' },
-                  { id: 'rename_card', name: 'Thẻ Đổi Nickname', price: 500, icon: '🎫', image: 'rename_card.png', isFrame: false, desc: 'Cho phép đổi Biệt Danh không giới hạn 1 lần. (Mặc định đã miễn phí)' },
-                  { id: 'title_best', name: 'Danh Hiệu: Khỏe Nhất Biển', price: 5000, icon: '👑', image: 'HHKhoeNhatBien.png', isFrame: false, desc: 'Hiển thị huy hiệu vàng đặc biệt kế bên tên trong leaderboard và phòng debate.' },
-                  { id: 'frame_diamond_plus', name: 'Khung Kim Cương Plus', price: 2000, icon: '💎', image: 'KimCuongPlus.png', isFrame: true, desc: 'Phiên bản nâng cấp của Khung Kim Cương với hiệu ứng pulse. Yêu cầu Lv 61+.' },
-                  { id: 'avatar_crab_gold', name: 'Avatar Cua Hoàng Đế', price: 800, icon: '🦀', image: 'avatar_crab_gold.png', isFrame: false, desc: 'Avatar cua vàng độc quyền. Dùng trong hồ sơ cá nhân.' },
-                  { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', image: 'title_genus.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
-                  { id: 'title_banthan', name: 'Danh Hiệu: Bạn Thân Cua', price: 1200, icon: '🦀', image: 'HHBanThan.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người yêu cộng đồng KaiKo.' },
-                  { id: 'title_kaikonew', name: 'Danh Hiệu: KaiKo Mới Này', price: 800, icon: '🌟', image: 'HHKaiKoMoiNhu.png', isFrame: false, desc: 'Danh hiệu chào mừng người mới gia nhập KaiKo.' },
-                ].map(item => {
-                  const owned = myItems.includes(item.id)
-                  const canAfford = serverPoints >= item.price
-                  return (
-                    <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-                      {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
-                      <div style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
-                        <img src={item.isFrame ? `/assets/frames/${item.image}` : `/assets/badges/${item.image}`} alt={item.name} style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none'; if (e.target.nextSibling) e.target.nextSibling.style.display='block' }} />
-                        <div style={{ display: 'none' }}>{item.icon}</div>
-                      </div>
-                      <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{item.name}</h3>
-                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.2rem', flex: 1 }}>{item.desc}</p>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: canAfford || owned ? '#fbbf24' : '#ef4444', marginBottom: '1rem' }}>{item.price} ⭐</div>
-                      <button
-                        onClick={async () => {
-                          if (owned) return
-                          if (!canAfford) { alert(`Không đủ điểm! Cần ${item.price}, bạn có ${serverPoints}.`); return }
-                          if (!window.confirm(`Xác nhận mua "${item.name}" với ${item.price} điểm?`)) return
-                          try {
-                            const res = await axios.post(`${API_BASE}/purchase`, { username, item_id: item.id, price: item.price })
-                            if (res.data.success) {
-                              setServerPoints(res.data.remaining_points)
-                              setMyItems(prev => [...prev, item.id])
-                              alert(`🎉 Mua thành công! Còn lại ${res.data.remaining_points} điểm.`)
-                            } else {
-                              alert(res.data.error)
-                            }
-                          } catch(e) { alert('Lỗi kết nối!') }
-                        }}
-                        disabled={owned}
-                        className={owned ? 'btn-secondary' : 'btn-primary'}
-                        style={{ width: '100%', opacity: owned ? 0.6 : 1, cursor: owned ? 'default' : 'pointer' }}
-                      >
-                        {owned ? 'Đã sở hữu' : canAfford ? 'Mua Ngay' : 'Không đủ điểm'}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* CÀI ĐẶT */}
-          {activeTab === 'settings' && (
-            <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem' }}>⚙️ Cài Đặt</h2>
-              
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
-                <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem' }}>Thông tin hiển thị</h3>
-                
-                <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Biệt danh (Nickname)</label>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <input 
-                    type="text" 
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="Nhập biệt danh của bạn..." 
-                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
-                  />
-                  <button 
-                    onClick={async () => {
-                      localStorage.setItem('kaiko_nickname_' + username, nickname)
-                      try {
-                        await axios.post(`${API_BASE}/set-nickname`, { username, nickname })
-                        setGlobalNicknames(prev => ({...prev, [username]: nickname}))
-                      } catch(e) {}
-                      alert('Đã lưu biệt danh thành công!')
-                    }}
-                    className="btn-primary"
-                  >
-                    Lưu
-                  </button>
-                </div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '10px' }}>
-                  Biệt danh này sẽ hiển thị thay thế cho tên đăng nhập gốc trong các trận tranh biện.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* THỐNG KÊ NGỤY BIỆN */}
-          {activeTab === 'stats' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>📊 Phân Tích Ngụy Biện</h2>
-              <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
-              
-              <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
-                {Object.keys(fallacyStats).length === 0 ? (
-                  <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
-                    Tuyệt vời! Bạn chưa mắc lỗi ngụy biện nào.
-                  </div>
-                ) : (
-                  <div>
-                    {Object.entries(fallacyStats).sort((a,b) => b[1] - a[1]).map(([fallacy, count]) => (
-                      <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
-                        <div style={{ flex: 1 }}>
-                          <h4 style={{ margin: '0 0 5px 0', color: '#ef4444' }}>{fallacy}</h4>
-                          <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Bạn đã mắc lỗi này <strong style={{color: '#fff'}}>{count} lần</strong>. Hãy chú ý hơn trong lập luận!</div>
-                        </div>
-                        <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', opacity: 0.8 }}>{count}</div>
-                      </div>
-                    ))}
                   </div>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* HỆ THỐNG BÁI SƯ */}
-          {activeTab === 'mentor' && (
-            <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-              <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>🎓 Hệ Thống Bái Sư</h2>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                {/* Xin Bái Sư */}
-                <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
-                  <h3 style={{ marginTop: 0, color: '#8b5cf6' }}>🤝 Xin Bái Sư</h3>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Tìm sư phụ giỏi hơn để học hỏi kinh nghiệm. Hai người có thể thi đấu với nhau để nhận quà.</p>
+                {/* Large event */}
+                {events.filter(e => e.event_type === 'large').map(ev => {
+                  const isLocked = ev.status === 'locked'
+                  return (
+                    <div key={ev.id} style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden', textAlign: 'center' }}>
+                      {isLocked && (
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
+                          <h3 style={{ fontSize: '1.8rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
+                          <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi tất cả sự kiện nhỏ kết thúc!</p>
+                        </div>
+                      )}
+                      <div style={{ filter: isLocked ? 'blur(4px)' : 'none', opacity: isLocked ? 0.5 : 1 }}>
+                        <h2 style={{ fontSize: '2.5rem', color: '#facc15', marginBottom: '1rem', textShadow: '0 4px 20px rgba(250,204,21,0.4)' }}>🎉 {ev.title} 🎉</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>{ev.description}</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', maxWidth: '600px', margin: '0 auto' }}>
+                          <div style={{ background: 'rgba(139,92,246,0.1)', border: '2px solid #8b5cf6', borderRadius: '20px', padding: '2rem' }}>
+                            <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                              <img src="/assets/mascots/CuaMa.png" alt="Cua Ma" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }} />
+                              <div style={{ display: 'none' }}>👻</div>
+                            </div>
+                            <h3 style={{ color: '#8b5cf6' }}>Phe Cua Ma</h3>
+                          </div>
+                          <div style={{ background: 'rgba(234,179,8,0.1)', border: '2px solid #eab308', borderRadius: '20px', padding: '2rem' }}>
+                            <div style={{ fontSize: '5rem', marginBottom: '0.5rem', display: 'flex', justifyContent: 'center' }}>
+                              <img src="/assets/mascots/CuaThan.png" alt="Cua Thần" style={{ width: '100px', height: '100px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block' }} />
+                              <div style={{ display: 'none' }}>😇</div>
+                            </div>
+                            <h3 style={{ color: '#eab308' }}>Phe Cua Thần</h3>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* CỬA HÀNG - Real purchase logic */}
+            {activeTab === 'store' && (
+              <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', textAlign: 'center' }}>
+                <h2 style={{ fontSize: '3rem', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>🛒 Cửa Hàng KaiKo</h2>
+                <div style={{ display: 'inline-block', background: 'rgba(251,191,36,0.1)', border: '1px solid #fbbf24', borderRadius: '12px', padding: '8px 24px', marginBottom: '2.5rem', color: '#fbbf24', fontWeight: 'bold', fontSize: '1.2rem' }}>
+                  ⭐ Điểm Tích Lũy: {serverPoints}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+                  {[
+                    { id: 'frame_fire', name: 'Khung Cua Lửa', price: 1500, icon: '🔥', image: 'fire.png', isFrame: true, desc: 'Hiệu ứng cháy sáng quanh Avatar. Mở khóa frame "fire" trong hồ sơ.' },
+                    { id: 'rename_card', name: 'Thẻ Đổi Nickname', price: 500, icon: '🎫', image: 'rename_card.png', isFrame: false, desc: 'Cho phép đổi Biệt Danh không giới hạn 1 lần. (Mặc định đã miễn phí)' },
+                    { id: 'title_best', name: 'Danh Hiệu: Khỏe Nhất Biển', price: 5000, icon: '👑', image: 'HHKhoeNhatBien.png', isFrame: false, desc: 'Hiển thị huy hiệu vàng đặc biệt kế bên tên trong leaderboard và phòng debate.' },
+                    { id: 'frame_diamond_plus', name: 'Khung Kim Cương Plus', price: 2000, icon: '💎', image: 'KimCuongPlus.png', isFrame: true, desc: 'Phiên bản nâng cấp của Khung Kim Cương với hiệu ứng pulse. Yêu cầu Lv 61+.' },
+                    { id: 'avatar_crab_gold', name: 'Avatar Cua Hoàng Đế', price: 800, icon: '🦀', image: 'avatar_crab_gold.png', isFrame: false, desc: 'Avatar cua vàng độc quyền. Dùng trong hồ sơ cá nhân.' },
+                    { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', image: 'title_genus.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
+                    { id: 'title_banthan', name: 'Danh Hiệu: Bạn Thân Cua', price: 1200, icon: '🦀', image: 'HHBanThan.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người yêu cộng đồng KaiKo.' },
+                    { id: 'title_kaikonew', name: 'Danh Hiệu: KaiKo Mới Này', price: 800, icon: '🌟', image: 'HHKaiKoMoiNhu.png', isFrame: false, desc: 'Danh hiệu chào mừng người mới gia nhập KaiKo.' },
+                  ].map(item => {
+                    const owned = myItems.includes(item.id)
+                    const canAfford = serverPoints >= item.price
+                    return (
+                      <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                        {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
+                        <div style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
+                          <img src={item.isFrame ? `/assets/frames/${item.image}` : `/assets/badges/${item.image}`} alt={item.name} style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'block' }} />
+                          <div style={{ display: 'none' }}>{item.icon}</div>
+                        </div>
+                        <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', margin: '0 0 8px 0' }}>{item.name}</h3>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1.2rem', flex: 1 }}>{item.desc}</p>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: canAfford || owned ? '#fbbf24' : '#ef4444', marginBottom: '1rem' }}>{item.price} ⭐</div>
+                        <button
+                          onClick={async () => {
+                            if (owned) return
+                            if (!canAfford) { alert(`Không đủ điểm! Cần ${item.price}, bạn có ${serverPoints}.`); return }
+                            if (!window.confirm(`Xác nhận mua "${item.name}" với ${item.price} điểm?`)) return
+                            try {
+                              const res = await axios.post(`${API_BASE}/purchase`, { username, item_id: item.id, price: item.price })
+                              if (res.data.success) {
+                                setServerPoints(res.data.remaining_points)
+                                setMyItems(prev => [...prev, item.id])
+                                alert(`🎉 Mua thành công! Còn lại ${res.data.remaining_points} điểm.`)
+                              } else {
+                                alert(res.data.error)
+                              }
+                            } catch (e) { alert('Lỗi kết nối!') }
+                          }}
+                          disabled={owned}
+                          className={owned ? 'btn-secondary' : 'btn-primary'}
+                          style={{ width: '100%', opacity: owned ? 0.6 : 1, cursor: owned ? 'default' : 'pointer' }}
+                        >
+                          {owned ? 'Đã sở hữu' : canAfford ? 'Mua Ngay' : 'Không đủ điểm'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* CÀI ĐẶT */}
+            {activeTab === 'settings' && (
+              <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem' }}>⚙️ Cài Đặt</h2>
+
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem' }}>Thông tin hiển thị</h3>
+
+                  <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Biệt danh (Nickname)</label>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <input 
-                      type="text" 
-                      placeholder="Nhập tên sư phụ..." 
-                      value={mentorInput}
-                      onChange={e => setMentorInput(e.target.value)}
-                      style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                    <input
+                      type="text"
+                      value={nickname}
+                      onChange={(e) => setNickname(e.target.value)}
+                      placeholder="Nhập biệt danh của bạn..."
+                      style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
                     />
-                    <button 
+                    <button
                       onClick={async () => {
-                        if (!mentorInput.trim()) return;
+                        localStorage.setItem('kaiko_nickname_' + username, nickname)
                         try {
-                          const res = await axios.post(`${API_BASE}/mentorship/request`, { master: mentorInput.trim(), disciple: username });
-                          if (res.data.success) { alert('Đã gửi lời bái sư!'); setMentorInput(''); }
-                          else alert(res.data.error);
-                        } catch(e) { alert('Lỗi kết nối'); }
+                          await axios.post(`${API_BASE}/set-nickname`, { username, nickname })
+                          setGlobalNicknames(prev => ({ ...prev, [username]: nickname }))
+                        } catch (e) { }
+                        alert('Đã lưu biệt danh thành công!')
                       }}
-                      style={{ background: '#8b5cf6', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                      className="btn-primary"
                     >
-                      Gửi
+                      Lưu
                     </button>
                   </div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '10px' }}>
+                    Biệt danh này sẽ hiển thị thay thế cho tên đăng nhập gốc trong các trận tranh biện.
+                  </p>
                 </div>
+              </div>
+            )}
 
-                {/* Tình Trạng */}
+            {/* THỐNG KÊ NGỤY BIỆN */}
+            {activeTab === 'stats' && (
+              <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>📊 Phân Tích Ngụy Biện</h2>
+                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
+
                 <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
-                  <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>📜 Môn Phái</h3>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <strong style={{ color: '#f59e0b' }}>Sư Phụ của bạn:</strong>
-                    {mentorData.masters.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có sư phụ</div> : 
-                      mentorData.masters.map(m => <div key={m.id} style={{ color: '#fff', marginTop: '5px' }}>👑 {m.master} {m.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
-                    }
-                  </div>
-                  <div>
-                    <strong style={{ color: '#10b981' }}>Đệ Tử của bạn:</strong>
-                    {mentorData.disciples.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có đệ tử</div> : 
-                      mentorData.disciples.map(d => <div key={d.id} style={{ color: '#fff', marginTop: '5px' }}>👶 {d.disciple} {d.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
-                    }
-                  </div>
-                  {mentorData.requests && mentorData.requests.length > 0 && (
-                    <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
-                      <strong style={{ color: '#ef4444' }}>Yêu Cầu Bái Sư:</strong>
-                      {mentorData.requests.map(reqDisciple => (
-                        <div key={reqDisciple} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', marginTop: '10px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                          <span style={{ color: '#fff' }}>👶 {reqDisciple}</span>
-                          <div style={{ display: 'flex', gap: '5px' }}>
-                            <button onClick={async () => {
-                              try {
-                                await axios.post(`${API_BASE}/mentorship/accept`, { master: username, disciple: reqDisciple });
-                                loadMentorship();
-                              } catch(e) {}
-                            }} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Nhận</button>
-                            <button onClick={async () => {
-                              try {
-                                await axios.post(`${API_BASE}/mentorship/decline`, { master: username, disciple: reqDisciple });
-                                loadMentorship();
-                              } catch(e) {}
-                            }} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Từ chối</button>
+                  {Object.keys(fallacyStats).length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
+                      Tuyệt vời! Bạn chưa mắc lỗi ngụy biện nào.
+                    </div>
+                  ) : (
+                    <div>
+                      {Object.entries(fallacyStats).sort((a, b) => b[1] - a[1]).map(([fallacy, count]) => (
+                        <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                          <div style={{ flex: 1 }}>
+                            <h4 style={{ margin: '0 0 5px 0', color: '#ef4444' }}>{fallacy}</h4>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Bạn đã mắc lỗi này <strong style={{ color: '#fff' }}>{count} lần</strong>. Hãy chú ý hơn trong lập luận!</div>
                           </div>
+                          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', opacity: 0.8 }}>{count}</div>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* CÁC TAB KHÁC CHƯA CÓ NỘI DUNG */}
-          {['unknown_tab', 'guide'].includes(activeTab) && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-secondary)' }}>
-              <div style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'grayscale(1)' }}>🚧</div>
-              <h2>Tính năng đang phát triển</h2>
-              <p>Mục này sẽ sớm ra mắt trong các bản cập nhật tới!</p>
-            </div>
-          )}
+            {/* HỆ THỐNG BÁI SƯ */}
+            {activeTab === 'mentor' && (
+              <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>🎓 Hệ Thống Bái Sư</h2>
 
-        {/* LIVE TAB */}
-        {activeTab === 'live' && (
-          <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
-            <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>📺 Xem Live Debate</h2>
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Tính năng đang trong giai đoạn phát triển.</p>
-              <p style={{ color: 'var(--text-secondary)' }}>Sắp tới bạn có thể theo dõi trực tiếp các trận tranh biện đỉnh cao và bình luận cùng cộng đồng.</p>
-            </div>
-          </div>
-        )}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                  {/* Xin Bái Sư */}
+                  <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                    <h3 style={{ marginTop: 0, color: '#8b5cf6' }}>🤝 Xin Bái Sư</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>Tìm sư phụ giỏi hơn để học hỏi kinh nghiệm. Hai người có thể thi đấu với nhau để nhận quà.</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <input
+                        type="text"
+                        placeholder="Nhập tên sư phụ..."
+                        value={mentorInput}
+                        onChange={e => setMentorInput(e.target.value)}
+                        style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!mentorInput.trim()) return;
+                          try {
+                            const res = await axios.post(`${API_BASE}/mentorship/request`, { master: mentorInput.trim(), disciple: username });
+                            if (res.data.success) { alert('Đã gửi lời bái sư!'); setMentorInput(''); }
+                            else alert(res.data.error);
+                          } catch (e) { alert('Lỗi kết nối'); }
+                        }}
+                        style={{ background: '#8b5cf6', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        Gửi
+                      </button>
+                    </div>
+                  </div>
 
-        {/* COMMUNITY TAB */}
-        {activeTab === 'community' && (
-          <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
-            <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>🌐 Diễn Đàn Cộng Đồng</h2>
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Cộng đồng KaiKo sắp ra mắt!</p>
-              <p style={{ color: 'var(--text-secondary)' }}>Nơi giao lưu, chia sẻ kinh nghiệm, chat nhóm và kết nối bạn bè 4 phương.</p>
-              <button className="btn-primary" style={{ marginTop: '1.5rem', padding: '10px 24px', borderRadius: '8px' }}>Tải lại tin mới</button>
-            </div>
-          </div>
-        )}
+                  {/* Tình Trạng */}
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>📜 Môn Phái</h3>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <strong style={{ color: '#f59e0b' }}>Sư Phụ của bạn:</strong>
+                      {mentorData.masters.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có sư phụ</div> :
+                        mentorData.masters.map(m => <div key={m.id} style={{ color: '#fff', marginTop: '5px' }}>👑 {m.master} {m.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
+                      }
+                    </div>
+                    <div>
+                      <strong style={{ color: '#10b981' }}>Đệ Tử của bạn:</strong>
+                      {mentorData.disciples.length === 0 ? <div style={{ color: 'var(--text-secondary)' }}>Chưa có đệ tử</div> :
+                        mentorData.disciples.map(d => <div key={d.id} style={{ color: '#fff', marginTop: '5px' }}>👶 {d.disciple} {d.is_graduated ? '(Đã Xuất Sư)' : ''}</div>)
+                      }
+                    </div>
+                    {mentorData.requests && mentorData.requests.length > 0 && (
+                      <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+                        <strong style={{ color: '#ef4444' }}>Yêu Cầu Bái Sư:</strong>
+                        {mentorData.requests.map(reqDisciple => (
+                          <div key={reqDisciple} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '8px', marginTop: '10px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                            <span style={{ color: '#fff' }}>👶 {reqDisciple}</span>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                              <button onClick={async () => {
+                                try {
+                                  await axios.post(`${API_BASE}/mentorship/accept`, { master: username, disciple: reqDisciple });
+                                  loadMentorship();
+                                } catch (e) { }
+                              }} style={{ background: '#10b981', color: '#fff', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Nhận</button>
+                              <button onClick={async () => {
+                                try {
+                                  await axios.post(`${API_BASE}/mentorship/decline`, { master: username, disciple: reqDisciple });
+                                  loadMentorship();
+                                } catch (e) { }
+                              }} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' }}>Từ chối</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CÁC TAB KHÁC CHƯA CÓ NỘI DUNG */}
+            {['unknown_tab', 'guide'].includes(activeTab) && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '5rem', marginBottom: '1rem', filter: 'grayscale(1)' }}>🚧</div>
+                <h2>Tính năng đang phát triển</h2>
+                <p>Mục này sẽ sớm ra mắt trong các bản cập nhật tới!</p>
+              </div>
+            )}
+
+            {/* LIVE TAB */}
+            {activeTab === 'live' && (
+              <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
+                <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>📺 Xem Live Debate</h2>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Tính năng đang trong giai đoạn phát triển.</p>
+                  <p style={{ color: 'var(--text-secondary)' }}>Sắp tới bạn có thể theo dõi trực tiếp các trận tranh biện đỉnh cao và bình luận cùng cộng đồng.</p>
+                </div>
+              </div>
+            )}
+
+            {/* COMMUNITY TAB */}
+            {activeTab === 'community' && (
+              <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
+                <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>🌐 Diễn Đàn Cộng Đồng</h2>
+                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Cộng đồng KaiKo sắp ra mắt!</p>
+                  <p style={{ color: 'var(--text-secondary)' }}>Nơi giao lưu, chia sẻ kinh nghiệm, chat nhóm và kết nối bạn bè 4 phương.</p>
+                  <button className="btn-primary" style={{ marginTop: '1.5rem', padding: '10px 24px', borderRadius: '8px' }}>Tải lại tin mới</button>
+                </div>
+              </div>
+            )}
 
           </div> {/* End inner background div */}
         </div>
@@ -1844,14 +2000,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 {(() => {
                   let theirAvatar = (selectedUser === username) ? selectedAvatar : localStorage.getItem('kaiko_avatar_' + selectedUser)
                   let theirFrame = (selectedUser === username) ? avatarFrame : localStorage.getItem('kaiko_frame_' + selectedUser)
-                  
+
                   // Tự động gán avatar/khung xịn cho các tài khoản giả lập/chưa set
                   if (!theirAvatar && selectedUser !== username && selectedUserStats) {
                     if (selectedUserStats.level >= 91) theirAvatar = '/assets/badges/avatar_crab_gold.png'
                     else if (selectedUserStats.level >= 61) theirAvatar = '/assets/avatars/CuaXanh.png'
                     else if (selectedUserStats.level >= 11) theirAvatar = '/assets/avatars/CuaDoTruyenThong.png'
                   }
-                  
+
                   if (!theirFrame && selectedUser !== username && selectedUserStats) {
                     if (selectedUserStats.level >= 91) theirFrame = 'diamond_plus'
                     else if (selectedUserStats.level >= 61) theirFrame = 'gold'
@@ -1859,18 +2015,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     else if (selectedUserStats.level >= 11) theirFrame = 'wood'
                     else theirFrame = 'none'
                   }
-                  
+
                   if (!theirFrame) theirFrame = 'none'
-                  
+
                   return (
                     <>
-                      <img 
-                        src={theirAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`} 
-                        alt="Avatar" 
-                        style={{ 
+                      <img
+                        src={theirAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`}
+                        alt="Avatar"
+                        style={{
                           width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.1)',
                           ...(frameStyles[theirFrame] || {})
-                        }} 
+                        }}
                       />
                       {theirFrame !== 'none' && (
                         <img
@@ -1886,7 +2042,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               </div>
               <h2 style={{ margin: '0 0 5px', color: 'var(--text-primary)' }}>{getDisplayName(selectedUser)}</h2>
               <div style={{ color: 'var(--text-secondary)', marginBottom: '15px' }}>@{selectedUser}</div>
-              
+
               {!selectedUserStats ? (
                 <p style={{ color: 'var(--text-secondary)' }}>Đang tải thông tin...</p>
               ) : selectedUserStats.error ? (
@@ -1917,18 +2073,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
                                   {badgeObjs.map(b => (
                                     <div key={b.id} title={b.name} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '50%', padding: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                      <img src={b.image} alt={b.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none' }} />
+                                      <img src={b.image} alt={b.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none' }} />
                                     </div>
                                   ))}
                                 </div>
                               )
-                            } catch {}
+                            } catch { }
                           }
-                          
+
                           // Nếu không có huy hiệu showcase thì hiện huy hiệu rank mặc định
                           return (
                             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                              <img src={getRankInfo(selectedUserStats.level).badgeImage} alt="Rank Badge" style={{ height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
+                              <img src={getRankInfo(selectedUserStats.level).badgeImage} alt="Rank Badge" style={{ height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display = 'none' }} />
                             </div>
                           )
                         })()}
@@ -1957,13 +2113,13 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   })()}
                   {selectedUser !== username && !isGuest && (
                     <div style={{ marginTop: '20px' }}>
-                      <button 
+                      <button
                         onClick={async () => {
                           try {
                             const res = await axios.post(`${API_BASE}/mentorship/request`, { master: selectedUser, disciple: username });
                             if (res.data.success) { alert('Đã gửi lời bái sư!'); }
                             else { alert(res.data.error); }
-                          } catch(e) { alert('Lỗi kết nối'); }
+                          } catch (e) { alert('Lỗi kết nối'); }
                         }}
                         style={{ padding: '10px 20px', borderRadius: '8px', border: 'none', background: '#8b5cf6', color: '#fff', fontWeight: 'bold', cursor: 'pointer' }}
                       >
@@ -1977,7 +2133,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           </div>
         </div>
       )}
-      
+
       {activeEvent && <EventWorkspaceModal event={activeEvent} onClose={() => setActiveEvent(null)} username={username} />}
       {activeVotingEvent && <EventVotingModal event={activeVotingEvent} username={username} onClose={() => setActiveVotingEvent(null)} />}
 
@@ -2137,7 +2293,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                             opacity: disabled ? 0.4 : 1, transition: 'all 0.2s'
                           }}
                         >
-                          <img src={b.image} alt={b.name} style={{ height: '72px', width: '72px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none' }} />
+                          <img src={b.image} alt={b.name} style={{ height: '72px', width: '72px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none' }} />
                           <div style={{ fontSize: '0.75rem', color: active ? '#a855f7' : 'var(--text-secondary)', textAlign: 'center', fontWeight: active ? 'bold' : 'normal' }}>{b.name}</div>
                           {active && <div style={{ fontSize: '0.65rem', background: '#a855f7', color: '#fff', borderRadius: '10px', padding: '1px 8px' }}>✓ Đang hiển</div>}
                         </div>
@@ -2155,10 +2311,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           </div>
         </div>
       )}
-      
+
       {/* Global Navigation (Bottom Left) */}
       <div style={{ position: 'fixed', bottom: '20px', left: '20px', display: 'flex', gap: '10px', zIndex: 9999 }}>
-        <button 
+        <button
           onClick={() => setActiveTab('home')}
           style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
           title="Trang chủ"
@@ -2166,7 +2322,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           🏠
         </button>
         {activeTab !== 'home' && (
-          <button 
+          <button
             onClick={() => setActiveTab('home')}
             style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
             title="Quay lại"
@@ -2234,8 +2390,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>Không có thông báo nào.</div>
             ) : (
               notifications.map(n => (
-                <div 
-                  key={n.id} 
+                <div
+                  key={n.id}
                   style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: n.is_read ? 'transparent' : 'rgba(168,85,247,0.1)', cursor: 'pointer' }}
                   onClick={async () => {
                     if (!n.is_read) {
