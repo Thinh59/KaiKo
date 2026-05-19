@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import axios from 'axios'
+
+const API_BASE = 'http://localhost:8000'
 
 const COLOR = { good: '#10b981', warn: '#f59e0b', bad: '#ef4444', info: '#3b82f6' }
 
@@ -14,15 +17,53 @@ function Badge({ type, text }) {
   )
 }
 
-function PlayerCard({ name, data, transcript }) {
+function PlayerCard({ name, rawName, currentUser, data, transcript }) {
   const [tab, setTab] = useState('score')
+  const [friendReqSent, setFriendReqSent] = useState(false)
+
+  const isOpponent = rawName && rawName !== currentUser && rawName !== 'ai_bot' && !rawName.startsWith('Guest_')
+
+  const handleAddFriend = async () => {
+    try {
+      const res = await axios.post(`${API_BASE}/friend-request`, {
+        user: currentUser,
+        target: rawName
+      })
+      if (res.data.success) {
+        setFriendReqSent(true)
+        alert('Đã gửi lời mời kết bạn!')
+      } else {
+        alert(res.data.error || 'Lỗi gửi kết bạn')
+      }
+    } catch (e) {
+      alert('Không thể gửi lời mời kết bạn')
+    }
+  }
 
   return (
     <div className="glass-panel" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '1.5rem', borderBottom: '1px solid var(--border-light)' }}>
-        <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.5rem' }}>{name}</h3>
-        <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '0.5rem', color: 'var(--accent-primary)' }}>
-          {data?.total ?? '--'} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>/ 100</span>
+      <div style={{ background: 'rgba(255, 255, 255, 0.05)', padding: '1.5rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {name}
+            {isOpponent && (
+              <button 
+                onClick={handleAddFriend}
+                disabled={friendReqSent}
+                style={{
+                  fontSize: '0.85rem', padding: '4px 10px', borderRadius: '20px', 
+                  background: friendReqSent ? 'rgba(255,255,255,0.1)' : 'var(--accent-primary)', 
+                  color: '#fff', border: 'none', cursor: friendReqSent ? 'default' : 'pointer'
+                }}
+                title="Thêm bạn bè"
+              >
+                {friendReqSent ? 'Đã gửi lời mời' : '👤 Thêm bạn'}
+              </button>
+            )}
+          </h3>
+          <div style={{ fontSize: '2.5rem', fontWeight: 'bold', marginTop: '0.5rem', color: 'var(--accent-primary)' }}>
+            {data?.total ?? '--'} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>/ 100</span>
+          </div>
         </div>
       </div>
 
@@ -121,9 +162,9 @@ function PlayerCard({ name, data, transcript }) {
   )
 }
 
-export default function Scoreboard({ result, onRestart }) {
+export default function Scoreboard({ result, onRestart, currentUser }) {
   if (!result) return null
-  const { scores, playerA, playerB, transcript_a, transcript_b } = result
+  const { scores, playerA, playerB, transcript_a, transcript_b, rawUsernameA, rawUsernameB } = result
 
   return (
     <div style={{ maxWidth: 1000, margin: '40px auto', padding: '24px', minHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
@@ -137,8 +178,8 @@ export default function Scoreboard({ result, onRestart }) {
       </div>
 
       <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <PlayerCard name={playerA} data={scores?.player_a} transcript={transcript_a} />
-        <PlayerCard name={playerB} data={scores?.player_b} transcript={transcript_b} />
+        <PlayerCard name={playerA} rawName={rawUsernameA} currentUser={currentUser} data={scores?.player_a} transcript={transcript_a} />
+        <PlayerCard name={playerB} rawName={rawUsernameB} currentUser={currentUser} data={scores?.player_b} transcript={transcript_b} />
       </div>
 
       {scores?.comment && (

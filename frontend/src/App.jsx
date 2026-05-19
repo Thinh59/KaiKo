@@ -255,8 +255,8 @@ function App() {
           : winner === result.playerB ? 'lose' : 'draw'
 
         await axios.post(`${API_BASE}/save-match`, {
-          username:       result.playerA,
-          opponent:       result.playerB,
+          username:       result.rawUsernameA || result.playerA,
+          opponent:       result.rawUsernameB || result.playerB,
           topic:          result.topic ?? '',
           mode:           mode ?? 'solo_ai',
           result:         resultStr,
@@ -322,7 +322,7 @@ function App() {
   } else if (page === 'dashboard') {
     content = (
       <ErrorBoundary>
-        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} />
+        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} />
       </ErrorBoundary>
     )
   } else if (page === 'mode') {
@@ -370,7 +370,9 @@ function App() {
       topic: currentMatch?.topic || 'Chủ đề ngẫu nhiên',
       playerA: isHost ? getDisplayName(username) : opponentName,
       playerB: isHost ? opponentName : getDisplayName(username),
-      isLocalHost: isHost
+      isLocalHost: isHost,
+      rawUsernameA: isHost ? username : currentMatch?.opponentId,
+      rawUsernameB: isHost ? currentMatch?.opponentId : username
     }
 
     content = (
@@ -402,7 +404,9 @@ function App() {
       topic: currentMatch?.topic || 'Chủ đề ngẫu nhiên',
       playerA: isHost ? getDisplayName(username) : opponentName,
       playerB: isHost ? opponentName : getDisplayName(username),
-      isLocalHost: isHost
+      isLocalHost: isHost,
+      rawUsernameA: isHost ? username : currentMatch?.opponentId,
+      rawUsernameB: isHost ? currentMatch?.opponentId : username
     }
 
     content = (
@@ -426,6 +430,7 @@ function App() {
       <Scoreboard
         result={debateResult}
         onRestart={handleRestart}
+        currentUser={username}
       />
     )
   } else {

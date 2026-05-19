@@ -282,6 +282,15 @@ def load_model():
             UNIQUE(username, comment_date)
         )
     ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id SERIAL PRIMARY KEY,
+            sender TEXT NOT NULL,
+            target TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
     
     cursor.execute('SELECT COUNT(*) as count FROM events')
     if cursor.fetchone()['count'] == 0:
@@ -361,6 +370,15 @@ class ConnectionManager:
     async def send_personal_message(self, message: str, client_id: str):
         if client_id in self.active_connections:
             await self.active_connections[client_id].send_text(message)
+
+    async def send_message_to_username(self, message: str, username: str):
+        prefix = f"{username}_"
+        for cid, ws in self.active_connections.items():
+            if cid.startswith(prefix):
+                try:
+                    await ws.send_text(message)
+                except:
+                    pass
 
     async def matchmake(self, client_id: str, player_name: str, mode: str, level: int = 1):
         self.player_names[client_id] = player_name
@@ -472,11 +490,33 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng không tồn tại hoặc đã đầy!"
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "chat_msg"]:
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "chat_msg", "chat"]:
                 target_id = message.get("target")
                 if target_id:
-                    # Chuyển tiếp tin nhắn tới đối phương
-                    await manager.send_personal_message(json.dumps(message), target_id)
+                    # Chuyển tiếp tin nhắn
+                    # --- CHAT MESSAGES ---
+                    if msg_type == "chat":
+                        # Lưu tin nhắn vào DB
+                        conn = get_db()
+                        cursor = conn.cursor()
+                        from datetime import datetime, timezone
+                        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                        cursor.execute("INSERT INTO chat_messages (sender, target, message, created_at) VALUES (%s, %s, %s, %s)",
+                                       (message.get("sender"), target_id, message.get("text"), now_str))
+                        conn.commit()
+                        conn.close()
+                        
+                        if target_id == 'global':
+                            # Global chat: send to everyone
+                            for ws in manager.active_connections.values():
+                                try:
+                                    await ws.send_text(json.dumps(message))
+                                except:
+                                    pass
+                        else:
+                            await manager.send_message_to_username(json.dumps(message), target_id)
+                    else:
+                        await manager.send_personal_message(json.dumps(message), target_id)
                     
     except WebSocketDisconnect:
         await manager.notify_opponent_disconnected(client_id)
@@ -683,7 +723,28 @@ def save_match(data: SaveMatch):
     cursor.execute("""
         UPDATE friends SET debate_count = COALESCE(debate_count,0) + 1
         WHERE (user1=%s AND user2=%s) OR (user1=%s AND user2=%s)
+        RETURNING debate_count
     """, (data.username, data.opponent, data.opponent, data.username))
+    f_row = cursor.fetchone()
+    
+    if f_row and f_row['debate_count'] == 50:
+        for u in [data.username, data.opponent]:
+            cursor.execute("SELECT id FROM user_items WHERE username=%s AND item_id='title_banthan'", (u,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO user_items (username, item_id, item_type, obtained_at) VALUES (%s, 'title_banthan', 'badge', %s)", (u, played_at))
+                cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, 'system', 'Chúc mừng! Bạn đã nhận được danh hiệu Bạn Thân Tri Kỷ!', %s)", (u, played_at))
+
+    # Cập nhật số trận Mentorship và tự động xuất sư
+    cursor.execute("""
+        UPDATE mentorship SET debate_count = COALESCE(debate_count,0) + 1 
+        WHERE ((master=%s AND disciple=%s) OR (master=%s AND disciple=%s)) AND is_graduated=FALSE
+        RETURNING id, debate_count, master, disciple
+    """, (data.username, data.opponent, data.opponent, data.username))
+    m_row = cursor.fetchone()
+    if m_row and m_row['debate_count'] >= 20:
+        cursor.execute("UPDATE mentorship SET is_graduated=TRUE, graduated_date=%s WHERE id=%s", (played_at, m_row['id']))
+        for u in [m_row['master'], m_row['disciple']]:
+            cursor.execute("INSERT INTO notifications (username, type, message, created_at) VALUES (%s, 'system', 'Chúc mừng! Hai thầy trò đã sát cánh 20 trận, đệ tử chính thức Xuất Sư!', %s)", (u, played_at))
 
     # --- TÍNH TOÁN LEVEL PHỨC TẠP ---
     cursor.execute("SELECT level_real, consecutive_losses FROM users WHERE username=%s", (data.username,))
@@ -1590,7 +1651,89 @@ def get_mentorship(username: str):
     conn.close()
     return {"success": True, "disciples": disciples, "masters": masters, "requests": requests}
 
+# --- SERVER ANNOUNCEMENTS ---
+@app.get("/server-announcements")
+def get_server_announcements():
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        # Top player by level
+        cursor.execute("SELECT username, level FROM users ORDER BY level DESC, exp DESC LIMIT 1")
+        top = cursor.fetchone()
+        # Recent match
+        cursor.execute("SELECT winner, loser, created_at FROM match_history ORDER BY id DESC LIMIT 1")
+        recent = cursor.fetchone()
+        # Total users
+        cursor.execute("SELECT COUNT(*) as cnt FROM users")
+        total_users = cursor.fetchone()['cnt']
+        # Total matches
+        cursor.execute("SELECT COUNT(*) as cnt FROM match_history")
+        total_matches = cursor.fetchone()['cnt']
 
+        announcements = [
+            f"🌟 KaiKo Arena - Nơi tranh biện huyền thoại! Hiện có {total_users} võ sĩ đang hành đạo",
+            f"⚔️ Tổng số trận đấu toàn server: {total_matches} trận - Chiến trường chưa bao giờ sôi động đến vậy!",
+        ]
+        if top:
+            announcements.append(f"👑 Đại Cao Thủ đang dẫn đầu bảng xếp hạng: [{top['username']}] - Cấp {top['level']}")
+        if recent:
+            announcements.append(f"🥊 Trận vừa kết thúc: {recent['winner']} đánh bại {recent['loser']} - Huyết chiến vừa tàn!")
+        announcements += [
+            "🎓 Hệ thống Sư Đồ đã mở! Bái sư để nâng cao tu vi của bạn ngay hôm nay",
+            "🦀 Huy hiệu 'Cua Hoàng Đế' đang chờ những tranh biện viên xuất sắc nhất",
+            "🔥 Tính năng Chat Cộng Đồng mới ra mắt - Kết nối với các đạo hữu ngay bây giờ!",
+        ]
+        return {"success": True, "announcements": announcements}
+    except Exception as e:
+        return {"success": True, "announcements": ["🌟 Chào mừng đến với KaiKo Arena - Sân đấu tranh biện huyền thoại!"]}
+    finally:
+        conn.close()
 
+# --- CHAT MESSAGES ---
+@app.get("/chat-messages/{target}")
+def get_chat_messages(target: str, username: str = None):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        if target == 'global':
+            cursor.execute("SELECT sender, message as text, created_at as timestamp FROM chat_messages WHERE target='global' ORDER BY id DESC LIMIT 100")
+            msgs = list(reversed(cursor.fetchall()))
+        else:
+            if not username:
+                return {"success": False, "error": "Missing username"}
+            cursor.execute(
+                "SELECT sender, message as text, created_at as timestamp FROM chat_messages WHERE (sender=%s AND target=%s) OR (sender=%s AND target=%s) ORDER BY id ASC LIMIT 100",
+                (username, target, target, username)
+            )
+            msgs = cursor.fetchall()
+        return {"success": True, "messages": [dict(m) for m in msgs]}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
 
+# --- FRIENDS LAST MESSAGES ---
+@app.get("/chat-friends-preview/{username}")
+def get_friends_chat_preview(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cursor.execute("SELECT user1, user2 FROM friends WHERE user1=%s OR user2=%s", (username, username))
+        friends_rows = cursor.fetchall()
+        result = []
+        for row in friends_rows:
+            friend = row['user2'] if row['user1'] == username else row['user1']
+            cursor.execute(
+                "SELECT sender, message as text, created_at as timestamp FROM chat_messages WHERE (sender=%s AND target=%s) OR (sender=%s AND target=%s) ORDER BY id DESC LIMIT 1",
+                (username, friend, friend, username)
+            )
+            last_msg = cursor.fetchone()
+            result.append({"friend": friend, "lastMessage": dict(last_msg) if last_msg else None})
+        return {"success": True, "data": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
 
+if __name__ == "__main__":
+    init_db()

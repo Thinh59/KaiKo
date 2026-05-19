@@ -248,7 +248,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
   );
 };
 
-export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
+export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler }) {
   const [activeTab, setActiveTab] = useState('home')
   const [activeEvent, setActiveEvent] = useState(null)
   const [activeVotingEvent, setActiveVotingEvent] = useState(null)
@@ -290,6 +290,98 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
   const [mentorData, setMentorData] = useState({ masters: [], disciples: [], requests: [] })
   const [mentorInput, setMentorInput] = useState('')
   const [historyFilter, setHistoryFilter] = useState('all')
+
+  const [activeChatUser, setActiveChatUser] = useState(null)
+  const [chatMessages, setChatMessages] = useState({})
+  const [chatInput, setChatInput] = useState('')
+  const [showChatWidget, setShowChatWidget] = useState(false)
+  const [chatTab, setChatTab] = useState('friends')   // 'friends' | 'community'
+  const [globalMessages, setGlobalMessages] = useState([])
+  const [globalInput, setGlobalInput] = useState('')
+  const [friendsChatPreview, setFriendsChatPreview] = useState([])
+  const [serverAnnouncements, setServerAnnouncements] = useState([])
+  const [tickerIdx, setTickerIdx] = useState(0)
+  const [chatUnreadCount, setChatUnreadCount] = useState(0)
+
+  // Load server announcements
+  useEffect(() => {
+    axios.get(`${API_BASE}/server-announcements`).then(r => {
+      if (r.data.success) setServerAnnouncements(r.data.announcements)
+    }).catch(() => {})
+  }, [])
+
+  // Rotate ticker every 6s
+  useEffect(() => {
+    if (serverAnnouncements.length === 0) return
+    const t = setInterval(() => setTickerIdx(i => (i + 1) % serverAnnouncements.length), 6000)
+    return () => clearInterval(t)
+  }, [serverAnnouncements])
+
+  // Load global chat history
+  useEffect(() => {
+    axios.get(`${API_BASE}/chat-messages/global`).then(r => {
+      if (r.data.success) setGlobalMessages(r.data.messages.map(m => ({ ...m, timestamp: m.timestamp })))
+    }).catch(() => {})
+  }, [])
+
+  // Load friends chat preview
+  const loadFriendsChatPreview = () => {
+    if (isGuest) return
+    axios.get(`${API_BASE}/chat-friends-preview/${username}`).then(r => {
+      if (r.data.success) setFriendsChatPreview(r.data.data)
+    }).catch(() => {})
+  }
+
+  // Load conversation with a specific friend from DB
+  const loadFriendChat = (friend) => {
+    axios.get(`${API_BASE}/chat-messages/${friend}?username=${username}`).then(r => {
+      if (r.data.success) {
+        setChatMessages(prev => ({ ...prev, [friend]: r.data.messages }))
+      }
+    }).catch(() => {})
+  }
+
+  useEffect(() => {
+    if (registerHandler) {
+      registerHandler('chat', (data) => {
+        if (data.target === 'global') {
+          // Skip echo từ chính mình (đã được thêm optimistically trong handleSendGlobal)
+          if (data.sender === username) return
+          setGlobalMessages(prev => [...prev, { sender: data.sender, text: data.text, timestamp: new Date().toISOString() }])
+        } else {
+          const key = data.sender === username ? data.target : data.sender
+          setChatMessages(prev => ({
+            ...prev,
+            [key]: [...(prev[key] || []), { sender: data.sender, text: data.text, timestamp: new Date().toISOString() }]
+          }))
+          if (!showChatWidget || chatTab !== 'friends' || activeChatUser !== key) {
+            setChatUnreadCount(c => c + 1)
+          }
+        }
+      })
+    }
+  }, [registerHandler, showChatWidget, chatTab, activeChatUser])
+
+  const handleSendChat = (e) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || !activeChatUser) return;
+    const msg = { type: 'chat', target: activeChatUser, sender: username, text: chatInput.trim() }
+    if (sendMessage) sendMessage(msg)
+    setChatMessages(prev => ({
+      ...prev,
+      [activeChatUser]: [...(prev[activeChatUser] || []), { sender: username, text: chatInput.trim(), timestamp: new Date().toISOString() }]
+    }))
+    setChatInput('')
+  }
+
+  const handleSendGlobal = (e) => {
+    if (e) e.preventDefault();
+    if (!globalInput.trim()) return;
+    const msg = { type: 'chat', target: 'global', sender: username, text: globalInput.trim() }
+    if (sendMessage) sendMessage(msg)
+    setGlobalMessages(prev => [...prev, { sender: username, text: globalInput.trim(), timestamp: new Date().toISOString() }])
+    setGlobalInput('')
+  }
 
   // All badge-type items with their image mappings
   const RANK_BADGE_CATALOG = [
@@ -692,6 +784,39 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+
+      {/* ── Server Ticker ── */}
+      {serverAnnouncements.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(90deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15), rgba(99,102,241,0.15))',
+          border: '1px solid rgba(99,102,241,0.3)',
+          borderRadius: '8px',
+          padding: '6px 16px',
+          marginBottom: '10px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          overflow: 'hidden',
+          height: '34px'
+        }}>
+          <span style={{ color: '#a78bfa', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0, letterSpacing: '1px' }}>📢 SERVER</span>
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+            <div key={tickerIdx} style={{
+              color: '#e2e8f0',
+              fontSize: '0.85rem',
+              whiteSpace: 'nowrap',
+              animation: 'tickerSlide 0.5s ease',
+            }}>
+              {serverAnnouncements[tickerIdx]}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+            {serverAnnouncements.map((_, i) => (
+              <div key={i} onClick={() => setTickerIdx(i)} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === tickerIdx ? '#a78bfa' : 'rgba(255,255,255,0.2)', cursor: 'pointer', transition: 'background 0.3s' }} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Header with Avatar + EXP Bar ── */}
       <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 2rem', marginBottom: '1.5rem', gap: '20px' }}>
@@ -1352,6 +1477,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setActiveChatUser(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', cursor: 'pointer', fontWeight: 'bold' }}>
+                        💬 Chat
+                      </button>
                       <button onClick={() => handleRemoveFriend(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
                         Xóa
                       </button>
@@ -1765,58 +1893,68 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
                 <p style={{ color: '#ef4444' }}>Không thể tải thông tin người chơi này.</p>
               ) : (
                 <>
-                  {/* Huy hiệu showcase của bạn bè */}
                   {(() => {
-                    try {
-                      const theirBadges = JSON.parse(localStorage.getItem('kaiko_badges_' + selectedUser) || '[]')
-                      const allCatalog = [...RANK_BADGE_CATALOG, ...BADGE_CATALOG]
-                      let display = theirBadges.map(id => allCatalog.find(b => b.id === id)).filter(Boolean)
-                      
-                      // Nếu họ chưa set showcase badge nào, tự động lấy các huy hiệu Rank họ đã đạt được (tối đa 5 cái gần nhất)
-                      if (display.length === 0 && selectedUserStats?.level) {
-                        display = RANK_BADGE_CATALOG.filter(b => selectedUserStats.level >= b.minLevel).slice(-5).reverse()
-                      }
-                      
-                      if (display.length > 0) {
-                        return (
-                          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                            {display.map(b => (
-                              <div key={b.id} title={b.name}>
-                                <img src={b.image} alt={b.name} style={{ height: '60px', width: '60px', objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      }
-                    } catch {}
-                    
-                    // Nếu không có huy hiệu showcase thì hiện huy hiệu rank mặc định
+                    const isHidden = selectedUser !== username && stats.level < selectedUserStats.level;
+                    if (isHidden) {
+                      return (
+                        <div style={{ padding: '2rem 1rem', textAlign: 'center' }}>
+                          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🌫️</div>
+                          <div style={{ color: '#a855f7', fontWeight: 'bold', fontSize: '1.2rem', marginBottom: '0.5rem' }}>Tu Vi Cảnh Giới Quá Cao</div>
+                          <div style={{ color: 'var(--text-secondary)' }}>Không thể nhìn thấu đạo hạnh của vị đạo hữu này!</div>
+                          <div style={{ marginTop: '15px', color: '#f59e0b', fontSize: '0.9rem' }}>Bạn cần đạt cấp độ tương đương hoặc cao hơn để xem thông tin.</div>
+                        </div>
+                      )
+                    }
+
                     return (
-                      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                        <img src={getRankInfo(selectedUserStats.level).badgeImage} alt="Rank Badge" style={{ height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
-                      </div>
+                      <>
+                        {(() => {
+                          const showcase = selectedUserStats.showcaseBadges || [];
+                          if (showcase.length > 0) {
+                            try {
+                              const badgeObjs = showcase.map(id => [...RANK_BADGE_CATALOG, ...BADGE_CATALOG].find(b => b.id === id)).filter(Boolean)
+                              return (
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                                  {badgeObjs.map(b => (
+                                    <div key={b.id} title={b.name} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '50%', padding: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                      <img src={b.image} alt={b.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} onError={(e) => { e.target.style.display='none' }} />
+                                    </div>
+                                  ))}
+                                </div>
+                              )
+                            } catch {}
+                          }
+                          
+                          // Nếu không có huy hiệu showcase thì hiện huy hiệu rank mặc định
+                          return (
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+                              <img src={getRankInfo(selectedUserStats.level).badgeImage} alt="Rank Badge" style={{ height: '90px', objectFit: 'contain', filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))' }} onError={(e) => { e.target.style.display='none' }} />
+                            </div>
+                          )
+                        })()}
+                        <div style={{ display: 'inline-block', background: getRankInfo(selectedUserStats.level).bg, color: getRankInfo(selectedUserStats.level).color, padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '1.5rem', border: `1px solid ${getRankInfo(selectedUserStats.level).color}50` }}>
+                          <span style={{ marginRight: '8px' }}>{getRankInfo(selectedUserStats.level).icon}</span> Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{selectedUserStats.total}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Trận</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{selectedUserStats.wins}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thắng</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{selectedUserStats.losses}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thua</div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop: '15px', fontSize: '1.1rem', color: '#f59e0b', fontWeight: 'bold' }}>
+                          ⭐ Điểm Kinh Nghiệm (EXP): {selectedUserStats.exp}
+                        </div>
+                      </>
                     )
                   })()}
-                  <div style={{ display: 'inline-block', background: getRankInfo(selectedUserStats.level).bg, color: getRankInfo(selectedUserStats.level).color, padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '1.5rem', border: `1px solid ${getRankInfo(selectedUserStats.level).color}50` }}>
-                    <span style={{ marginRight: '8px' }}>{getRankInfo(selectedUserStats.level).icon}</span> Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{selectedUserStats.total}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Trận</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>{selectedUserStats.wins}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thắng</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#ef4444' }}>{selectedUserStats.losses}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Thua</div>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: '15px', fontSize: '1.1rem', color: '#f59e0b', fontWeight: 'bold' }}>
-                    ⭐ Điểm Kinh Nghiệm (EXP): {selectedUserStats.exp}
-                  </div>
                   {selectedUser !== username && !isGuest && (
                     <div style={{ marginTop: '20px' }}>
                       <button 
@@ -1842,6 +1980,125 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
       
       {activeEvent && <EventWorkspaceModal event={activeEvent} onClose={() => setActiveEvent(null)} username={username} />}
       {activeVotingEvent && <EventVotingModal event={activeVotingEvent} username={username} onClose={() => setActiveVotingEvent(null)} />}
+
+      {/* === CHAT WIDGET === */}
+      {showChatWidget && (
+        <div style={{ position: 'fixed', bottom: '90px', right: '90px', width: '360px', height: '500px', background: 'rgba(10,10,20,0.97)', backdropFilter: 'blur(24px)', borderRadius: '20px', border: '1px solid rgba(99,102,241,0.4)', boxShadow: '0 20px 60px rgba(0,0,0,0.7)', zIndex: 9998, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)' }}>
+          {/* Header */}
+          <div style={{ background: activeChatUser ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'linear-gradient(135deg,#1e1b4b,#312e81)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {activeChatUser ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button onClick={() => setActiveChatUser(null)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '8px', padding: '4px 8px', cursor: 'pointer', fontSize: '0.8rem' }}>← Quay lại</button>
+                <span style={{ color: '#fff', fontWeight: 'bold' }}>{getDisplayName(activeChatUser)}</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '0', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', overflow: 'hidden' }}>
+                <button onClick={() => { setChatTab('friends'); loadFriendsChatPreview(); }} style={{ padding: '6px 16px', border: 'none', background: chatTab === 'friends' ? '#6366f1' : 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: chatTab === 'friends' ? 'bold' : 'normal', transition: 'background 0.2s' }}>👥 Bạn bè</button>
+                <button onClick={() => setChatTab('community')} style={{ padding: '6px 16px', border: 'none', background: chatTab === 'community' ? '#8b5cf6' : 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: chatTab === 'community' ? 'bold' : 'normal', transition: 'background 0.2s' }}>🌍 Cộng đồng</button>
+              </div>
+            )}
+            <button onClick={() => { setShowChatWidget(false); setActiveChatUser(null); }} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: '8px', padding: '4px 10px', cursor: 'pointer', fontSize: '1rem' }}>×</button>
+          </div>
+
+          {/* Content */}
+          {activeChatUser ? (
+            // Individual chat
+            <>
+              <div style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(!chatMessages[activeChatUser] || chatMessages[activeChatUser].length === 0) ? (
+                  <div style={{ margin: 'auto', color: '#6b7280', textAlign: 'center', fontSize: '0.9rem' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>💬</div>
+                    <p>Chưa có tin nhắn</p>
+                    <p style={{ fontSize: '0.8rem' }}>Gửi lời chào tới {getDisplayName(activeChatUser)}!</p>
+                  </div>
+                ) : chatMessages[activeChatUser].map((m, idx) => {
+                  const isMe = m.sender === username;
+                  return (
+                    <div key={idx} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                      <div style={{ background: isMe ? '#6366f1' : 'rgba(255,255,255,0.1)', color: '#fff', padding: '9px 14px', borderRadius: isMe ? '16px 16px 0 16px' : '16px 16px 16px 0', fontSize: '0.9rem', wordBreak: 'break-word' }}>{m.text}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <form onSubmit={handleSendChat} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px' }}>
+                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={`Nhắn ${getDisplayName(activeChatUser)}...`} style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
+                <button type="submit" style={{ background: '#6366f1', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
+              </form>
+            </>
+          ) : chatTab === 'friends' ? (
+            // Friends list with last message
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {friendsChatPreview.length === 0 && friends.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>👥</div>
+                  <p>Chưa có bạn bè nào</p>
+                  <p style={{ fontSize: '0.8rem' }}>Thêm bạn từ tab Bạn Bè!</p>
+                </div>
+              ) : (
+                // Merge friends list with chat preview
+                (() => {
+                  const allFriends = [...new Set([
+                    ...friendsChatPreview.map(f => f?.friend).filter(Boolean),
+                    ...friends.map(f => {
+                      if (!f) return undefined
+                      if (typeof f === 'string') return f
+                      return f.user1 === username ? f.user2 : (f.user2 === username ? f.user1 : undefined)
+                    }).filter(Boolean)
+                  ])];
+                  return allFriends.map(friend => {
+                    const preview = friendsChatPreview.find(f => f.friend === friend);
+                    const lastMsg = preview?.lastMessage;
+                    const localMsgs = chatMessages[friend] || [];
+                    const localLast = localMsgs.length > 0 ? localMsgs[localMsgs.length - 1] : null;
+                    const displayMsg = localLast?.text || lastMsg?.text || 'Chưa có tin nhắn';
+                    const isLocalMe = localLast?.sender === username;
+                    const isDbMe = lastMsg?.sender === username;
+                    const prefix = localLast ? (isLocalMe ? 'Bạn: ' : '') : (lastMsg ? (isDbMe ? 'Bạn: ' : '') : '');
+                    return (
+                      <div key={friend} onClick={() => { setActiveChatUser(friend); setChatUnreadCount(0); loadFriendChat(friend); }} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
+                          {(friend || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: '#f3f4f6', fontWeight: '600', fontSize: '0.9rem' }}>{getDisplayName(friend)}</div>
+                          <div style={{ color: '#9ca3af', fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prefix}{displayMsg}</div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+          ) : (
+            // Community global chat
+            <>
+              <div style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {globalMessages.length === 0 ? (
+                  <div style={{ margin: 'auto', color: '#6b7280', textAlign: 'center' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🌍</div>
+                    <p>Chưa có tin nhắn nào</p>
+                    <p style={{ fontSize: '0.8rem' }}>Hãy là người đầu tiên!</p>
+                  </div>
+                ) : globalMessages.map((m, idx) => {
+                  const isMe = m.sender === username;
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                      {!isMe && <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '2px', paddingLeft: '4px' }}>{m.sender}</div>}
+                      <div style={{ background: isMe ? '#8b5cf6' : 'rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: isMe ? '14px 14px 0 14px' : '14px 14px 14px 0', fontSize: '0.88rem', maxWidth: '80%', wordBreak: 'break-word' }}>{m.text}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <form onSubmit={handleSendGlobal} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px' }}>
+                <input type="text" value={globalInput} onChange={e => setGlobalInput(e.target.value)} placeholder="Nhắn toàn cộng đồng..." style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
+                <button type="submit" style={{ background: '#8b5cf6', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
+              </form>
+            </>
+          )}
+        </div>
+      )}
 
       {/* === MODAL CHỌN HUY HIỆU === */}
       {showBadgeSelector && (
@@ -1919,6 +2176,52 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
         )}
       </div>
 
+      {/* === FLOATING BUTTONS: Settings + Chat (stacked above MusicPlayer, right side) === */}
+      <div style={{ position: 'fixed', bottom: '90px', right: '24px', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 9997 }}>
+        {/* Settings button */}
+        <button
+          onClick={() => setActiveTab('settings')}
+          title="Cài đặt"
+          style={{
+            width: '54px', height: '54px', borderRadius: '50%',
+            background: activeTab === 'settings' ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(15,15,25,0.9)',
+            border: '2px solid rgba(99,102,241,0.4)',
+            color: '#fff', fontSize: '1.3rem', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(12px)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          ⚙️
+        </button>
+        {/* Chat button */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => { setShowChatWidget(o => !o); setChatUnreadCount(0); loadFriendsChatPreview(); }}
+            title="Chat"
+            style={{
+              width: '54px', height: '54px', borderRadius: '50%',
+              background: showChatWidget ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(15,15,25,0.9)',
+              border: `2px solid ${showChatWidget ? '#6366f1' : 'rgba(99,102,241,0.4)'}`,
+              color: '#fff', fontSize: '1.3rem', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: showChatWidget ? '0 0 20px rgba(99,102,241,0.5), 0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.3)',
+              backdropFilter: 'blur(12px)',
+              transition: 'all 0.3s ease',
+              animation: chatUnreadCount > 0 ? 'pulse 2s infinite' : 'none'
+            }}
+          >
+            💬
+          </button>
+          {chatUnreadCount > 0 && (
+            <div style={{ position: 'absolute', top: '-5px', right: '-5px', background: '#ef4444', color: '#fff', fontSize: '0.7rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid rgba(10,10,20,0.9)' }}>
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Notifications Dropdown (Moved to root level to avoid stacking context issues) */}
       {showNotifications && (
         <div className="glass-panel animate-fade-in" style={{ position: 'fixed', top: '80px', right: '16px', marginTop: '10px', width: '320px', background: 'var(--bg-primary)', border: '1px solid var(--border-light)', borderRadius: '12px', zIndex: 999999, overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.7)' }}>
@@ -1952,6 +2255,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch }) {
           </div>
         </div>
       )}
+
+      {/* CSS for ticker animation */}
+      <style>{`
+        @keyframes tickerSlide {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+      `}</style>
 
     </div>
   )
