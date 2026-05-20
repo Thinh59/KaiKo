@@ -305,6 +305,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [serverAnnouncements, setServerAnnouncements] = useState([])
   const [tickerIdx, setTickerIdx] = useState(0)
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
+  const [communityPosts, setCommunityPosts] = useState([])
+  const [communityInput, setCommunityInput] = useState('')
+  const [commentInputs, setCommentInputs] = useState({})
+  const [communityLoading, setCommunityLoading] = useState(false)
+  const [liveRooms, setLiveRooms] = useState([])
+  const [liveLoading, setLiveLoading] = useState(false)
+  const [activeSpectatorRoom, setActiveSpectatorRoom] = useState(null)
+  const [spectatorEvents, setSpectatorEvents] = useState([])
 
   // Load server announcements
   useEffect(() => {
@@ -346,7 +354,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
   useEffect(() => {
     if (registerHandler) {
-      registerHandler('chat', (data) => {
+      return registerHandler('chat', (data) => {
         if (data.target === 'global') {
           // Skip echo từ chính mình (đã được thêm optimistically trong handleSendGlobal)
           if (data.sender === username) return
@@ -363,7 +371,22 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         }
       })
     }
-  }, [registerHandler, showChatWidget, chatTab, activeChatUser])
+  }, [registerHandler, showChatWidget, chatTab, activeChatUser, username])
+
+  useEffect(() => {
+    if (!registerHandler) return
+    const cleanupEvent = registerHandler('spectator_event', (data) => {
+      if (!activeSpectatorRoom || data.roomId !== activeSpectatorRoom.roomId) return
+      setSpectatorEvents(prev => [...prev.slice(-80), { ...data.event, at: new Date().toISOString() }])
+    })
+    const cleanupJoined = registerHandler('spectator_joined', (data) => {
+      if (data.room) setActiveSpectatorRoom(data.room)
+    })
+    return () => {
+      cleanupEvent?.()
+      cleanupJoined?.()
+    }
+  }, [registerHandler, activeSpectatorRoom])
 
   const handleSendChat = (e) => {
     if (e) e.preventDefault();
@@ -384,6 +407,75 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     if (sendMessage) sendMessage(msg)
     setGlobalMessages(prev => [...prev, { sender: username, text: globalInput.trim(), timestamp: new Date().toISOString() }])
     setGlobalInput('')
+  }
+
+  const loadCommunityPosts = useCallback(async () => {
+    setCommunityLoading(true)
+    try {
+      const res = await axios.get(`${API_BASE}/community-posts`)
+      if (res.data.success) setCommunityPosts(res.data.posts || [])
+    } catch (err) {
+      console.warn('Không tải được bài cộng đồng:', err.message)
+    } finally {
+      setCommunityLoading(false)
+    }
+  }, [])
+
+  const handleCreateCommunityPost = async (e) => {
+    e?.preventDefault()
+    const content = communityInput.trim()
+    if (!content) return
+    try {
+      const res = await axios.post(`${API_BASE}/community-posts`, { username, content })
+      if (res.data.success) {
+        setCommunityPosts(prev => [{ ...res.data.post, nickname: globalNicknames[username] || nickname || '', comments: [] }, ...prev])
+        setCommunityInput('')
+      } else {
+        alert(res.data.error || 'Không đăng được bài')
+      }
+    } catch (err) {
+      alert('Lỗi kết nối khi đăng bài')
+    }
+  }
+
+  const handleLikePost = async (postId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/community-posts/${postId}/like`)
+      if (res.data.success) setCommunityPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: res.data.likes } : p))
+    } catch (err) { }
+  }
+
+  const handleCreateComment = async (postId) => {
+    const content = (commentInputs[postId] || '').trim()
+    if (!content) return
+    try {
+      const res = await axios.post(`${API_BASE}/community-posts/${postId}/comments`, { username, content })
+      if (res.data.success) {
+        const comment = { ...res.data.comment, nickname: globalNicknames[username] || nickname || '' }
+        setCommunityPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: [...(p.comments || []), comment], comment_count: (p.comment_count || 0) + 1 } : p))
+        setCommentInputs(prev => ({ ...prev, [postId]: '' }))
+      }
+    } catch (err) {
+      alert('Lỗi kết nối khi bình luận')
+    }
+  }
+
+  const loadLiveRooms = useCallback(async () => {
+    setLiveLoading(true)
+    try {
+      const res = await axios.get(`${API_BASE}/live-rooms`)
+      if (res.data.success) setLiveRooms(res.data.rooms || [])
+    } catch (err) {
+      console.warn('Không tải được phòng live:', err.message)
+    } finally {
+      setLiveLoading(false)
+    }
+  }, [])
+
+  const handleSpectateRoom = (room) => {
+    setActiveSpectatorRoom(room)
+    setSpectatorEvents([])
+    if (sendMessage) sendMessage({ type: 'spectate_room', roomId: room.roomId })
   }
 
   // All badge-type items with their image mappings
@@ -743,7 +835,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     if (activeTab === 'store' || activeTab === 'home') loadMyInfo()
     if (activeTab === 'stats') loadFallacyStats()
     if (activeTab === 'mentor') loadMentorship()
-  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo, loadFallacyStats, loadMentorship])
+    if (activeTab === 'community') loadCommunityPosts()
+    if (activeTab === 'live') loadLiveRooms()
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo, loadFallacyStats, loadMentorship, loadCommunityPosts, loadLiveRooms])
 
   // Polling for friend requests every 5 seconds
   useEffect(() => {
@@ -786,7 +880,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '1.5rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '0.5rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
 
       {/* ── Server Ticker ── */}
       {serverAnnouncements.length > 0 && (
@@ -822,7 +916,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       )}
 
       {/* ── Header with Avatar + EXP Bar ── */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.2rem 2rem', marginBottom: '1.5rem', gap: '20px' }}>
+      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 2rem', marginBottom: '1rem', gap: '20px' }}>
         {/* Left: Avatar + Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
           {/* Avatar circle with glow */}
@@ -873,6 +967,15 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   ⭐ {serverPoints} pts
                 </span>
               )}
+              {/* === WIN/LOSS MOVED HERE === */}
+              {!isGuest && (
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginLeft: 'auto', background: 'rgba(0,0,0,0.3)', padding: '4px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <span style={{ color: '#10b981', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem' }}>🏆 {stats.wins || 0}W</span>
+                  <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '0.75rem' }}>vs</span>
+                  <span style={{ color: '#ef4444', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem' }}>{stats.losses || 0}L 💔</span>
+                  {checkinStreak > 0 && <span style={{ color: '#f59e0b', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem', marginLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: '8px' }}>🔥 {checkinStreak} ngày</span>}
+                </div>
+              )}
             </div>
             {/* EXP Progress Bar */}
             {!isGuest && (
@@ -889,6 +992,52 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
             {isGuest && (
               <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>🔒 Khách — Đăng nhập để lưu tiến trình!</p>
             )}
+
+            {/* Action Buttons: Quest and Check-in */}
+            <div style={{ marginTop: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div
+                onClick={() => setShowDailyQuests(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                  border: '2px double #78350f',
+                  borderRadius: '12px',
+                  padding: '6px 14px',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 10px rgba(245,158,11,0.3)',
+                  transition: 'transform 0.25s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                <span style={{ fontSize: '1.2rem' }}>📜</span>
+                <span style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.8rem', color: '#78350f', letterSpacing: '0.04em' }}>
+                  NHIỆM VỤ HÀNG NGÀY
+                </span>
+              </div>
+              
+              <button
+                onClick={handleCheckIn}
+                disabled={hasCheckedIn}
+                style={{
+                  background: hasCheckedIn ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f97316, #f59e0b)',
+                  color: hasCheckedIn ? '#10b981' : '#fff',
+                  border: hasCheckedIn ? '1px solid rgba(16,185,129,0.4)' : '2px solid rgba(255,255,255,0.4)',
+                  borderRadius: '12px', padding: '6px 16px',
+                  cursor: hasCheckedIn ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.85rem',
+                  boxShadow: hasCheckedIn ? 'none' : '0 4px 10px rgba(245,158,11,0.3)',
+                  transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '8px',
+                }}
+                onMouseEnter={e => { if(!hasCheckedIn) e.currentTarget.style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { if(!hasCheckedIn) e.currentTarget.style.transform = 'translateY(0)' }}
+              >
+                <span style={{ fontSize: '1.2rem' }}>{hasCheckedIn ? '✅' : '🎁'}</span>
+                <span>{hasCheckedIn ? 'ĐÃ ĐIỂM DANH' : 'ĐIỂM DANH NHẬN QUÀ'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -914,7 +1063,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
           <button
             onClick={onLogout}
-            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '8px 18px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.25s ease', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
+            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.25s ease', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
           >
@@ -927,22 +1076,23 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
         {/* ── Content ── */}
         <div className="glass-panel animate-fade-in" style={{
-          padding: activeTab === 'home' ? '2rem' : '1.5rem',
-          minHeight: '600px',
+          padding: '1rem',
+          flex: 1,
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
           {/* Lớp nền con lồng bên trong */}
           <div style={{
-            background: activeTab === 'home' ? 'transparent' : 'rgba(251, 146, 60, 0.12)', // Màu cam nhạt
+            background: activeTab === 'home' ? 'transparent' : 'rgba(0, 0, 0, 0.3)',
             borderRadius: '20px',
-            padding: activeTab === 'home' ? '0' : '2rem',
-            border: activeTab === 'home' ? 'none' : '1px solid rgba(251, 146, 60, 0.2)',
+            padding: activeTab === 'home' ? '0' : '1rem',
+            border: activeTab === 'home' ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            overflowY: 'auto',
-            maxHeight: 'calc(100vh - 200px)'
+            overflowY: activeTab === 'home' ? 'visible' : 'auto',
           }}>
 
             {activeTab !== 'home' && (
@@ -967,45 +1117,15 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   position: 'relative', textAlign: 'center',
                   background: 'linear-gradient(135deg, rgba(180,70,10,0.22) 0%, rgba(245,158,11,0.14) 50%, rgba(239,68,68,0.18) 100%)',
                   border: '1px solid rgba(245,158,11,0.4)',
-                  borderRadius: '20px', padding: '1.8rem 2rem',
+                  borderRadius: '20px', padding: '0.8rem 1.5rem',
                   overflow: 'hidden',
+                  flexShrink: 0
                 }}>
                   {/* Corner decorations */}
                   <span style={{ position: 'absolute', top: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
                   <span style={{ position: 'absolute', top: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
                   <span style={{ position: 'absolute', bottom: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
                   <span style={{ position: 'absolute', bottom: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
-                  
-                  {/* Quick stats & Streak */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    {!isGuest ? (
-                      <div style={{ display: 'flex', gap: '16px' }}>
-                        <span style={{ color: '#10b981', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '1px' }}>🏆 {stats.wins || 0}W</span>
-                        <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '0.8rem', alignSelf: 'center' }}>vs</span>
-                        <span style={{ color: '#ef4444', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem', letterSpacing: '1px' }}>{stats.losses || 0}L 💔</span>
-                        {checkinStreak > 0 && <span style={{ color: '#f59e0b', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.95rem' }}>🔥 {checkinStreak} ngày</span>}
-                      </div>
-                    ) : <div />}
-                    
-                    {/* Check-in button inside Hero zone */}
-                    <button
-                      onClick={handleCheckIn}
-                      disabled={hasCheckedIn}
-                      style={{
-                        background: hasCheckedIn ? 'rgba(16,185,129,0.1)' : 'linear-gradient(135deg, #f59e0b, #ef4444)',
-                        color: hasCheckedIn ? '#10b981' : '#fff',
-                        border: hasCheckedIn ? '1px solid rgba(16,185,129,0.4)' : 'none',
-                        borderRadius: 'var(--radius-lg)', padding: '6px 16px',
-                        cursor: hasCheckedIn ? 'not-allowed' : 'pointer',
-                        fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.85rem',
-                        boxShadow: hasCheckedIn ? 'none' : '0 4px 15px rgba(245,158,11,0.4)',
-                        transition: 'all 0.25s', display: 'flex', alignItems: 'center', gap: '6px'
-                      }}
-                    >
-                      <span>{hasCheckedIn ? '✅' : '🎁'}</span>
-                      <span>{hasCheckedIn ? 'Đã Điểm Danh' : 'Điểm Danh'}</span>
-                    </button>
-                  </div>
                   
                   {/* Ambient glow behind button */}
                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
@@ -1014,25 +1134,24 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     onClick={onPlay}
                     className="btn-primary play-btn-ring"
                     style={{
-                      padding: '16px 72px', fontSize: '1.8rem', borderRadius: 'var(--radius-full)',
+                      padding: '12px 60px', fontSize: '1.5rem', borderRadius: 'var(--radius-full)',
                       letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'var(--font-heading)',
                       boxShadow: '0 0 40px rgba(239,68,68,0.5), 0 8px 32px rgba(245,158,11,0.3)',
                       position: 'relative', zIndex: 1
                     }}
                   >
-                    🎮 CHƠI NGAY
+                    CHƠI NGAY
                   </button>
                 </div>
 
                 {/* ── Divider ── */}
-                <img src="/assets/ui/divider.png" alt="" className="game-divider"
-                  onError={e => { e.target.style.display = 'none' }} />
+                <div style={{ width: '60%', height: '2px', background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)', margin: '0.4rem auto' }} />
 
                 {/* ── Row 2: Nav Grid ── */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '1.2rem' }}>
+                <div style={{ zoom: 0.65, display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '0.8rem' }}>
                   
                   {/* Left Column: Profile Card + Scroll Quest Button */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%' }}>
                     {/* Profile card — tall */}
                     {(() => {
                       const profileTab = TABS.find(t => t.id === 'profile')
@@ -1042,53 +1161,28 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                           onClick={() => setActiveTab('profile')}
                           style={{
                             background: 'transparent',
-                            borderRadius: '20px', padding: '1.2rem 1rem',
+                            borderRadius: '20px', padding: '1rem',
                             cursor: 'pointer', textAlign: 'center',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '10px', minHeight: '200px', flex: 1
+                            gap: '8px', flex: 1
                           }}
                         >
                           {profileTab.image
                             ? <img src={profileTab.image} alt={profileTab.label}
-                                style={{ width: '6rem', height: '6rem', objectFit: 'contain', filter: `drop-shadow(0 4px 14px ${profileTab.color}90)` }}
+                                style={{ width: '11rem', height: '11rem', objectFit: 'contain', filter: `drop-shadow(0 4px 14px ${profileTab.color}90)` }}
                                 onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
                             : null
                           }
-                          <div className="nav-card-icon" style={{ fontSize: '4rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}70)`, display: profileTab.image ? 'none' : 'block' }}>{profileTab.icon}</div>
-                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.72rem', color: '#92400e', letterSpacing: '0.04em' }}>{profileTab.label.toUpperCase()}</div>
+                          <div className="nav-card-icon" style={{ fontSize: '9rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}70)`, display: profileTab.image ? 'none' : 'block' }}>{profileTab.icon}</div>
+                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '1.1rem', color: '#f59e0b', letterSpacing: '0.04em' }}>{profileTab.label.toUpperCase()}</div>
                           {!isGuest && (
-                            <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '3px 12px', fontSize: '0.72rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)', border: `1px solid ${profileTab.color}40` }}>
+                            <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '4px 16px', fontSize: '1rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)', border: `1px solid ${profileTab.color}40` }}>
                               LV {currentLevel}
                             </div>
                           )}
                         </div>
                       )
                     })()}
-
-                    {/* Quest scroll button */}
-                    <div
-                      onClick={() => setShowDailyQuests(true)}
-                      style={{
-                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                        border: '3px double #78350f',
-                        borderRadius: '16px',
-                        padding: '10px 14px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '10px',
-                        boxShadow: '0 6px 16px rgba(120,53,15,0.25)',
-                        transition: 'transform 0.25s',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                    >
-                      <span style={{ fontSize: '1.4rem' }}>📜</span>
-                      <span style={{ fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.78rem', color: '#78350f', letterSpacing: '0.04em' }}>
-                        NHIỆM VỤ HÀNG NGÀY
-                      </span>
-                    </div>
                   </div>
 
                   {/* Right Column: Grid of other tabs */}
@@ -1103,17 +1197,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                           borderRadius: '14px',
                           cursor: 'pointer', textAlign: 'center',
                           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          gap: '4px', padding: '0.4rem',
+                          gap: '8px', padding: '0.6rem',
                         }}
                       >
                         {tab.image
                           ? <img src={tab.image} alt={tab.label} className="nav-card-icon"
-                              style={{ width: '4.4rem', height: '4.4rem', objectFit: 'contain', filter: `drop-shadow(0 3px 10px ${tab.color}80)` }}
+                              style={{ width: '8.5rem', height: '8.5rem', objectFit: 'contain', filter: `drop-shadow(0 3px 10px ${tab.color}80)` }}
                               onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
                           : null
                         }
-                        <div className="nav-card-icon" style={{ fontSize: '3.5rem', lineHeight: 1, filter: `drop-shadow(0 3px 8px ${tab.color}70)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
-                        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '0.72rem', color: '#92400e', letterSpacing: '0.04em', lineHeight: 1.2 }}>{tab.label.toUpperCase()}</div>
+                        <div className="nav-card-icon" style={{ fontSize: '7rem', lineHeight: 1, filter: `drop-shadow(0 3px 8px ${tab.color}70)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
+                        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '1rem', color: '#f59e0b', letterSpacing: '0.04em', lineHeight: 1.2 }}>{tab.label.toUpperCase()}</div>
                       </div>
                     ))}
                   </div>
@@ -1719,7 +1813,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     <div key={ev.id} style={{ position: 'relative', background: 'rgba(0,0,0,0.5)', padding: '3rem', borderRadius: '24px', border: '2px dashed var(--border-light)', overflow: 'hidden', textAlign: 'center' }}>
                       {isLocked && (
                         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-                          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔒</div>
+                          <div style={{ fontSize: '5rem', marginBottom: '1rem' }}>🔒</div>
                           <h3 style={{ fontSize: '1.8rem', color: '#fff', margin: 0 }}>Sự Kiện Lớn Đang Khép Kín</h3>
                           <p style={{ color: '#aaa', marginTop: '10px' }}>Chỉ mở sau khi tất cả sự kiện nhỏ kết thúc!</p>
                         </div>
@@ -1773,7 +1867,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     return (
                       <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
                         {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
-                        <div style={{ fontSize: '3.5rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
+                        <div style={{ fontSize: '4.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
                           <img src={item.isFrame ? `/assets/frames/${item.image}` : `/assets/badges/${item.image}`} alt={item.name} style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'block' }} />
                           <div style={{ display: 'none' }}>{item.icon}</div>
                         </div>
@@ -1965,24 +2059,109 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
             {/* LIVE TAB */}
             {activeTab === 'live' && (
-              <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
-                <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>📺 Xem Live Debate</h2>
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Tính năng đang trong giai đoạn phát triển.</p>
-                  <p style={{ color: 'var(--text-secondary)' }}>Sắp tới bạn có thể theo dõi trực tiếp các trận tranh biện đỉnh cao và bình luận cùng cộng đồng.</p>
+              <div className="glass-panel animate-fade-in" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ color: 'var(--accent-primary)', margin: 0, fontSize: '2rem' }}>📺 Xem Live Debate</h2>
+                  <button onClick={loadLiveRooms} className="btn-secondary" style={{ padding: '10px 18px', borderRadius: '8px' }}>Tải lại</button>
                 </div>
+                {liveLoading ? (
+                  <p style={{ color: 'var(--text-secondary)' }}>Đang tải phòng live...</p>
+                ) : liveRooms.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Chưa có phòng nào đang thi đấu.</p>
+                    <p style={{ color: 'var(--text-secondary)' }}>Các trận rank và trận level cao sẽ hiện ở đây khi có đủ 2 người chơi.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                    {liveRooms.map(room => (
+                      <div key={room.roomId} style={{ background: room.isHighLevel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${room.isHighLevel ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
+                          <strong style={{ color: room.isHighLevel ? '#f87171' : 'var(--text-primary)' }}>{room.isHighLevel ? 'Trận cấp cao' : 'Live'}</strong>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{room.spectators} đang xem</span>
+                        </div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: '700', lineHeight: 1.35 }}>{room.topic}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>{room.players.map(p => `${p.name} Lv.${p.level}`).join(' vs ')}</div>
+                        <button onClick={() => handleSpectateRoom(room)} className="btn-primary" style={{ padding: '10px 14px', borderRadius: '8px', alignSelf: 'flex-start' }}>Vào xem</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activeSpectatorRoom && (
+                  <div style={{ marginTop: '1rem', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(99,102,241,0.35)', borderRadius: '14px', overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{activeSpectatorRoom.topic}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{activeSpectatorRoom.players?.map(p => p.name).join(' vs ')}</div>
+                      </div>
+                      <button onClick={() => { setActiveSpectatorRoom(null); setSpectatorEvents([]) }} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.5)', color: '#ef4444', borderRadius: '8px', padding: '8px 12px', cursor: 'pointer' }}>Đóng</button>
+                    </div>
+                    <div style={{ maxHeight: '320px', overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {spectatorEvents.length === 0 ? (
+                        <p style={{ color: 'var(--text-secondary)', textAlign: 'center' }}>Đang chờ tín hiệu live từ phòng...</p>
+                      ) : spectatorEvents.map((ev, idx) => {
+                        const label = ev.type === 'transcript_update' ? `Lượt ${ev.player}` : ev.type === 'chat_msg' ? `Chat ${ev.msg?.speaker}` : ev.type === 'fallacy_detected' ? 'Ngụy biện' : ev.type === 'emoji_react' ? 'Reaction' : ev.type
+                        const text = ev.type === 'transcript_update' ? ev.text : ev.type === 'chat_msg' ? ev.msg?.text : ev.type === 'fallacy_detected' ? `${ev.speaker}: ${ev.fallacy}` : ev.type === 'emoji_react' ? ev.emoji : 'Trận đấu đã kết thúc'
+                        return (
+                          <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ color: '#a5b4fc', fontWeight: '700', fontSize: '0.78rem', marginBottom: '4px' }}>{label}</div>
+                            <div style={{ color: 'var(--text-primary)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{text}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* COMMUNITY TAB */}
             {activeTab === 'community' && (
-              <div className="glass-panel animate-fade-in" style={{ padding: '2rem' }}>
-                <h2 style={{ color: 'var(--accent-primary)', marginBottom: '1.5rem', fontSize: '2rem' }}>🌐 Diễn Đàn Cộng Đồng</h2>
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Cộng đồng KaiKo sắp ra mắt!</p>
-                  <p style={{ color: 'var(--text-secondary)' }}>Nơi giao lưu, chia sẻ kinh nghiệm, chat nhóm và kết nối bạn bè 4 phương.</p>
-                  <button className="btn-primary" style={{ marginTop: '1.5rem', padding: '10px 24px', borderRadius: '8px' }}>Tải lại tin mới</button>
+              <div className="glass-panel animate-fade-in" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                  <h2 style={{ color: 'var(--accent-primary)', margin: 0, fontSize: '2rem' }}>Diễn Đàn Cộng Đồng</h2>
+                  <button onClick={loadCommunityPosts} className="btn-secondary" style={{ padding: '10px 18px', borderRadius: '8px' }}>Tải lại tin mới</button>
                 </div>
+                <form onSubmit={handleCreateCommunityPost} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <textarea value={communityInput} onChange={e => setCommunityInput(e.target.value)} maxLength={1000} placeholder="Chia sẻ kinh nghiệm tranh biện, hỏi chiến thuật, hoặc đăng chủ đề muốn cộng đồng bàn luận..." style={{ minHeight: '94px', resize: 'vertical', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '10px', padding: '12px', outline: 'none', fontSize: '1rem', lineHeight: 1.45 }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{communityInput.length}/1000</span>
+                    <button type="submit" className="btn-primary" style={{ padding: '10px 20px', borderRadius: '8px' }}>Đăng bài</button>
+                  </div>
+                </form>
+                {communityLoading ? (
+                  <p style={{ color: 'var(--text-secondary)' }}>Đang tải bài viết...</p>
+                ) : communityPosts.length === 0 ? (
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '12px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                    <p style={{ color: 'var(--text-secondary)' }}>Chưa có bài viết nào. Hãy mở màn diễn đàn.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {communityPosts.map(post => (
+                      <div key={post.id} style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{post.nickname || getDisplayName(post.username)}</div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{new Date(post.created_at + 'Z').toLocaleString('vi-VN')}</div>
+                          </div>
+                          <button onClick={() => handleLikePost(post.id)} style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content' }}>♥ {post.likes || 0}</button>
+                        </div>
+                        <div style={{ color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginBottom: '12px' }}>{post.content}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                          {(post.comments || []).map(comment => (
+                            <div key={comment.id} style={{ background: 'rgba(0,0,0,0.18)', borderRadius: '8px', padding: '8px 10px' }}>
+                              <span style={{ color: '#a5b4fc', fontWeight: '700' }}>{comment.nickname || getDisplayName(comment.username)}: </span>
+                              <span style={{ color: 'var(--text-primary)' }}>{comment.content}</span>
+                            </div>
+                          ))}
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input value={commentInputs[post.id] || ''} onChange={e => setCommentInputs(prev => ({ ...prev, [post.id]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') handleCreateComment(post.id) }} placeholder="Viết bình luận..." style={{ flex: 1, background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '8px', padding: '10px 12px', outline: 'none' }} />
+                            <button onClick={() => handleCreateComment(post.id)} className="btn-secondary" style={{ padding: '8px 14px', borderRadius: '8px' }}>Gửi</button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2427,3 +2606,4 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     </div>
   )
 }
+

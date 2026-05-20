@@ -61,7 +61,7 @@ export default function HomePage({ onPlay }) {
             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
           >
-            Chơi Ngay 🎮
+            Chơi Ngay
           </button>
         </div>
 
@@ -83,4 +83,5 @@ export default function HomePage({ onPlay }) {
     </div>
   )
 }
+
 

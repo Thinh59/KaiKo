@@ -74,10 +74,10 @@ export default function AuthPage({ onLogin }) {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-          <h1 style={{ fontSize: '3.5rem', margin: '0 0 0.5rem', color: 'var(--text-primary)', letterSpacing: '-1px' }}>
+          <h1 style={{ fontSize: '3.5rem', margin: '0 0 0.5rem', color: '#ffe9c2', letterSpacing: '-1px', textShadow: '0 4px 20px rgba(0,0,0,0.75), 0 0 18px rgba(251,146,60,0.55)' }}>
             <span style={{ color: 'var(--accent-primary)', textShadow: '0 0 20px rgba(99, 102, 241, 0.5)' }}>Kai</span>Ko
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem' }}>Nền tảng Tranh biện AI & Đối kháng</p>
+          <p style={{ color: '#ffe8bf', fontSize: '1.1rem', textShadow: '0 2px 10px rgba(0,0,0,0.65)' }}>Nền tảng Tranh biện AI & Đối kháng</p>
         </div>
 
         {/* Đăng nhập Google */}
@@ -111,8 +111,8 @@ export default function AuthPage({ onLogin }) {
         </div>
 
         {/* Form đăng nhập KaiKo */}
-        <div style={{ background: 'rgba(255,255,255,0.04)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.25)', width: '100%', maxWidth: '400px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
-          <h2 style={{ color: 'var(--text-primary)', textAlign: 'center', margin: '0 0 1.5rem', fontSize: '1.4rem' }}>
+        <div style={{ background: 'rgba(26,10,2,0.55)', backdropFilter: 'blur(6px)', padding: '2rem', borderRadius: '16px', border: '1px solid rgba(251, 146, 60, 0.45)', width: '100%', maxWidth: '400px', boxShadow: '0 16px 36px rgba(0,0,0,0.45)' }}>
+          <h2 style={{ color: '#fff2d6', textAlign: 'center', margin: '0 0 1.5rem', fontSize: '1.4rem', textShadow: '0 2px 8px rgba(0,0,0,0.65)' }}>
             {isLogin ? '🔐 Đăng Nhập KaiKo' : '📝 Đăng Ký KaiKo'}
           </h2>
           <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -121,7 +121,7 @@ export default function AuthPage({ onLogin }) {
               placeholder="Tên đăng nhập"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none' }}
+              style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
               required
             />
             <input
@@ -129,7 +129,7 @@ export default function AuthPage({ onLogin }) {
               placeholder="Mật khẩu"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none' }}
+              style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
               required
             />
             {errorMsg && <p style={{ color: '#ef4444', fontSize: '0.9rem', margin: 0, textAlign: 'center' }}>{errorMsg}</p>}
@@ -187,3 +187,4 @@ export default function AuthPage({ onLogin }) {
     </div>
   )
 }
+

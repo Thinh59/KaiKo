@@ -5,28 +5,28 @@
   --font-heading: 'VT323', 'Oxanium', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --accent-primary: #ef4444;
-  --accent-hover: #dc2626;
-  --accent-gradient: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
-  --accent-glow: rgba(239, 68, 68, 0.5);
+  --accent-primary: #f97316;
+  --accent-hover: #ea580c;
+  --accent-gradient: linear-gradient(135deg, #f97316 0%, #facc15 100%);
+  --accent-glow: rgba(249, 115, 22, 0.5);
 
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-full: 9999px;
 
-  /* Warm amber palette */
-  --bg-primary: #fffbeb;
-  --bg-secondary: #fef3c7;
-  --bg-glass: rgba(254, 243, 199, 0.9);
-  --text-primary: #451a03;
-  --text-secondary: #92400e;
-  --border-light: rgba(217, 119, 6, 0.3);
-  --border-focus: rgba(239, 68, 68, 0.5);
-  --shadow-sm: 0 4px 6px -1px rgba(217, 119, 6, 0.1);
-  --shadow-md: 0 10px 15px -3px rgba(217, 119, 6, 0.2);
-  --shadow-lg: 0 20px 25px -5px rgba(217, 119, 6, 0.3);
-  --shadow-glow: 0 0 20px rgba(239, 68, 68, 0.4);
+  /* Warm amber palette - Dark mode */
+  --bg-primary: #120904;
+  --bg-secondary: #291508;
+  --bg-glass: rgba(20, 10, 5, 0.45);
+  --text-primary: #fffbeb;
+  --text-secondary: #fde68a;
+  --border-light: rgba(245, 158, 11, 0.4);
+  --border-focus: rgba(245, 158, 11, 0.8);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(249, 115, 22, 0.4);
 
   /* Rarity colors */
   --rarity-common: #9ca3af;
@@ -50,10 +50,10 @@ body {
   overflow-x: hidden;
   transition: background-color 0.3s ease, color 0.3s ease;
   background-image:
-    radial-gradient(ellipse at 10% 20%, rgba(239, 68, 68, 0.12), transparent 35%),
+    radial-gradient(ellipse at 10% 20%, rgba(249, 115, 22, 0.12), transparent 35%),
     radial-gradient(ellipse at 90% 10%, rgba(245, 158, 11, 0.14), transparent 30%),
     radial-gradient(ellipse at 50% 80%, rgba(168, 85, 247, 0.06), transparent 40%),
-    radial-gradient(ellipse at 80% 60%, rgba(239, 68, 68, 0.06), transparent 30%),
+    radial-gradient(ellipse at 80% 60%, rgba(249, 115, 22, 0.06), transparent 30%),
     url('/assets/backgrounds/dashboard_bg.jpg');
   background-size: auto, auto, auto, auto, cover;
   background-position: 0 0, 0 0, 0 0, 0 0, center center;
