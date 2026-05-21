@@ -354,3 +354,13 @@ Tại sao đây là thứ tự hợp lý?
 
 Đi từ Cá nhân ➔ Cộng đồng ➔ Cạnh tranh ➔ Sự kiện ➔ Kiếm tiền.
 Backend của bạn đã có sẵn rất nhiều nền móng (như bảng friends, community_posts), nên Giai đoạn 1 và 2 sẽ hoàn thành rất nhanh và giúp App trông "có sức sống" ngay lập tức.
+
+21/05/2026
+lỗi: lịch sử trận đấu chưa được lưu đúng ai thắng ai thua, chưa có filter theo tên đối thủ, loại public/private, loại chat/video; chưa hiển thị ngày debate
+tôi muốn cài đặt cơ chế cho cái chat debate, tôi muốn khi cả 2 người dùng vào xong thì sẽ có 15s để cả hai cùng gõ topic, ai gõ xong trước thì người đó thắng topic, sau khi cả 2 gõ xong topic thì sẽ bắt đầu hiện lên cái đồng hồ đếm ngược 3 phút, ai hơn điểm thì người đó thắng.
+kiểm soát thời gian 3 phút cho debate Chat
+fix bug: khi 1 bên bấm Kết thúc và chấm điểm thì phải có sự đồng ý của bên còn lại nếu chưa hết thời gian 3 phút
+Done!
+
+Fix bug: 
+- dùng Gemini-3.1-flash-lite-preview thay vì dùng gemini-2.5-flash`

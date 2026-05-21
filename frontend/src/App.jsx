@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import HomePage from './components/HomePage'
@@ -248,31 +248,49 @@ function App() {
     if (username && !username.startsWith('Guest_')) {
       try {
         const scores = result.scores
-        const selfScore = scores?.player_a?.total ?? 0
-        const oppScore  = scores?.player_b?.total ?? 0
-        const winner    = scores?.winner ?? ''
-        const resultStr = winner === result.playerA ? 'win'
-          : winner === result.playerB ? 'lose' : 'draw'
+        const winner  = scores?.winner ?? ''
 
-        const getRealUsername = (id) => {
-          if (!id || id === 'ai_bot') return id || '';
-          const lastIndex = id.lastIndexOf('_');
-          return lastIndex !== -1 ? id.substring(0, lastIndex) : id;
-        };
+        // Xác định user hiện tại là Player A hay B
+        // rawUsernameA/B có dạng "{username}_{random}" — so sánh bằng startsWith
+        const iAmA = (result.rawUsernameA || '').startsWith(username + '_')
+                  || result.rawUsernameA === username
+                  || mode === 'solo_ai'
+                  || mode === 'text_solo'
+
+        // Điểm và fallacy theo góc nhìn của user hiện tại
+        const selfScore   = iAmA ? (scores?.player_a?.total  ?? 0) : (scores?.player_b?.total  ?? 0)
+        const oppScore    = iAmA ? (scores?.player_b?.total  ?? 0) : (scores?.player_a?.total  ?? 0)
+        const selfFallacy = iAmA ? (scores?.player_a?.deduct ?? 0) : (scores?.player_b?.deduct ?? 0)
+        const oppFallacy  = iAmA ? (scores?.player_b?.deduct ?? 0) : (scores?.player_a?.deduct ?? 0)
+        const transcSelf  = iAmA ? (result.transcript_a ?? '') : (result.transcript_b ?? '')
+        const transcOpp   = iAmA ? (result.transcript_b ?? '') : (result.transcript_a ?? '')
+
+        // Tên đối thủ (display name)
+        const oppDisplayName = iAmA ? result.playerB : result.playerA
+
+        // Kết quả từ góc nhìn user hiện tại
+        const selfPlayerName = iAmA ? result.playerA : result.playerB
+        const oppPlayerName  = iAmA ? result.playerB : result.playerA
+        const resultStr = winner === selfPlayerName ? 'win'
+          : winner === oppPlayerName ? 'lose' : 'draw'
+
+        // Retrieve visibility from current mode
+        const visibility = (mode === 'solo_ai' || mode === 'text_solo') ? 'private' : (matchInfo?.visibility || 'private');
 
         const saveRes = await axios.post(`${API_BASE}/save-match`, {
-          username:       getRealUsername(result.rawUsernameA) || result.playerA,
-          opponent:       getRealUsername(result.rawUsernameB) || result.playerB,
-          topic:          result.topic ?? '',
-          mode:           mode ?? 'solo_ai',
-          result:         resultStr,
-          score_self:     selfScore,
-          score_opp:      oppScore,
-          fallacies_self: scores?.player_a?.deduct ?? 0,
-          fallacies_opp:  scores?.player_b?.deduct ?? 0,
-          summary:        scores?.why ?? '',
-          transcript_self: result.transcript_a ?? '',
-          transcript_opp:  result.transcript_b ?? '',
+          username:        username,        // luôn dùng username từ App state
+          opponent:        oppDisplayName,
+          topic:           result.topic ?? '',
+          mode:            mode ?? 'solo_ai',
+          result:          resultStr,
+          score_self:      selfScore,
+          score_opp:       oppScore,
+          fallacies_self:  selfFallacy,
+          fallacies_opp:   oppFallacy,
+          summary:         scores?.why ?? '',
+          transcript_self: transcSelf,
+          transcript_opp:  transcOpp,
+          visibility:      visibility,
         })
         if (saveRes.data.success) {
           setDebateResult(prev => prev ? { ...prev, matchId: saveRes.data.match_id, newLevel: saveRes.data.level } : prev)

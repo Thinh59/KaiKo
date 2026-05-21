@@ -402,7 +402,11 @@ class ConnectionManager:
 
     async def send_personal_message(self, message: str, client_id: str):
         if client_id in self.active_connections:
-            await self.active_connections[client_id].send_text(message)
+            try:
+                await self.active_connections[client_id].send_text(message)
+            except RuntimeError:
+                # The connection is already closed
+                pass
 
     async def send_message_to_username(self, message: str, username: str):
         prefix = f"{username}_"
@@ -605,7 +609,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng live không còn tồn tại."
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat"]:
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "debate_result"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn
@@ -1320,7 +1324,7 @@ def get_history(username: str, limit: int = 20):
     cursor.execute("""
         SELECT id, opponent, topic, mode, result,
                score_self, score_opp, fallacies_self, fallacies_opp,
-               summary, played_at, transcript_self, transcript_opp
+               summary, played_at, transcript_self, transcript_opp, visibility
         FROM match_history
         WHERE username = %s
         ORDER BY played_at DESC

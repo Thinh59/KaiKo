@@ -83,7 +83,7 @@ function HistoryRow({ match, onClick }) {
       </div>
 
       {/* Mode badge */}
-      <div style={{ textAlign: 'right' }}>
+      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
         <span style={{
           background: match.mode?.startsWith('text_') ? 'rgba(168,85,247,0.12)' : 'rgba(99,102,241,0.1)',
           color: match.mode?.startsWith('text_') ? '#a855f7' : 'var(--accent-primary)',
@@ -93,6 +93,15 @@ function HistoryRow({ match, onClick }) {
           fontSize: '0.78rem',
           fontWeight: '600'
         }}>#{match.id}</span>
+        <span style={{
+          fontSize: '0.7rem',
+          color: match.visibility === 'public' ? '#10b981' : 'var(--text-secondary)',
+          background: 'rgba(0,0,0,0.3)',
+          padding: '2px 8px',
+          borderRadius: '4px'
+        }}>
+          {match.visibility === 'public' ? '🌍 Công khai' : '🔒 Riêng tư'}
+        </span>
       </div>
     </div>
   )
@@ -293,6 +302,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [mentorData, setMentorData] = useState({ masters: [], disciples: [], requests: [] })
   const [mentorInput, setMentorInput] = useState('')
   const [historyFilter, setHistoryFilter] = useState('all')
+  const [opponentFilter, setOpponentFilter] = useState('')
+  const [visibilityFilter, setVisibilityFilter] = useState('all')
 
   const [activeChatUser, setActiveChatUser] = useState(null)
   const [chatMessages, setChatMessages] = useState({})
@@ -1340,7 +1351,23 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
                   <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>📋 Lịch sử trận đấu</h2>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <input
+                      type="text"
+                      placeholder="Tìm tên đối thủ..."
+                      value={opponentFilter}
+                      onChange={e => setOpponentFilter(e.target.value)}
+                      style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: '0.9rem', outline: 'none', maxWidth: '150px' }}
+                    />
+                    <select
+                      value={visibilityFilter}
+                      onChange={e => setVisibilityFilter(e.target.value)}
+                      style={{ padding: '8px 14px', borderRadius: 'var(--radius-full)', border: '1px solid rgba(99,102,241,0.3)', background: 'rgba(0,0,0,0.4)', color: 'var(--text-primary)', fontSize: '0.9rem', cursor: 'pointer' }}
+                    >
+                      <option value="all">Mọi quyền</option>
+                      <option value="public">Công khai</option>
+                      <option value="private">Riêng tư</option>
+                    </select>
                     <select
                       value={historyFilter}
                       onChange={e => setHistoryFilter(e.target.value)}
@@ -1397,15 +1424,16 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'center' }}>Lỗi</span><span style={{ textAlign: 'right' }}>ID</span>
                     </div>
 
-                    {(historyFilter === 'all'
-                      ? history
-                      : history.filter(m => {
-                        if (historyFilter === 'chat') return m.mode?.startsWith('text_')
-                        if (historyFilter === 'video') return !m.mode?.startsWith('text_') && m.mode !== 'solo_ai'
-                        if (historyFilter === 'solo_ai') return m.mode === 'solo_ai'
-                        return true
-                      })
-                    ).map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
+                    {history.filter(m => {
+                      let pass = true;
+                      if (historyFilter === 'chat' && !m.mode?.startsWith('text_')) pass = false;
+                      if (historyFilter === 'video' && (m.mode?.startsWith('text_') || m.mode === 'solo_ai')) pass = false;
+                      if (historyFilter === 'solo_ai' && m.mode !== 'solo_ai') pass = false;
+                      if (opponentFilter.trim() !== '' && !m.opponent?.toLowerCase().includes(opponentFilter.toLowerCase())) pass = false;
+                      // DB doesnt save visibility yet, but mock support for future:
+                      if (visibilityFilter !== 'all' && m.visibility && m.visibility !== visibilityFilter) pass = false;
+                      return pass;
+                    }).map(m => <HistoryRow key={m.id} match={m} onClick={() => onViewMatch(m)} />)}
                   </div>
                 )}
               </div>

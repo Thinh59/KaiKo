@@ -28,7 +28,8 @@ export function useSignaling(playerName) {
           isHost: data.isHost,
           opponentId: data.opponentId,
           opponentName: data.opponentName || data.opponentId,
-          topic: data.topic
+          topic: data.topic,
+          visibility: data.visibility || 'private'
         })
       } else if (data.type === 'room_created') {
         setCreatedRoomCode(data.roomCode)
