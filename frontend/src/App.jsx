@@ -254,9 +254,15 @@ function App() {
         const resultStr = winner === result.playerA ? 'win'
           : winner === result.playerB ? 'lose' : 'draw'
 
+        const getRealUsername = (id) => {
+          if (!id || id === 'ai_bot') return id || '';
+          const lastIndex = id.lastIndexOf('_');
+          return lastIndex !== -1 ? id.substring(0, lastIndex) : id;
+        };
+
         const saveRes = await axios.post(`${API_BASE}/save-match`, {
-          username:       result.rawUsernameA || result.playerA,
-          opponent:       result.rawUsernameB || result.playerB,
+          username:       getRealUsername(result.rawUsernameA) || result.playerA,
+          opponent:       getRealUsername(result.rawUsernameB) || result.playerB,
           topic:          result.topic ?? '',
           mode:           mode ?? 'solo_ai',
           result:         resultStr,

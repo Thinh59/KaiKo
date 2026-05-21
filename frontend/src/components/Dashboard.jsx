@@ -298,6 +298,11 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [chatMessages, setChatMessages] = useState({})
   const [chatInput, setChatInput] = useState('')
   const [showChatWidget, setShowChatWidget] = useState(false)
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [globalVolume, setGlobalVolume] = useState(() => parseFloat(localStorage.getItem('kaiko_volume') || '1.0'))
+  const [camEnabled, setCamEnabled] = useState(false)
+  const [micEnabled, setMicEnabled] = useState(false)
   const [chatTab, setChatTab] = useState('friends')   // 'friends' | 'community'
   const [globalMessages, setGlobalMessages] = useState([])
   const [globalInput, setGlobalInput] = useState('')
@@ -1214,12 +1219,15 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
                 </div>
 
-                {/* ── Daily Quests Scroll Modal ── */}
-                {showDailyQuests && (
+
+
+                {false && (
                   <div style={{
+
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                     background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', zIndex: 1000,
+
+
                     backdropFilter: 'blur(4px)'
                   }}>
                     <div style={{
@@ -1477,30 +1485,6 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               </div>
             )}
 
-            {/* SETTINGS */}
-            {activeTab === 'settings' && (
-              <div>
-                <h2 style={{ color: 'var(--text-primary)', marginBottom: '1.5rem' }}>⚙️ Cài đặt</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '500px' }}>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Tài khoản</h4>
-                    <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Tên đăng nhập:</p>
-                    <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box' }} />
-                    {isGuest && <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '8px 0 0' }}>⚠️ Tài khoản khách — lịch sử không được lưu.</p>}
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <h4 style={{ margin: '0 0 12px', color: 'var(--text-primary)' }}>Thiết bị & Quyền</h4>
-                    <p style={{ color: 'var(--text-secondary)', margin: '0 0 12px' }}>Camera và Microphone cần được cấp quyền để ứng dụng hoạt động tốt.</p>
-                    <button
-                      onClick={() => navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(() => alert('✅ Quyền đã được cấp!')).catch(() => alert('❌ Bị từ chối. Kiểm tra cài đặt trình duyệt.'))}
-                      style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 20px', cursor: 'pointer' }}
-                    >
-                      🔐 Kiểm tra quyền Camera & Mic
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* PROFILE */}
             {activeTab === 'profile' && (
@@ -1903,40 +1887,172 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               </div>
             )}
 
-            {/* CÀI ĐẶT */}
+            {/* CÀI ĐẶT UNIFIED */}
             {activeTab === 'settings' && (
-              <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem' }}>⚙️ Cài Đặt</h2>
+              <div style={{ maxWidth: '1000px', margin: '0 auto', width: '100%', paddingBottom: '3rem' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem', textAlign: 'center' }}>Cài đặt</h2>
 
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
-                  <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem' }}>Thông tin hiển thị</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+                  
+                  {/* Account Info & Nickname */}
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>👤 Tài Khoản</h3>
+                    <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Tên đăng nhập:</p>
+                    <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box', marginBottom: '16px', background: 'rgba(0,0,0,0.2)' }} />
+                    {isGuest && <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '-10px 0 16px' }}>⚠️ Tài khoản khách — lịch sử không được lưu.</p>}
 
-                  <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Biệt danh (Nickname)</label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <input
-                      type="text"
-                      value={nickname}
-                      onChange={(e) => setNickname(e.target.value)}
-                      placeholder="Nhập biệt danh của bạn..."
-                      style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
-                    />
-                    <button
-                      onClick={async () => {
-                        localStorage.setItem('kaiko_nickname_' + username, nickname)
-                        try {
-                          await axios.post(`${API_BASE}/set-nickname`, { username, nickname })
-                          setGlobalNicknames(prev => ({ ...prev, [username]: nickname }))
-                        } catch (e) { }
-                        alert('Đã lưu biệt danh thành công!')
-                      }}
-                      className="btn-primary"
-                    >
-                      Lưu
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <label style={{ color: 'var(--text-secondary)' }}>Biệt danh (Nickname)</label>
+                      <span style={{ color: globalNicknames[username] ? '#ef4444' : '#10b981', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                        {globalNicknames[username] ? '0 Thẻ Đổi Tên' : 'Miễn phí lần đầu (1 Thẻ)'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <input
+                        type="text"
+                        value={nickname}
+                        onChange={(e) => setNickname(e.target.value)}
+                        placeholder="Nhập biệt danh..."
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
+                      />
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await axios.post(`${API_BASE}/set-nickname`, { username, nickname });
+                            if (res.data.success) {
+                              localStorage.setItem('kaiko_nickname_' + username, nickname);
+                              setGlobalNicknames(prev => ({ ...prev, [username]: nickname }));
+                              alert('Đã lưu biệt danh thành công!');
+                              loadMyInfo(); 
+                            } else {
+                              alert('Lỗi: ' + res.data.error);
+                            }
+                          } catch (e) {
+                            alert('Lỗi kết nối server!');
+                          }
+                        }}
+                        className="btn-primary"
+                        style={{ padding: '0 16px', opacity: isGuest ? 0.5 : 1, pointerEvents: isGuest ? 'none' : 'auto' }}
+                      >
+                        Lưu
+                      </button>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '10px', lineHeight: 1.4 }}>
+                      Nếu bạn đã đặt tên, việc đổi tên sẽ tiêu hao 1 Thẻ Đổi Nickname (mua trong Cửa Hàng).
+                    </p>
                   </div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '10px' }}>
-                    Biệt danh này sẽ hiển thị thay thế cho tên đăng nhập gốc trong các trận tranh biện.
-                  </p>
+
+                  {/* Password Management */}
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🔒 Đổi Mật Khẩu</h3>
+                    {!isGuest ? (
+                      <>
+                        <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Mật khẩu hiện tại</label>
+                        <input
+                          type="password"
+                          value={oldPassword}
+                          onChange={(e) => setOldPassword(e.target.value)}
+                          placeholder="Nhập mật khẩu cũ..."
+                          className="glass-input"
+                          style={{ padding: '12px', width: '100%', boxSizing: 'border-box', marginBottom: '16px' }}
+                        />
+                        <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px' }}>Mật khẩu mới</label>
+                        <input
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="Nhập mật khẩu mới..."
+                          className="glass-input"
+                          style={{ padding: '12px', width: '100%', boxSizing: 'border-box', marginBottom: '16px' }}
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!oldPassword || !newPassword) return alert("Vui lòng điền đủ thông tin.");
+                            try {
+                              const res = await axios.post(`${API_BASE}/change-password`, { username, old_password: oldPassword, new_password: newPassword });
+                              if (res.data.success) {
+                                alert("Đổi mật khẩu thành công!");
+                                setOldPassword('');
+                                setNewPassword('');
+                              } else {
+                                alert("Lỗi: " + res.data.error);
+                              }
+                            } catch (e) {
+                              alert("Lỗi kết nối!");
+                            }
+                          }}
+                          className="btn-primary"
+                          style={{ width: '100%' }}
+                        >
+                          Xác Nhận Đổi
+                        </button>
+                      </>
+                    ) : (
+                      <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Tài khoản khách không thể đổi mật khẩu.</p>
+                    )}
+                  </div>
+
+                  {/* Device & Permissions */}
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🎙️ Thiết Bị & Âm Thanh</h3>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                      <div>
+                        <div style={{ color: '#fff', fontWeight: 'bold' }}>Camera & Mic</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {camEnabled ? 'Đã cấp quyền' : 'Chưa cấp quyền'}
+                        </div>
+                      </div>
+                      <div
+                        onClick={() => {
+                          if (!camEnabled) {
+                            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                              .then(() => { setCamEnabled(true); setMicEnabled(true); alert('✅ Cấp quyền thành công!') })
+                              .catch(() => alert('❌ Bị từ chối. Vui lòng kiểm tra cài đặt trình duyệt.'));
+                          } else {
+                            setCamEnabled(false);
+                            setMicEnabled(false);
+                          }
+                        }}
+                        style={{
+                          width: '54px', height: '30px', borderRadius: '15px',
+                          background: camEnabled ? '#10b981' : '#ef4444',
+                          position: 'relative', cursor: 'pointer',
+                          transition: 'background 0.3s', flexShrink: 0
+                        }}
+                      >
+                        <div style={{
+                          width: '26px', height: '26px', borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: '2px',
+                          left: camEnabled ? '26px' : '2px',
+                          transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                        }} />
+                      </div>
+                    </div>
+
+
+                    {/* Audio Volume Slider */}
+                    <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        <span style={{ color: '#fff', fontWeight: 'bold' }}>Âm Lượng Tổng</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>{Math.round(globalVolume * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.05" 
+                        value={globalVolume}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setGlobalVolume(val);
+                          localStorage.setItem('kaiko_volume', val);
+                          document.querySelectorAll('audio, video').forEach(el => { el.volume = val; });
+                        }}
+                        style={{ width: '100%', accentColor: '#a855f7', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+
+
                 </div>
               </div>
             )}
@@ -2491,8 +2607,37 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         </div>
       )}
 
+      {/* Global Daily Quests Modal */}
+      {showDailyQuests && (
+        <div onClick={() => setShowDailyQuests(false)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, backdropFilter: 'blur(4px)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', border: '8px double #78350f', borderRadius: '20px', padding: '2rem', width: '90%', maxWidth: '420px', boxShadow: '0 20px 40px rgba(0,0,0,0.5)', position: 'relative', color: '#78350f', fontFamily: 'var(--font-heading)' }}>
+            <div style={{ position: 'absolute', top: '-15px', left: '8%', right: '8%', height: '10px', background: '#78350f', borderRadius: '5px' }} />
+            <div style={{ position: 'absolute', bottom: '-15px', left: '8%', right: '8%', height: '10px', background: '#78350f', borderRadius: '5px' }} />
+            <h3 style={{ textAlign: 'center', margin: '0 0 1.5rem', fontSize: '1.3rem', fontWeight: '900', letterSpacing: '2px', borderBottom: '2px dashed #78350f', paddingBottom: '0.5rem' }}>📜 CUỘN GIẤY NHIỆM VỤ</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '2rem' }}>
+              {[
+                { label: 'Thắng 3 trận đấu', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
+                { label: 'Điểm danh ngày hôm nay', reward: '+50 pts', done: hasCheckedIn },
+              ].map((q, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: q.done ? 'rgba(120,53,15,0.1)' : 'rgba(255,255,255,0.5)', borderRadius: '10px', border: q.done ? '1px solid rgba(120,53,15,0.3)' : '1px dashed rgba(120,53,15,0.4)', opacity: q.done ? 0.75 : 1, fontWeight: '700', fontSize: '0.95rem' }}>
+                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid #78350f', display: 'flex', alignItems: 'center', justifyContent: 'center', background: q.done ? '#78350f' : 'transparent', color: q.done ? '#fef3c7' : '#78350f', flexShrink: 0 }}>{q.done && '✓'}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ textDecoration: q.done ? 'line-through' : 'none' }}>{q.label}</div>
+                    <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>Phần thưởng: <span style={{ color: '#c2410c' }}>{q.reward}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setShowDailyQuests(false)} style={{ width: '100%', padding: '10px 0', background: '#78350f', color: '#fef3c7', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>ĐÓNG CUỘN GIẤY</button>
+          </div>
+        </div>
+      )}
+
       {/* Global Navigation (Bottom Left) */}
+
       <div style={{ position: 'fixed', bottom: '20px', left: '20px', display: 'flex', gap: '10px', zIndex: 9999 }}>
+        <button onClick={() => setShowDailyQuests(true)} style={{ background: 'linear-gradient(135deg, #f59e0b, #ea580c)', color: '#fff', border: 'none', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.3rem', boxShadow: '0 4px 16px rgba(245,158,11,0.5)' }} title="Nhiệm Vụ Hàng Ngày">📋</button>
+
         <button
           onClick={() => setActiveTab('home')}
           style={{ background: 'rgba(0,0,0,0.6)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '50px', height: '50px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
@@ -2603,6 +2748,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         }
       `}</style>
 
+                {/* ── Daily Quests Scroll Modal ── */}
     </div>
   )
 }

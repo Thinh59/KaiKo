@@ -21,13 +21,18 @@ function PlayerCard({ name, rawName, currentUser, data, transcript }) {
   const [tab, setTab] = useState('score')
   const [friendReqSent, setFriendReqSent] = useState(false)
 
+  const getRealUsername = (id) => {
+    if (!id || id === 'ai_bot') return id || '';
+    const lastIndex = id.lastIndexOf('_');
+    return lastIndex !== -1 ? id.substring(0, lastIndex) : id;
+  };
   const isOpponent = rawName && rawName !== currentUser && rawName !== 'ai_bot' && !rawName.startsWith('Guest_')
 
   const handleAddFriend = async () => {
     try {
       const res = await axios.post(`${API_BASE}/friend-request`, {
         user: currentUser,
-        target: rawName
+        target: getRealUsername(rawName)
       })
       if (res.data.success) {
         setFriendReqSent(true)
@@ -168,7 +173,13 @@ function PostMatchReview({ result, currentUser }) {
   const [submitted, setSubmitted] = useState(false)
   const [message, setMessage] = useState('')
 
-  const reviewee = result.rawUsernameA === currentUser ? result.rawUsernameB : result.rawUsernameA
+  const getRealUsername = (id) => {
+    if (!id || id === 'ai_bot') return id || '';
+    const lastIndex = id.lastIndexOf('_');
+    return lastIndex !== -1 ? id.substring(0, lastIndex) : id;
+  };
+  const rawReviewee = result.rawUsernameA === currentUser ? result.rawUsernameB : result.rawUsernameA;
+  const reviewee = getRealUsername(rawReviewee);
   const canReview = currentUser && reviewee && reviewee !== currentUser && reviewee !== 'ai_bot' && !reviewee.startsWith?.('Guest_')
 
   const submitReview = async () => {
