@@ -16,6 +16,8 @@ const PULSE_STYLE = `
 export default function VideoGrid({
   remoteVideoRef,
   localVideoRef,
+  localStream,
+  remoteStream,
   remoteName,
   localName,
   isCameraOn,
@@ -34,6 +36,19 @@ export default function VideoGrid({
     document.head.appendChild(el)
     styleInjected.current = true
   }, [])
+
+  // Sync streams to video elements
+  useEffect(() => {
+    if (localVideoRef && localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream
+    }
+  }, [localStream, localVideoRef])
+
+  useEffect(() => {
+    if (remoteVideoRef && remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream
+    }
+  }, [remoteStream, remoteVideoRef])
 
   return (
     <div className="glass-panel" style={{
@@ -64,7 +79,7 @@ export default function VideoGrid({
         background: '#0a0a0f',
         position: 'relative'
       }}>
-        {remoteVideoRef?.current?.srcObject ? (
+        {remoteStream ? (
           <video
             ref={remoteVideoRef}
             autoPlay

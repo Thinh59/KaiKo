@@ -13,6 +13,9 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
   const pcRef = useRef(null)
   const localStreamRef = useRef(null)
 
+  const [localStream, setLocalStream] = useState(null)
+  const [remoteStream, setRemoteStream] = useState(null)
+
   const [connected, setConnected] = useState(false)
   const [isCameraOn, setIsCameraOn] = useState(true)
   const [isMicOn, setIsMicOn] = useState(true)
@@ -26,6 +29,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
         audio: true
       })
       localStreamRef.current = stream
+      setLocalStream(stream)
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
       }
@@ -49,6 +53,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
       pc.ontrack = event => {
+        setRemoteStream(event.streams[0])
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = event.streams[0]
         }
@@ -129,6 +134,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
           localStreamRef.current.addTrack(videoTrack);
         } else {
           localStreamRef.current = stream;
+          setLocalStream(stream);
           if (localVideoRef.current) localVideoRef.current.srcObject = stream;
         }
         
@@ -165,6 +171,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
           localStreamRef.current.addTrack(audioTrack);
         } else {
           localStreamRef.current = stream;
+          setLocalStream(stream);
         }
         
         if (pcRef.current) {
@@ -189,12 +196,14 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
         console.log(`Stopped track: ${track.kind}`);
       });
       localStreamRef.current = null;
+      setLocalStream(null);
     }
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
     }
     setConnected(false);
+    setRemoteStream(null);
   }, []);
 
   useEffect(() => {
@@ -214,6 +223,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
     toggleCamera,
     toggleMic,
     stopAllMedia,
-    localStream: localStreamRef.current
+    localStream,
+    remoteStream
   }
 }

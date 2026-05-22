@@ -90,7 +90,8 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
 
   const {
     localVideoRef, remoteVideoRef, connected,
-    isCameraOn, isMicOn, initWebRTC, toggleCamera, toggleMic, stopAllMedia
+    isCameraOn, isMicOn, initWebRTC, toggleCamera, toggleMic, stopAllMedia,
+    localStream, remoteStream
   } = useWebRTC({
     roomId: roomInfo?.roomId,
     isHost: roomInfo?.isHost,
@@ -626,6 +627,8 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         <VideoGrid
           remoteVideoRef={remoteVideoRef}
           localVideoRef={localVideoRef}
+          localStream={localStream}
+          remoteStream={remoteStream}
           remoteName={playerBName}
           localName={roomData.playerA}
           isCameraOn={isCameraOn}
