@@ -364,3 +364,4 @@ Done!
 
 Fix bug: 
 - dùng Gemini-3.1-flash-lite-preview thay vì dùng gemini-2.5-flash`
+- chỉnh time trong chat dabate lại nhiều hơn 3 phút có thể là tối đa 30 phút.

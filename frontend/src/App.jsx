@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import HomePage from './components/HomePage'
@@ -135,6 +135,16 @@ function App() {
   const [mode, setMode] = useState(null) // '1v1' | 'solo_ai' | '2v2'
   const [soloTopic, setSoloTopic] = useState('AI có thay thế được con người?')
   const [globalNicknames, setGlobalNicknames] = useState({})
+  const [theme, setTheme] = useState(() => localStorage.getItem('kaiko_theme') || 'dark')
+
+  useEffect(() => {
+    if (theme === 'bright') {
+      document.body.classList.add('bright-mode')
+    } else {
+      document.body.classList.remove('bright-mode')
+    }
+    localStorage.setItem('kaiko_theme', theme)
+  }, [theme])
 
   useEffect(() => {
     axios.get(`${API_BASE}/nicknames`)
@@ -343,13 +353,13 @@ function App() {
   if (window.location.pathname === '/sso-callback') {
     content = <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />;
   } else if (page === 'home') {
-    content = <HomePage onPlay={handlePlayNowClick} />
+    content = <HomePage onPlay={handlePlayNowClick} theme={theme} />
   } else if (page === 'auth') {
     content = <AuthPage onLogin={handleLogin} />
   } else if (page === 'dashboard') {
     content = (
       <ErrorBoundary>
-        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} />
+        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} theme={theme} setTheme={setTheme} />
       </ErrorBoundary>
     )
   } else if (page === 'mode') {

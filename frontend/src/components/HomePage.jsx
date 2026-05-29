@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 
-export default function HomePage({ onPlay }) {
+export default function HomePage({ onPlay, theme }) {
   useEffect(() => {
     // Add particles on mount
     const container = document.createElement('div')
@@ -28,7 +28,9 @@ export default function HomePage({ onPlay }) {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'url("/assets/backgrounds/homepage_splash.jpg") center/cover no-repeat, url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop") center/cover no-repeat',
+      background: theme === 'bright' 
+        ? 'url("/assets/backgrounds/homepage_splash_bright.png") center/cover no-repeat'
+        : 'url("/assets/backgrounds/homepage_splash.jpg") center/cover no-repeat, url("https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop") center/cover no-repeat',
       position: 'relative',
       padding: '2rem'
     }}>

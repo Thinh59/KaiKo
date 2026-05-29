@@ -96,7 +96,7 @@ function HistoryRow({ match, onClick }) {
         <span style={{
           fontSize: '0.7rem',
           color: match.visibility === 'public' ? '#10b981' : 'var(--text-secondary)',
-          background: 'rgba(0,0,0,0.3)',
+          background: 'var(--input-bg)',
           padding: '2px 8px',
           borderRadius: '4px'
         }}>
@@ -150,7 +150,7 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
 
         {loading ? <p style={{ color: 'var(--text-secondary)' }}>Đang tải...</p> : (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ background: 'rgba(255,255,255,0.05)', padding: '10px', display: 'flex', gap: '10px', borderRadius: '8px 8px 0 0', border: '1px solid var(--border-light)', borderBottom: 'none' }}>
+            <div style={{ background: 'var(--panel-bg)', padding: '10px', display: 'flex', gap: '10px', borderRadius: '8px 8px 0 0', border: '1px solid var(--border-light)', borderBottom: 'none' }}>
               <button onClick={() => handleFormat('bold')} style={{ fontWeight: 'bold', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>B</button>
               <button onClick={() => handleFormat('italic')} style={{ fontStyle: 'italic', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>I</button>
               <button onClick={() => handleFormat('underline')} style={{ textDecoration: 'underline', padding: '5px 15px', borderRadius: '4px', cursor: 'pointer', background: '#e5e7eb', color: '#000', border: '1px solid #d1d5db' }}>U</button>
@@ -159,7 +159,7 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
             <div
               ref={editorRef}
               contentEditable
-              style={{ flex: 1, overflowY: 'auto', background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '0 0 8px 8px', border: '1px solid var(--border-light)', color: '#fff', outline: 'none', fontSize: '1.1rem', lineHeight: '1.6' }}
+              style={{ flex: 1, overflowY: 'auto', background: 'var(--input-bg)', padding: '20px', borderRadius: '0 0 8px 8px', border: '1px solid var(--border-light)', color: '#fff', outline: 'none', fontSize: '1.1rem', lineHeight: '1.6' }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', gap: '10px' }}>
               <button onClick={onClose} className="btn-secondary" style={{ padding: '10px 20px' }}>Hủy</button>
@@ -222,7 +222,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
               submissions.map(sub => {
                 const isExpanded = expandedId === sub.participant_id;
                 return (
-                  <div key={sub.participant_id} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
+                  <div key={sub.participant_id} style={{ background: 'var(--panel-bg)', padding: '15px', borderRadius: '12px', border: '1px solid var(--border-light)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                       <div style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>@{sub.username}</div>
                       <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>⭐ {sub.votes} Votes</div>
@@ -259,7 +259,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
   );
 };
 
-export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler }) {
+export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler, theme, setTheme }) {
   const [activeTab, setActiveTab] = useState('home')
   const [showDailyQuests, setShowDailyQuests] = useState(false)
   const [activeEvent, setActiveEvent] = useState(null)
@@ -985,7 +985,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               )}
               {/* === WIN/LOSS MOVED HERE === */}
               {!isGuest && (
-                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginLeft: 'auto', background: 'rgba(0,0,0,0.3)', padding: '4px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginLeft: 'auto', background: 'var(--input-bg)', padding: '4px 12px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <span style={{ color: '#10b981', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem' }}>🏆 {stats.wins || 0}W</span>
                   <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-heading)', fontWeight: '600', fontSize: '0.75rem' }}>vs</span>
                   <span style={{ color: '#ef4444', fontFamily: 'var(--font-heading)', fontWeight: '800', fontSize: '0.9rem' }}>{stats.losses || 0}L 💔</span>
@@ -1033,7 +1033,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   NHIỆM VỤ HÀNG NGÀY
                 </span>
               </div>
-              
+
               <button
                 onClick={handleCheckIn}
                 disabled={hasCheckedIn}
@@ -1047,8 +1047,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   boxShadow: hasCheckedIn ? 'none' : '0 4px 10px rgba(245,158,11,0.3)',
                   transition: 'all 0.3s', display: 'flex', alignItems: 'center', gap: '8px',
                 }}
-                onMouseEnter={e => { if(!hasCheckedIn) e.currentTarget.style.transform = 'translateY(-2px)' }}
-                onMouseLeave={e => { if(!hasCheckedIn) e.currentTarget.style.transform = 'translateY(0)' }}
+                onMouseEnter={e => { if (!hasCheckedIn) e.currentTarget.style.transform = 'translateY(-2px)' }}
+                onMouseLeave={e => { if (!hasCheckedIn) e.currentTarget.style.transform = 'translateY(0)' }}
               >
                 <span style={{ fontSize: '1.2rem' }}>{hasCheckedIn ? '✅' : '🎁'}</span>
                 <span>{hasCheckedIn ? 'ĐÃ ĐIỂM DANH' : 'ĐIỂM DANH NHẬN QUÀ'}</span>
@@ -1064,7 +1064,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => { setShowNotifications(!showNotifications); loadNotifications(); }}
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', position: 'relative' }}
+              style={{ background: 'var(--panel-bg)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', width: '40px', height: '40px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', position: 'relative' }}
             >
               🔔
               {unreadCount > 0 && (
@@ -1142,10 +1142,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   <span style={{ position: 'absolute', top: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
                   <span style={{ position: 'absolute', bottom: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
                   <span style={{ position: 'absolute', bottom: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
-                  
+
                   {/* Ambient glow behind button */}
                   <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
-                  
+
                   <button
                     onClick={onPlay}
                     className="btn-primary play-btn-ring"
@@ -1164,73 +1164,46 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 <div style={{ width: '60%', height: '2px', background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)', margin: '0.4rem auto' }} />
 
                 {/* ── Row 2: Nav Grid ── */}
-                <div style={{ zoom: 0.65, display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '0.8rem' }}>
-                  
-                  {/* Left Column: Profile Card + Scroll Quest Button */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', height: '100%' }}>
-                    {/* Profile card — tall */}
-                    {(() => {
-                      const profileTab = TABS.find(t => t.id === 'profile')
-                      return (
-                        <div
-                          className="nav-card"
-                          onClick={() => setActiveTab('profile')}
-                          style={{
-                            background: 'transparent',
-                            borderRadius: '20px', padding: '1rem',
-                            cursor: 'pointer', textAlign: 'center',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                            gap: '8px', flex: 1
-                          }}
-                        >
-                          {profileTab.image
-                            ? <img src={profileTab.image} alt={profileTab.label}
-                                style={{ width: '11rem', height: '11rem', objectFit: 'contain', filter: `drop-shadow(0 4px 14px ${profileTab.color}90)` }}
-                                onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
-                            : null
-                          }
-                          <div className="nav-card-icon" style={{ fontSize: '9rem', filter: `drop-shadow(0 4px 12px ${profileTab.color}70)`, display: profileTab.image ? 'none' : 'block' }}>{profileTab.icon}</div>
-                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '1.1rem', color: '#f59e0b', letterSpacing: '0.04em' }}>{profileTab.label.toUpperCase()}</div>
-                          {!isGuest && (
-                            <div style={{ background: `${profileTab.color}20`, borderRadius: 'var(--radius-full)', padding: '4px 16px', fontSize: '1rem', color: profileTab.color, fontWeight: '700', fontFamily: 'var(--font-heading)', border: `1px solid ${profileTab.color}40` }}>
-                              LV {currentLevel}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                  </div>
+                <div style={{ zoom: 0.75, padding: '0.5rem 0', position: 'relative' }}>
+                  {/* Mascots Decoration */}
+                  <img src="/assets/mascots/summer/CuaHoaPhuong.png" alt="Mascot Left" style={{ position: 'absolute', left: '1%', top: '50%', transform: 'translateY(-50%)', width: '26rem', filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.4))', pointerEvents: 'none', zIndex: 0 }} />
+                  <img src="/assets/mascots/summer/CuaDua.png" alt="Mascot Right" style={{ position: 'absolute', right: '1%', top: '50%', transform: 'translateY(-50%) scaleX(-1)', width: '26rem', filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.4))', pointerEvents: 'none', zIndex: 0 }} />
 
-                  {/* Right Column: Grid of other tabs */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gridTemplateRows: 'repeat(3, 1fr)', gap: '0.6rem' }}>
-                    {TABS.filter(t => t.id !== 'profile').map((tab) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, max-content)', gap: '2.5rem', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
+                    {TABS.map((tab) => (
                       <div
                         key={tab.id}
                         className="nav-card"
                         onClick={() => setActiveTab(tab.id)}
                         style={{
                           background: 'transparent',
-                          borderRadius: '14px',
+                          borderRadius: '20px', padding: '0.5rem',
                           cursor: 'pointer', textAlign: 'center',
                           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          gap: '8px', padding: '0.6rem',
+                          gap: '8px',
                         }}
                       >
                         {tab.image
                           ? <img src={tab.image} alt={tab.label} className="nav-card-icon"
-                              style={{ width: '8.5rem', height: '8.5rem', objectFit: 'contain', filter: `drop-shadow(0 3px 10px ${tab.color}80)` }}
-                              onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
+                            style={{ width: '10.5rem', height: '10.5rem', objectFit: 'contain', filter: `drop-shadow(0 6px 15px ${tab.color}90)` }}
+                            onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
                           : null
                         }
-                        <div className="nav-card-icon" style={{ fontSize: '7rem', lineHeight: 1, filter: `drop-shadow(0 3px 8px ${tab.color}70)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
-                        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '700', fontSize: '1rem', color: '#f59e0b', letterSpacing: '0.04em', lineHeight: 1.2 }}>{tab.label.toUpperCase()}</div>
+                        <div className="nav-card-icon" style={{ fontSize: '8rem', lineHeight: 1, filter: `drop-shadow(0 6px 12px ${tab.color}80)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '900', fontSize: '1.4rem', color: '#ff4d00', textShadow: '0 0 10px rgba(255, 77, 0, 0.9), 0 2px 4px rgba(0,0,0,0.6)', letterSpacing: '0.08em', lineHeight: 1.3 }}>{tab.label.toUpperCase()}</div>
+                          
+                          {tab.id === 'profile' && !isGuest && (
+                            <div style={{ background: `${tab.color}20`, borderRadius: 'var(--radius-full)', padding: '4px 16px', fontSize: '1.1rem', color: tab.color, fontWeight: '800', fontFamily: 'var(--font-heading)', border: `2px solid ${tab.color}40`, boxShadow: `0 0 8px ${tab.color}30` }}>
+                              LV {currentLevel}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
-
                 </div>
-
-
 
                 {false && (
                   <div style={{
@@ -1306,7 +1279,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                             }}>
                               {q.done && '✓'}
                             </div>
-                            
+
                             {/* Quest Text */}
                             <div style={{ flex: 1 }}>
                               <div>{q.label}</div>
@@ -1468,7 +1441,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       <span style={{ textAlign: 'right' }}>Điểm TB</span>
                     </div>
                     {leaderboard.map((user, idx) => (
-                      <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
+                      <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'var(--panel-bg)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
                         <div style={{ textAlign: 'center', fontSize: '1.2rem', fontWeight: 'bold', color: idx === 0 ? '#fbbf24' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : 'var(--text-secondary)' }}>
                           {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                         </div>
@@ -1576,7 +1549,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 </div>
 
                 {!isGuest && (
-                  <div style={{ width: '350px', margin: '0 auto 1.5rem', background: 'rgba(255,255,255,0.1)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  <div style={{ width: '350px', margin: '0 auto 1.5rem', background: 'var(--panel-bg-hover)', borderRadius: '20px', height: '24px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
                     <div style={{ width: `${stats.exp || 0}%`, background: 'linear-gradient(90deg, var(--accent-primary) 0%, #a855f7 100%)', height: '100%', transition: 'width 1s ease-in-out' }}></div>
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)' }}>
                       {stats.exp || 0} / 100 EXP (Tới cấp tiếp theo)
@@ -1646,7 +1619,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       { label: 'Thất bại', value: stats.losses, color: '#ef4444', icon: '💔' },
                       { label: 'Điểm TB', value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
                     ].map(s => (
-                      <div key={s.label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div key={s.label} style={{ background: 'var(--panel-bg)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{s.icon}</div>
                         <div style={{ fontSize: '2.5rem', fontWeight: '800', color: s.color }}>{s.value}</div>
                         <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginTop: '8px' }}>{s.label}</div>
@@ -1688,7 +1661,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     value={friendInput}
                     onChange={(e) => setFriendInput(e.target.value)}
                     placeholder="Nhập tên người chơi để kết bạn..."
-                    style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1.1rem' }}
+                    style={{ flex: 1, padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'var(--input-bg)', color: '#fff', fontSize: '1.1rem' }}
                   />
                   <button onClick={handleAddFriend} className="btn-primary" style={{ padding: '0 24px', borderRadius: '8px', fontWeight: 'bold' }}>
                     Gửi Yêu Cầu
@@ -1724,10 +1697,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     const debateCount = fobj?.debate_count || 0
                     const isBestFriend = debateCount >= 50
                     return (
-                      <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isBestFriend ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '16px 24px', borderRadius: '12px', border: `1px solid ${isBestFriend ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'}` }}>
+                      <div key={fname} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isBestFriend ? 'rgba(16,185,129,0.08)' : 'var(--panel-bg)', padding: '16px 24px', borderRadius: '12px', border: `1px solid ${isBestFriend ? 'rgba(16,185,129,0.3)' : 'var(--panel-bg)'}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer' }} onClick={() => handleViewUser(fname)}>
                           <div style={{ position: 'relative' }}>
-                            <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
+                            <img src={`https://api.dicebear.com/7.x/bottts/svg?seed=${fname}`} alt="avatar" style={{ width: '50px', height: '50px', borderRadius: '50%', background: 'var(--panel-bg-hover)' }} />
                             {isBestFriend && <div style={{ position: 'absolute', bottom: '-4px', right: '-4px', fontSize: '1.1rem' }}>💚</div>}
                           </div>
                           <div>
@@ -1773,7 +1746,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         const isOpen = ev.status === 'open'
                         const isUpcoming = ev.status === 'upcoming'
                         return (
-                          <div key={ev.id} style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '20px', border: `1px solid ${isOpen ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div key={ev.id} style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '20px', border: `1px solid ${isOpen ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                             <div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                 <span style={{ background: isOpen ? 'rgba(16,185,129,0.2)' : isUpcoming ? 'rgba(59,130,246,0.2)' : 'rgba(107,114,128,0.2)', color: isOpen ? '#10b981' : isUpcoming ? '#3b82f6' : '#6b7280', padding: '4px 12px', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 'bold' }}>
@@ -1877,7 +1850,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     const owned = myItems.includes(item.id)
                     const canAfford = serverPoints >= item.price
                     return (
-                      <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                      <div key={item.id} style={{ background: owned ? 'rgba(16,185,129,0.08)' : 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: `1px solid ${owned ? 'rgba(16,185,129,0.4)' : 'var(--border-light)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
                         {owned && <div style={{ position: 'absolute', top: '12px', right: '12px', background: '#10b981', color: '#fff', borderRadius: '20px', padding: '2px 10px', fontSize: '0.75rem', fontWeight: 'bold' }}>✓ Đã có</div>}
                         <div style={{ fontSize: '4.4rem', marginBottom: '1rem', display: 'flex', justifyContent: 'center', height: '80px' }}>
                           <img src={item.isFrame ? `/assets/frames/${item.image}` : `/assets/badges/${item.image}`} alt={item.name} style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; if (e.target.nextSibling) e.target.nextSibling.style.display = 'block' }} />
@@ -1921,12 +1894,12 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '2rem', textAlign: 'center' }}>Cài đặt</h2>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-                  
+
                   {/* Account Info & Nickname */}
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
                     <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>👤 Tài Khoản</h3>
                     <p style={{ color: 'var(--text-secondary)', margin: '0 0 8px' }}>Tên đăng nhập:</p>
-                    <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box', marginBottom: '16px', background: 'rgba(0,0,0,0.2)' }} />
+                    <input type="text" value={username} readOnly className="glass-input" style={{ padding: '12px', width: '100%', boxSizing: 'border-box', marginBottom: '16px', background: 'var(--input-bg)' }} />
                     {isGuest && <p style={{ color: '#f59e0b', fontSize: '0.85rem', margin: '-10px 0 16px' }}>⚠️ Tài khoản khách — lịch sử không được lưu.</p>}
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -1941,7 +1914,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         value={nickname}
                         onChange={(e) => setNickname(e.target.value)}
                         placeholder="Nhập biệt danh..."
-                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem' }}
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'var(--input-bg)', color: '#fff', fontSize: '1rem' }}
                       />
                       <button
                         onClick={async () => {
@@ -1951,7 +1924,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                               localStorage.setItem('kaiko_nickname_' + username, nickname);
                               setGlobalNicknames(prev => ({ ...prev, [username]: nickname }));
                               alert('Đã lưu biệt danh thành công!');
-                              loadMyInfo(); 
+                              loadMyInfo();
                             } else {
                               alert('Lỗi: ' + res.data.error);
                             }
@@ -1971,7 +1944,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   </div>
 
                   {/* Password Management */}
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
                     <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🔒 Đổi Mật Khẩu</h3>
                     {!isGuest ? (
                       <>
@@ -2021,10 +1994,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   </div>
 
                   {/* Device & Permissions */}
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
                     <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🎙️ Thiết Bị & Âm Thanh</h3>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '16px', background: 'var(--input-bg)', borderRadius: '12px' }}>
                       <div>
                         <div style={{ color: '#fff', fontWeight: 'bold' }}>Camera & Mic</div>
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -2060,14 +2033,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
 
                     {/* Audio Volume Slider */}
-                    <div style={{ padding: '16px', background: 'rgba(0,0,0,0.2)', borderRadius: '12px' }}>
+                    <div style={{ padding: '16px', background: 'var(--input-bg)', borderRadius: '12px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                         <span style={{ color: '#fff', fontWeight: 'bold' }}>Âm Lượng Tổng</span>
                         <span style={{ color: 'var(--text-secondary)' }}>{Math.round(globalVolume * 100)}%</span>
                       </div>
-                      <input 
-                        type="range" 
-                        min="0" max="1" step="0.05" 
+                      <input
+                        type="range"
+                        min="0" max="1" step="0.05"
                         value={globalVolume}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value);
@@ -2077,6 +2050,43 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         }}
                         style={{ width: '100%', accentColor: '#a855f7', cursor: 'pointer' }}
                       />
+                    </div>
+                  </div>
+
+                  {/* Theme Settings */}
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <h3 style={{ color: 'var(--text-primary)', marginTop: 0, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>🎨 Giao Diện (Theme)</h3>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', padding: '16px', background: 'var(--input-bg)', borderRadius: '12px' }}>
+                      <div>
+                        <div style={{ color: '#fff', fontWeight: 'bold' }}>Chế Độ Sáng/Tối</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          {theme === 'bright' ? 'Sáng (Day Mode)' : 'Tối (Night Mode)'}
+                        </div>
+                      </div>
+                      <div
+                        onClick={() => {
+                          if (setTheme) {
+                            setTheme(theme === 'bright' ? 'dark' : 'bright');
+                          }
+                        }}
+                        style={{
+                          width: '54px', height: '30px', borderRadius: '15px',
+                          background: theme === 'bright' ? '#f59e0b' : '#3b82f6',
+                          position: 'relative', cursor: 'pointer',
+                          transition: 'background 0.3s', flexShrink: 0
+                        }}
+                      >
+                        <div style={{
+                          width: '26px', height: '26px', borderRadius: '50%', background: '#fff',
+                          position: 'absolute', top: '2px',
+                          left: theme === 'bright' ? '26px' : '2px',
+                          transition: 'left 0.3s', boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px'
+                        }}>
+                          {theme === 'bright' ? '☀️' : '🌙'}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -2091,7 +2101,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>📊 Phân Tích Ngụy Biện</h2>
                 <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
 
-                <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
                   {Object.keys(fallacyStats).length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
                       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
@@ -2100,7 +2110,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   ) : (
                     <div>
                       {Object.entries(fallacyStats).sort((a, b) => b[1] - a[1]).map(([fallacy, count]) => (
-                        <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'rgba(0,0,0,0.2)', padding: '15px', borderRadius: '12px' }}>
+                        <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'var(--input-bg)', padding: '15px', borderRadius: '12px' }}>
                           <div style={{ flex: 1 }}>
                             <h4 style={{ margin: '0 0 5px 0', color: '#ef4444' }}>{fallacy}</h4>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Bạn đã mắc lỗi này <strong style={{ color: '#fff' }}>{count} lần</strong>. Hãy chú ý hơn trong lập luận!</div>
@@ -2130,7 +2140,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         placeholder="Nhập tên sư phụ..."
                         value={mentorInput}
                         onChange={e => setMentorInput(e.target.value)}
-                        style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: '#fff' }}
+                        style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', background: 'var(--input-bg)', color: '#fff' }}
                       />
                       <button
                         onClick={async () => {
@@ -2149,7 +2159,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   </div>
 
                   {/* Tình Trạng */}
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
                     <h3 style={{ marginTop: 0, color: 'var(--text-primary)' }}>📜 Môn Phái</h3>
                     <div style={{ marginBottom: '1rem' }}>
                       <strong style={{ color: '#f59e0b' }}>Sư Phụ của bạn:</strong>
@@ -2211,14 +2221,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 {liveLoading ? (
                   <p style={{ color: 'var(--text-secondary)' }}>Đang tải phòng live...</p>
                 ) : liveRooms.length === 0 ? (
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '3rem', borderRadius: '16px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '1rem' }}>Chưa có phòng nào đang thi đấu.</p>
                     <p style={{ color: 'var(--text-secondary)' }}>Các trận rank và trận level cao sẽ hiện ở đây khi có đủ 2 người chơi.</p>
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
                     {liveRooms.map(room => (
-                      <div key={room.roomId} style={{ background: room.isHighLevel ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${room.isHighLevel ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div key={room.roomId} style={{ background: room.isHighLevel ? 'rgba(239,68,68,0.1)' : 'var(--panel-bg)', border: `1px solid ${room.isHighLevel ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
                           <strong style={{ color: room.isHighLevel ? '#f87171' : 'var(--text-primary)' }}>{room.isHighLevel ? 'Trận cấp cao' : 'Live'}</strong>
                           <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{room.spectators} đang xem</span>
@@ -2246,7 +2256,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         const label = ev.type === 'transcript_update' ? `Lượt ${ev.player}` : ev.type === 'chat_msg' ? `Chat ${ev.msg?.speaker}` : ev.type === 'fallacy_detected' ? 'Ngụy biện' : ev.type === 'emoji_react' ? 'Reaction' : ev.type
                         const text = ev.type === 'transcript_update' ? ev.text : ev.type === 'chat_msg' ? ev.msg?.text : ev.type === 'fallacy_detected' ? `${ev.speaker}: ${ev.fallacy}` : ev.type === 'emoji_react' ? ev.emoji : 'Trận đấu đã kết thúc'
                         return (
-                          <div key={idx} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div key={idx} style={{ background: 'var(--panel-bg)', borderRadius: '10px', padding: '10px 12px', border: '1px solid rgba(255,255,255,0.06)' }}>
                             <div style={{ color: '#a5b4fc', fontWeight: '700', fontSize: '0.78rem', marginBottom: '4px' }}>{label}</div>
                             <div style={{ color: 'var(--text-primary)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{text}</div>
                           </div>
@@ -2265,7 +2275,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   <h2 style={{ color: 'var(--accent-primary)', margin: 0, fontSize: '2rem' }}>Diễn Đàn Cộng Đồng</h2>
                   <button onClick={loadCommunityPosts} className="btn-secondary" style={{ padding: '10px 18px', borderRadius: '8px' }}>Tải lại tin mới</button>
                 </div>
-                <form onSubmit={handleCreateCommunityPost} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <form onSubmit={handleCreateCommunityPost} style={{ background: 'var(--panel-bg)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <textarea value={communityInput} onChange={e => setCommunityInput(e.target.value)} maxLength={1000} placeholder="Chia sẻ kinh nghiệm tranh biện, hỏi chiến thuật, hoặc đăng chủ đề muốn cộng đồng bàn luận..." style={{ minHeight: '94px', resize: 'vertical', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '10px', padding: '12px', outline: 'none', fontSize: '1rem', lineHeight: 1.45 }} />
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{communityInput.length}/1000</span>
@@ -2275,7 +2285,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 {communityLoading ? (
                   <p style={{ color: 'var(--text-secondary)' }}>Đang tải bài viết...</p>
                 ) : communityPosts.length === 0 ? (
-                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '2rem', borderRadius: '12px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '12px', textAlign: 'center', border: '1px dashed var(--border-light)' }}>
                     <p style={{ color: 'var(--text-secondary)' }}>Chưa có bài viết nào. Hãy mở màn diễn đàn.</p>
                   </div>
                 ) : (
@@ -2347,7 +2357,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         src={theirAvatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${selectedUser}`}
                         alt="Avatar"
                         style={{
-                          width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: 'rgba(255,255,255,0.1)',
+                          width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', background: 'var(--panel-bg-hover)',
                           ...(frameStyles[theirFrame] || {})
                         }}
                       />
@@ -2395,7 +2405,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                               return (
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginBottom: '1rem', flexWrap: 'wrap' }}>
                                   {badgeObjs.map(b => (
-                                    <div key={b.id} title={b.name} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '50%', padding: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <div key={b.id} title={b.name} style={{ background: 'var(--panel-bg)', borderRadius: '50%', padding: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
                                       <img src={b.image} alt={b.name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none' }} />
                                     </div>
                                   ))}
@@ -2414,7 +2424,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         <div style={{ display: 'inline-block', background: getRankInfo(selectedUserStats.level).bg, color: getRankInfo(selectedUserStats.level).color, padding: '4px 12px', borderRadius: '8px', fontWeight: 'bold', fontSize: '1rem', marginBottom: '1.5rem', border: `1px solid ${getRankInfo(selectedUserStats.level).color}50` }}>
                           <span style={{ marginRight: '8px' }}>{getRankInfo(selectedUserStats.level).icon}</span> Level {selectedUserStats.level} - {getRankInfo(selectedUserStats.level).title}
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ background: 'var(--panel-bg)', borderRadius: '16px', padding: '16px', display: 'flex', justifyContent: 'space-around', border: '1px solid rgba(255,255,255,0.1)' }}>
                           <div>
                             <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-primary)' }}>{selectedUserStats.total}</div>
                             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Trận</div>
@@ -2471,7 +2481,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 <span style={{ color: '#fff', fontWeight: 'bold' }}>{getDisplayName(activeChatUser)}</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: '0', background: 'rgba(0,0,0,0.3)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', gap: '0', background: 'var(--input-bg)', borderRadius: '10px', overflow: 'hidden' }}>
                 <button onClick={() => { setChatTab('friends'); loadFriendsChatPreview(); }} style={{ padding: '6px 16px', border: 'none', background: chatTab === 'friends' ? '#6366f1' : 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: chatTab === 'friends' ? 'bold' : 'normal', transition: 'background 0.2s' }}>👥 Bạn bè</button>
                 <button onClick={() => setChatTab('community')} style={{ padding: '6px 16px', border: 'none', background: chatTab === 'community' ? '#8b5cf6' : 'transparent', color: '#fff', cursor: 'pointer', fontSize: '0.85rem', fontWeight: chatTab === 'community' ? 'bold' : 'normal', transition: 'background 0.2s' }}>🌍 Cộng đồng</button>
               </div>
@@ -2494,7 +2504,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   const isMe = m.sender === username;
                   return (
                     <div key={idx} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-                      <div style={{ background: isMe ? '#6366f1' : 'rgba(255,255,255,0.1)', color: '#fff', padding: '9px 14px', borderRadius: isMe ? '16px 16px 0 16px' : '16px 16px 16px 0', fontSize: '0.9rem', wordBreak: 'break-word' }}>{m.text}</div>
+                      <div style={{ background: isMe ? '#6366f1' : 'var(--panel-bg-hover)', color: '#fff', padding: '9px 14px', borderRadius: isMe ? '16px 16px 0 16px' : '16px 16px 16px 0', fontSize: '0.9rem', wordBreak: 'break-word' }}>{m.text}</div>
                     </div>
                   )
                 })}
@@ -2535,7 +2545,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     const prefix = localLast ? (isLocalMe ? 'Bạn: ' : '') : (lastMsg ? (isDbMe ? 'Bạn: ' : '') : '');
                     return (
                       <div key={friend} onClick={() => { setActiveChatUser(friend); setChatUnreadCount(0); loadFriendChat(friend); }} style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'background 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--panel-bg)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                         <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', flexShrink: 0 }}>
                           {(friend || '?').charAt(0).toUpperCase()}
@@ -2565,7 +2575,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   return (
                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
                       {!isMe && <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: '2px', paddingLeft: '4px' }}>{m.sender}</div>}
-                      <div style={{ background: isMe ? '#8b5cf6' : 'rgba(255,255,255,0.1)', color: '#fff', padding: '8px 12px', borderRadius: isMe ? '14px 14px 0 14px' : '14px 14px 14px 0', fontSize: '0.88rem', maxWidth: '80%', wordBreak: 'break-word' }}>{m.text}</div>
+                      <div style={{ background: isMe ? '#8b5cf6' : 'var(--panel-bg-hover)', color: '#fff', padding: '8px 12px', borderRadius: isMe ? '14px 14px 0 14px' : '14px 14px 14px 0', fontSize: '0.88rem', maxWidth: '80%', wordBreak: 'break-word' }}>{m.text}</div>
                     </div>
                   )
                 })}
@@ -2776,7 +2786,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         }
       `}</style>
 
-                {/* ── Daily Quests Scroll Modal ── */}
+      {/* ── Daily Quests Scroll Modal ── */}
     </div>
   )
 }
