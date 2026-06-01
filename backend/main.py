@@ -488,20 +488,23 @@ class ConnectionManager:
                     opponent_id: opponent_info.get("level", 1)
                 }
             }
-            # Báo cho client_id (guest - người join)
+            # Tự động random người nào là Host (Ủng Hộ) và người nào là Guest (Phản Đối)
+            is_client_host = random.choice([True, False])
+            
+            # Báo cho client_id
             await self.send_personal_message(json.dumps({
                 "type": "matched",
                 "roomId": room_id,
-                "isHost": False,
+                "isHost": is_client_host,
                 "opponentId": opponent_id,
                 "opponentName": opponent_name,
                 "topic": topic
             }), client_id)
-            # Báo cho opponent_id (host - người tạo)
+            # Báo cho opponent_id
             await self.send_personal_message(json.dumps({
                 "type": "matched",
                 "roomId": room_id,
-                "isHost": True,
+                "isHost": not is_client_host,
                 "opponentId": client_id,
                 "opponentName": player_name,
                 "topic": topic
@@ -797,7 +800,7 @@ async def get_random_topic():
 
     try:
         gemini = genai.GenerativeModel(
-            "gemini-2.5-flash",
+            "gemini-3.1-flash-lite-preview",
             generation_config=genai.GenerationConfig(
                 max_output_tokens=50,
                 temperature=0.9,

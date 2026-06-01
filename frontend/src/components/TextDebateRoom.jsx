@@ -24,7 +24,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
   const [topicInput, setTopicInput] = useState('')
   const [currentTopic, setCurrentTopic] = useState(roomData.topic || 'Chủ đề ngẫu nhiên')
   const [topicTimeLeft, setTopicTimeLeft] = useState(15)
-  const [debateTimeLeft, setDebateTimeLeft] = useState(180) // 3 minutes
+  const [debateTimeLeft, setDebateTimeLeft] = useState(1800) // 30 minutes
   const [endRequested, setEndRequested] = useState(false) // Did *I* request to end?
   const [opponentWantsToEnd, setOpponentWantsToEnd] = useState(false)
 
@@ -328,6 +328,13 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     }
   }
 
+  useEffect(() => {
+    if (phase === 'debate' && debateTimeLeft === 0) {
+      setPhase('scoring')
+      if (isPlayerA || isSolo) executeScoring()
+    }
+  }, [debateTimeLeft, phase, isPlayerA, isSolo])
+
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60)
     const s = seconds % 60
@@ -411,7 +418,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '40px' }}>
             <div style={{ fontSize: '3rem' }}>✍️</div>
             <h3>Bắt đầu cuộc tranh biện</h3>
-            <p>Gõ liên tục các lập luận của bạn. Hết 3 phút hệ thống sẽ tự động chấm điểm.</p>
+            <p>Gõ liên tục các lập luận của bạn. Hết 30 phút hệ thống sẽ tự động chấm điểm.</p>
           </div>
         )}
         {messages.map((msg) => {
