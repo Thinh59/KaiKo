@@ -50,6 +50,9 @@ body.bright-mode {
     radial-gradient(ellipse at 10% 20%, rgba(249, 115, 22, 0.15), transparent 35%),
     radial-gradient(ellipse at 90% 10%, rgba(14, 165, 233, 0.15), transparent 30%),
     url('/assets/backgrounds/dashboard_bg_bright.png');
+  background-size: auto, auto, 100vw 100vh;
+  background-position: 0 0, 0 0, center center;
+  background-attachment: fixed;
 }
 
 body.bright-mode .glass-panel,
@@ -90,7 +93,7 @@ body {
     radial-gradient(ellipse at 50% 80%, rgba(168, 85, 247, 0.06), transparent 40%),
     radial-gradient(ellipse at 80% 60%, rgba(249, 115, 22, 0.06), transparent 30%),
     url('/assets/backgrounds/dashboard_bg.jpg');
-  background-size: auto, auto, auto, auto, cover;
+  background-size: auto, auto, auto, auto, 100vw 100vh;
   background-position: 0 0, 0 0, 0 0, 0 0, center center;
   background-attachment: fixed;
 }

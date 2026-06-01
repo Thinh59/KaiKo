@@ -896,7 +896,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: '0.5rem', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', padding: activeTab === 'home' ? '0' : '0.5rem', width: '100%', maxWidth: activeTab === 'home' ? '100%' : '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
 
       {/* ── Server Ticker ── */}
       {serverAnnouncements.length > 0 && (
@@ -932,7 +932,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       )}
 
       {/* ── Header with Avatar + EXP Bar ── */}
-      <div className="glass-panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 2rem', marginBottom: '1rem', gap: '20px' }}>
+      <div className={activeTab === 'home' ? '' : 'glass-panel'} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.8rem 2rem', marginBottom: '1rem', gap: '20px' }}>
         {/* Left: Avatar + Info */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
           {/* Avatar circle with glow */}
@@ -1091,13 +1091,13 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
 
         {/* ── Content ── */}
-        <div className="glass-panel animate-fade-in" style={{
-          padding: '1rem',
+        <div className={activeTab === 'home' ? 'animate-fade-in' : 'glass-panel animate-fade-in'} style={{
+          padding: activeTab === 'home' ? '0' : '1rem',
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: activeTab === 'home' ? 'visible' : 'hidden'
         }}>
           {/* Lớp nền con lồng bên trong */}
           <div style={{
@@ -1126,200 +1126,174 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
             {/* HOME (SẢNH CHÍNH) */}
             {activeTab === 'home' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingTop: '0.5rem' }}>
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '1.5rem', paddingTop: '1rem', paddingBottom: '1.5rem' }}>
 
-                {/* ── Row 1: Hero Play Zone ── */}
-                <div style={{
-                  position: 'relative', textAlign: 'center',
-                  background: 'linear-gradient(135deg, rgba(180,70,10,0.22) 0%, rgba(245,158,11,0.14) 50%, rgba(239,68,68,0.18) 100%)',
-                  border: '1px solid rgba(245,158,11,0.4)',
-                  borderRadius: '20px', padding: '0.8rem 1.5rem',
-                  overflow: 'hidden',
-                  flexShrink: 0
-                }}>
-                  {/* Corner decorations */}
-                  <span style={{ position: 'absolute', top: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
-                  <span style={{ position: 'absolute', top: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
-                  <span style={{ position: 'absolute', bottom: 8, left: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
-                  <span style={{ position: 'absolute', bottom: 8, right: 12, color: 'rgba(245,158,11,0.6)', fontSize: '1.1rem', userSelect: 'none' }}>◈</span>
+                {/* ── CHƠI NGAY — Hero Button ── */}
+                <style>{`
+                  @keyframes lobbyPulse {
+                    0%   { box-shadow: 0 0 0 0 rgba(255,100,30,0.7), 0 0 60px rgba(239,68,68,0.6), 0 8px 32px rgba(245,158,11,0.5); }
+                    50%  { box-shadow: 0 0 0 22px rgba(255,100,30,0), 0 0 80px rgba(239,68,68,0.8), 0 8px 48px rgba(245,158,11,0.7); }
+                    100% { box-shadow: 0 0 0 0 rgba(255,100,30,0), 0 0 60px rgba(239,68,68,0.6), 0 8px 32px rgba(245,158,11,0.5); }
+                  }
+                  @keyframes mascotBob {
+                    0%, 100% { transform: translateY(0px) scaleY(1); }
+                    40%       { transform: translateY(-14px) scaleY(1.03); }
+                    70%       { transform: translateY(-6px) scaleY(0.98); }
+                  }
+                  @keyframes mascotBobR {
+                    0%, 100% { transform: translateY(0px) scaleX(-1) scaleY(1); }
+                    40%       { transform: translateY(-12px) scaleX(-1) scaleY(1.03); }
+                    70%       { transform: translateY(-5px) scaleX(-1) scaleY(0.98); }
+                  }
+                  @keyframes particleFly {
+                    0%   { transform: translateY(0) scale(1); opacity: 1; }
+                    100% { transform: translateY(-60px) scale(0.3); opacity: 0; }
+                  }
+                  @keyframes titleFloatGlow {
+                    0%, 100% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 15px rgba(249, 115, 22, 0.4)); }
+                    50%      { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 40px rgba(245, 158, 11, 0.9)); }
+                  }
+                  .play-hero-btn {
+                    padding: 18px 80px;
+                    font-size: 2rem;
+                    font-family: var(--font-heading);
+                    font-weight: 900;
+                    letter-spacing: 4px;
+                    text-transform: uppercase;
+                    border: none;
+                    border-radius: 60px;
+                    cursor: pointer;
+                    color: #fff;
+                    background: linear-gradient(180deg, #ff6a1a 0%, #e63900 40%, #c73000 100%);
+                    box-shadow:
+                      0 1px 0 0 rgba(255,160,80,0.8) inset,
+                      0 -3px 0 0 rgba(100,10,0,0.7) inset,
+                      0 0 60px rgba(239,68,68,0.6),
+                      0 8px 32px rgba(245,158,11,0.5);
+                    animation: lobbyPulse 2s ease-in-out infinite;
+                    text-shadow: 0 2px 4px rgba(0,0,0,0.5), 0 0 20px rgba(255,200,100,0.8);
+                    transition: transform 0.12s;
+                  }
+                  .play-hero-btn:hover { transform: scale(1.06) translateY(-3px); }
+                  .play-hero-btn:active { transform: scale(0.96) translateY(2px); }
+                `}</style>
 
-                  {/* Ambient glow behind button */}
-                  <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '280px', height: '80px', background: 'radial-gradient(ellipse, rgba(239,68,68,0.35), transparent 70%)', pointerEvents: 'none', filter: 'blur(20px)' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', transform: 'translateY(-10vh)', zIndex: 5 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '3rem', animation: 'animate-fade-in 1s ease-out' }}>
+                    <h1 style={{ 
+                      fontFamily: 'var(--font-heading)', 
+                      fontSize: '9rem', 
+                      margin: 0, 
+                      lineHeight: 1, 
+                      letterSpacing: '0.05em',
+                      animation: 'titleFloatGlow 3.5s ease-in-out infinite'
+                    }}>KaiKo</h1>
+                    <h2 style={{ 
+                      fontFamily: 'var(--font-heading)', 
+                      fontSize: '1.9rem', 
+                      color: '#fde047', 
+                      textShadow: '0 0 15px rgba(253, 224, 71, 0.6)', 
+                      margin: '20px 0 0 0', 
+                      letterSpacing: '0.25em'
+                    }}>TRANH BIỆN TÌM CHÂN LÝ</h2>
+                  </div>
 
-                  <button
-                    onClick={onPlay}
-                    className="btn-primary play-btn-ring"
-                    style={{
-                      padding: '12px 60px', fontSize: '1.5rem', borderRadius: 'var(--radius-full)',
-                      letterSpacing: '3px', textTransform: 'uppercase', fontFamily: 'var(--font-heading)',
-                      boxShadow: '0 0 40px rgba(239,68,68,0.5), 0 8px 32px rgba(245,158,11,0.3)',
-                      position: 'relative', zIndex: 1
-                    }}
-                  >
-                    CHƠI NGAY
-                  </button>
+                  <div style={{ position: 'relative' }}>
+                    {[...Array(6)].map((_, i) => (
+                      <div key={i} style={{
+                        position: 'absolute', bottom: '100%',
+                        left: `${15 + i * 14}%`,
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: ['#ffd700','#ff6b35','#ff9f43','#fff','#ffd700','#ff6b35'][i],
+                        animation: `particleFly ${1.2 + i * 0.3}s ease-out ${i * 0.2}s infinite`,
+                        pointerEvents: 'none',
+                      }} />
+                    ))}
+                    <button id="lobby-play-btn" onClick={onPlay} className="play-hero-btn">
+                      ⚔️ CHƠI NGAY
+                    </button>
+                  </div>
                 </div>
 
-                {/* ── Divider ── */}
-                <div style={{ width: '60%', height: '2px', background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)', margin: '0.4rem auto' }} />
+                {/* ── macOS Style Dock ── */}
+                <div style={{ position: 'absolute', bottom: '2%', width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
+                  
+                  {/* Mascots */}
+                  <img src="/assets/mascots/summer/CuaHoaPhuong.png" alt="Mascot Left" onClick={() => setActiveTab('events')} title="Nhấp để xem Sự Kiện!" style={{ position: 'absolute', left: '2%', bottom: '20px', width: '15rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', cursor: 'pointer', zIndex: 3, animation: 'mascotBob 2.8s ease-in-out infinite' }} />
+                  
+                  <img src="/assets/mascots/summer/CuaDua.png" alt="Mascot Right" onClick={() => setShowDailyQuests(true)} title="Nhấp để xem Nhiệm Vụ!" style={{ position: 'absolute', right: '2%', bottom: '20px', width: '15rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', cursor: 'pointer', zIndex: 3, animation: 'mascotBobR 3.2s ease-in-out infinite' }} />
 
-                {/* ── Row 2: Nav Grid ── */}
-                <div style={{ zoom: 0.75, padding: '0.5rem 0', position: 'relative' }}>
-                  {/* Mascots Decoration */}
-                  <img src="/assets/mascots/summer/CuaHoaPhuong.png" alt="Mascot Left" style={{ position: 'absolute', left: '1%', top: '50%', transform: 'translateY(-50%)', width: '26rem', filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.4))', pointerEvents: 'none', zIndex: 0 }} />
-                  <img src="/assets/mascots/summer/CuaDua.png" alt="Mascot Right" style={{ position: 'absolute', right: '1%', top: '50%', transform: 'translateY(-50%) scaleX(-1)', width: '26rem', filter: 'drop-shadow(0 10px 25px rgba(0,0,0,0.4))', pointerEvents: 'none', zIndex: 0 }} />
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, max-content)', gap: '2.5rem', justifyContent: 'center', position: 'relative', zIndex: 1 }}>
-                    {TABS.map((tab) => (
-                      <div
-                        key={tab.id}
-                        className="nav-card"
-                        onClick={() => setActiveTab(tab.id)}
-                        style={{
-                          background: 'transparent',
-                          borderRadius: '20px', padding: '0.5rem',
-                          cursor: 'pointer', textAlign: 'center',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                          gap: '8px',
-                        }}
-                      >
+                  <style>{`
+                    .mac-dock {
+                      display: flex; gap: 0.5rem; align-items: flex-end;
+                      background: rgba(0,0,0,0.4); backdrop-filter: blur(12px);
+                      border-radius: 40px; border: 1px solid rgba(255,255,255,0.1);
+                      padding: 10px 20px; box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+                      height: 80px;
+                      z-index: 10;
+                    }
+                    .mac-dock-item {
+                      position: relative;
+                      display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+                      cursor: pointer;
+                      width: 65px; height: 65px;
+                      transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+                      transform-origin: bottom;
+                    }
+                    .mac-dock-item:hover {
+                      width: 95px; height: 95px;
+                      margin: 0 10px;
+                    }
+                    .mac-dock-item img, .mac-dock-item .nav-card-icon {
+                      width: 100%; height: 100%; object-fit: contain;
+                      font-size: 3.5rem; line-height: 1;
+                      transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+                      filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+                    }
+                    .mac-dock-item:hover img, .mac-dock-item:hover .nav-card-icon {
+                      font-size: 5.5rem;
+                      filter: drop-shadow(0 8px 16px rgba(0,0,0,0.8));
+                    }
+                    .mac-dock-label {
+                      position: absolute;
+                      top: -45px;
+                      background: rgba(0,0,0,0.8);
+                      color: white;
+                      font-family: var(--font-heading);
+                      font-weight: bold;
+                      font-size: 1rem;
+                      padding: 6px 14px;
+                      border-radius: 8px;
+                      opacity: 0;
+                      transform: translateY(10px);
+                      transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+                      pointer-events: none;
+                      white-space: nowrap;
+                      border: 1px solid rgba(255,255,255,0.2);
+                      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+                    }
+                    .mac-dock-item:hover .mac-dock-label {
+                      opacity: 1;
+                      transform: translateY(0);
+                    }
+                  `}</style>
+                  
+                  <div className="mac-dock">
+                    {TABS.filter(t => t.id !== 'home').map(tab => (
+                      <div key={tab.id} className="mac-dock-item" onClick={() => setActiveTab(tab.id)}>
+                        <div className="mac-dock-label">{tab.label.toUpperCase()}</div>
                         {tab.image
-                          ? <img src={tab.image} alt={tab.label} className="nav-card-icon"
-                            style={{ width: '10.5rem', height: '10.5rem', objectFit: 'contain', filter: `drop-shadow(0 6px 15px ${tab.color}90)` }}
-                            onError={e => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block') }} />
-                          : null
-                        }
-                        <div className="nav-card-icon" style={{ fontSize: '8rem', lineHeight: 1, filter: `drop-shadow(0 6px 12px ${tab.color}80)`, display: tab.image ? 'none' : 'block' }}>{tab.icon}</div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ fontFamily: 'var(--font-heading)', fontWeight: '900', fontSize: '1.4rem', color: '#ff4d00', textShadow: '0 0 10px rgba(255, 77, 0, 0.9), 0 2px 4px rgba(0,0,0,0.6)', letterSpacing: '0.08em', lineHeight: 1.3 }}>{tab.label.toUpperCase()}</div>
-                          
-                          {tab.id === 'profile' && !isGuest && (
-                            <div style={{ background: `${tab.color}20`, borderRadius: 'var(--radius-full)', padding: '4px 16px', fontSize: '1.1rem', color: tab.color, fontWeight: '800', fontFamily: 'var(--font-heading)', border: `2px solid ${tab.color}40`, boxShadow: `0 0 8px ${tab.color}30` }}>
-                              LV {currentLevel}
-                            </div>
-                          )}
-                        </div>
+                          ? <img src={tab.image} alt={tab.label} onError={e => { e.target.style.display='none'; e.target.nextSibling&&(e.target.nextSibling.style.display='block') }} />
+                          : null}
+                        <div className="nav-card-icon" style={{ display: tab.image ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center' }}>{tab.icon}</div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {false && (
-                  <div style={{
-
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center',
-
-
-                    backdropFilter: 'blur(4px)'
-                  }}>
-                    <div style={{
-                      background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                      border: '8px double #78350f',
-                      borderRadius: '20px',
-                      padding: '2rem',
-                      width: '90%',
-                      maxWidth: '420px',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(120,53,15,0.15)',
-                      position: 'relative',
-                      color: '#78350f',
-                      fontFamily: 'var(--font-heading)'
-                    }}>
-                      {/* Decorative Scroll Handles */}
-                      <div style={{
-                        position: 'absolute', top: '-15px', left: '8%', right: '8%',
-                        height: '10px', background: '#78350f', borderRadius: '5px'
-                      }} />
-                      <div style={{
-                        position: 'absolute', bottom: '-15px', left: '8%', right: '8%',
-                        height: '10px', background: '#78350f', borderRadius: '5px'
-                      }} />
-
-                      <h3 style={{
-                        textAlign: 'center', margin: '0 0 1.5rem',
-                        fontSize: '1.3rem', fontWeight: '900',
-                        letterSpacing: '2px', borderBottom: '2px dashed #78350f',
-                        paddingBottom: '0.5rem'
-                      }}>
-                        📜 CUỘN GIẤY NHIỆM VỤ
-                      </h3>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '2rem' }}>
-                        {[
-                          { label: 'Thắng 3 trận đấu', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
-                          { label: 'Điểm danh ngày hôm nay', reward: '+50 pts', done: hasCheckedIn },
-                        ].map((q, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '12px',
-                              opacity: q.done ? 0.45 : 1,
-                              transition: 'opacity 0.25s',
-                              fontSize: '0.95rem',
-                              fontWeight: '700'
-                            }}
-                          >
-                            {/* Custom Checkbox */}
-                            <div style={{
-                              width: '22px',
-                              height: '22px',
-                              border: '2.5px solid #78350f',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '14px',
-                              fontWeight: '900',
-                              color: '#78350f',
-                              background: q.done ? 'rgba(120,53,15,0.1)' : 'transparent',
-                              flexShrink: 0
-                            }}>
-                              {q.done && '✓'}
-                            </div>
-
-                            {/* Quest Text */}
-                            <div style={{ flex: 1 }}>
-                              <div>{q.label}</div>
-                              <div style={{ fontSize: '0.78rem', opacity: 0.85, fontWeight: '600' }}>
-                                Phần thưởng: <span style={{ color: '#c2410c' }}>{q.reward}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <button
-                        onClick={() => setShowDailyQuests(false)}
-                        style={{
-                          width: '100%',
-                          padding: '10px 0',
-                          background: '#78350f',
-                          color: '#fef3c7',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontWeight: '800',
-                          cursor: 'pointer',
-                          letterSpacing: '1px',
-                          fontFamily: 'var(--font-heading)',
-                          boxShadow: '0 4px 10px rgba(120,53,15,0.3)',
-                          transition: 'background 0.2s'
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#92400e'}
-                        onMouseLeave={e => e.currentTarget.style.background = '#78350f'}
-                      >
-                        ĐÓNG CUỘN GIẤY
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-              </div>
+                </div>
             )}
 
-            {/* HISTORY */}
             {activeTab === 'history' && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>

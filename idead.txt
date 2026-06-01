@@ -369,3 +369,9 @@ Fix bug:
 - [x] random phe ủng hộ/phản đối: hiện tại chưa, tôi muốn khi vào phòng thì sẽ tự động random cho mỗi người
 
 
+Fix bug:
+- Chỉnh màu time trong chat debate
+- Chỉnh nút thoát
+- Gợi ý, hỗ trợ khi bí luận (trả lời câu hỏi, phản biện,...) 
+- Thêm tương tác khi chat/video debate khi đối thủ debate để đánh qua lại. => thêm cho từng người chơi 1 con bot riêng = khung avarta,...
+

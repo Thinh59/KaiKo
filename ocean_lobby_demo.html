@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KaiKo Ocean Lobby Background</title>
+<style>
+  body, html { 
+    margin: 0; 
+    padding: 0; 
+    width: 100%; 
+    height: 100%; 
+    overflow: hidden; 
+    background-color: #02111b; 
+  }
+  #ocean-bg { 
+    display: block; 
+    width: 100%; 
+    height: 100%; 
+  }
+</style>
+</head>
+<body>
+<canvas id="ocean-bg"></canvas>
+
+<script>
+  const canvas = document.getElementById('ocean-bg');
+  const ctx = canvas.getContext('2d');
+  let w, h;
+  
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // 1. Background Gradient
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, '#0a3d6e'); // Surface light
+    grad.addColorStop(1, '#02111b'); // Deep ocean dark
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 2. God Rays (Sunlight piercing through)
+  class GodRay {
+    constructor() {
+      this.reset();
+      this.time = Math.random() * 1000;
+    }
+    reset() {
+      this.x = Math.random() * w;
+      this.width = 50 + Math.random() * 200;
+      this.opacity = 0.04 + Math.random() * 0.08;
+      this.pulseSpeed = 0.005 + Math.random() * 0.01;
+      this.swaySpeed = 0.001 + Math.random() * 0.002;
+    }
+    update() {
+      this.time += 1;
+    }
+    draw() {
+      const currentOpacity = Math.max(0, this.opacity + Math.sin(this.time * this.pulseSpeed) * 0.03);
+      const sway = Math.sin(this.time * this.swaySpeed) * 200;
+      
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, `rgba(200, 240, 255, ${currentOpacity})`);
+      grad.addColorStop(1, `rgba(200, 240, 255, 0)`);
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(this.x - this.width/2 + sway * 0.1, 0);
+      ctx.lineTo(this.x + this.width/2 + sway * 0.1, 0);
+      ctx.lineTo(this.x + this.width * 2 + sway, h);
+      ctx.lineTo(this.x - this.width * 2 + sway, h);
+      ctx.fill();
+    }
+  }
+
+  // 3. Plankton / Bioluminescent Particles (Far layer)
+  class Plankton {
+    constructor() {
+      this.x = Math.random() * w;
+      this.y = Math.random() * h;
+      this.size = Math.random() * 1.5 + 0.5;
+      this.vx = (Math.random() - 0.5) * 0.3;
+      this.vy = (Math.random() - 0.5) * 0.3 - 0.1;
+      this.opacity = 0.2 + Math.random() * 0.6;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.y < -10) this.y = h + 10;
+      if (this.x < -10) this.x = w + 10;
+      if (this.x > w + 10) this.x = -10;
+    }
+    draw() {
+      ctx.fillStyle = `rgba(100, 255, 200, ${this.opacity})`;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 4. Bubbles (Rising wobbling spheres)
+  class Bubble {
+    constructor() {
+      this.reset();
+      this.y = Math.random() * h; // Start randomized
+    }
+    reset() {
+      this.x = Math.random() * w;
+      this.y = h + 20;
+      this.size = 2 + Math.random() * 6;
+      this.vy = -(0.5 + Math.random() * 1.5);
+      this.wobbleSpeed = 0.02 + Math.random() * 0.03;
+      this.wobbleAmp = 1 + Math.random() * 3;
+      this.time = Math.random() * 100;
+    }
+    update() {
+      this.y += this.vy;
+      this.time += 1;
+      if (this.y < -20) this.reset();
+    }
+    draw() {
+      const x = this.x + Math.sin(this.time * this.wobbleSpeed) * this.wobbleAmp;
+      const grad = ctx.createRadialGradient(x - this.size*0.3, this.y - this.size*0.3, 0, x, this.y, this.size);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      grad.addColorStop(0.3, 'rgba(255, 255, 255, 0.2)');
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // 5. Tropical Fish
+  const fishColors = ['#ff9f43', '#feca57', '#54a0ff', '#ff9ff3', '#9b59b6', '#ee5253'];
+  class Fish {
+    constructor() {
+      this.reset();
+      this.x = Math.random() * w; // Start on screen for immediate life
+    }
+    reset() {
+      this.direction = Math.random() > 0.5 ? 1 : -1;
+      this.x = this.direction === 1 ? -100 : w + 100;
+      this.y = h * 0.2 + Math.random() * (h * 0.5);
+      this.size = 0.6 + Math.random() * 0.6;
+      this.vx = (0.5 + Math.random() * 1.5) * this.direction;
+      this.color = fishColors[Math.floor(Math.random() * fishColors.length)];
+      this.time = Math.random() * 100;
+      this.bobSpeed = 0.02 + Math.random() * 0.03;
+      this.tailSpeed = 0.2 + Math.random() * 0.2;
+    }
+    update() {
+      this.x += this.vx;
+      this.time += 1;
+      if (this.direction === 1 && this.x > w + 100) this.reset();
+      if (this.direction === -1 && this.x < -100) this.reset();
+    }
+    draw() {
+      const y = this.y + Math.sin(this.time * this.bobSpeed) * 15;
+      const tailWag = Math.sin(this.time * this.tailSpeed) * 10 * this.size;
+      
+      ctx.save();
+      ctx.translate(this.x, y);
+      if (this.direction === -1) ctx.scale(-1, 1);
+      
+      // Tail (Triangle)
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.moveTo(-15 * this.size, 0);
+      ctx.lineTo(-35 * this.size, -12 * this.size + tailWag);
+      ctx.lineTo(-35 * this.size, 12 * this.size + tailWag);
+      ctx.fill();
+      
+      // Body (Oval)
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 22 * this.size, 12 * this.size, 0, 0, Math.PI*2);
+      ctx.fill();
+      
+      // Fin
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(-2 * this.size, 4 * this.size, 7 * this.size, 3 * this.size, -0.3, 0, Math.PI*2);
+      ctx.fill();
+
+      // Eye
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(10 * this.size, -3 * this.size, 4 * this.size, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(11 * this.size, -3 * this.size, 2 * this.size, 0, Math.PI*2);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+  }
+
+  // 6. Jellyfish
+  class Jellyfish {
+    constructor() {
+      this.reset();
+      this.y = Math.random() * h;
+    }
+    reset() {
+      this.x = Math.random() * w;
+      this.y = h + Math.random() * 200 + 100;
+      this.size = 20 + Math.random() * 25;
+      this.vy = -(0.3 + Math.random() * 0.4);
+      this.time = Math.random() * 100;
+      this.pulseSpeed = 0.03 + Math.random() * 0.02;
+    }
+    update() {
+      this.y += this.vy;
+      this.time += 1;
+      this.x += Math.sin(this.time * 0.01) * 0.3; // gentle drift
+      if (this.y < -150) this.reset();
+    }
+    draw() {
+      const pulse = Math.sin(this.time * this.pulseSpeed);
+      const headHeight = this.size * (0.8 + pulse * 0.15); // Pulsing motion
+      
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      
+      // Tentacles
+      ctx.strokeStyle = 'rgba(150, 220, 255, 0.4)';
+      ctx.lineWidth = 1.5;
+      for (let i = -2; i <= 2; i++) {
+        const offset = i * (this.size * 0.25);
+        const sway = Math.sin(this.time * 0.05 + i) * 15;
+        const len = this.size * 2.5 + Math.sin(this.time * 0.1 + i) * 10;
+        
+        ctx.beginPath();
+        ctx.moveTo(offset, headHeight * 0.3);
+        ctx.quadraticCurveTo(offset + sway, headHeight + len/2, offset - sway*0.5, headHeight + len);
+        ctx.stroke();
+      }
+      
+      // Bell Gradient
+      const grad = ctx.createRadialGradient(0, -headHeight*0.2, 0, 0, 0, this.size);
+      grad.addColorStop(0, 'rgba(200, 255, 255, 0.7)');
+      grad.addColorStop(0.5, 'rgba(100, 150, 255, 0.4)');
+      grad.addColorStop(1, 'rgba(50, 100, 200, 0)');
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      // Draw bell using bezier curves
+      ctx.moveTo(-this.size, headHeight * 0.4);
+      ctx.bezierCurveTo(-this.size, -headHeight, this.size, -headHeight, this.size, headHeight * 0.4);
+      ctx.quadraticCurveTo(0, headHeight * 0.8, -this.size, headHeight * 0.4);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+  }
+
+  // 7. Seaweed (Swaying along bottom)
+  class Seaweed {
+    constructor(x, hOffset) {
+      this.x = x;
+      this.baseY = hOffset;
+      this.segments = 5 + Math.floor(Math.random() * 5);
+      this.time = Math.random() * 100;
+      this.swaySpeed = 0.02 + Math.random() * 0.01;
+    }
+    update() {
+      this.time += 1;
+    }
+    draw() {
+      // Outer shadow/border
+      ctx.strokeStyle = '#051829';
+      ctx.lineWidth = 12;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      this.drawStalk();
+      
+      // Inner highlight
+      ctx.strokeStyle = '#0a3a52';
+      ctx.lineWidth = 6;
+      this.drawStalk();
+    }
+    drawStalk() {
+      ctx.beginPath();
+      ctx.moveTo(this.x, h + this.baseY);
+      let currX = this.x;
+      let currY = h + this.baseY;
+      
+      for(let i=1; i<=this.segments; i++) {
+        const sway = Math.sin(this.time * this.swaySpeed + i * 0.4) * 15;
+        currY -= 35;
+        currX += sway * 0.3;
+        ctx.lineTo(currX, currY);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // 8. Foreground Rocks
+  function drawForegroundRocks() {
+    ctx.fillStyle = '#020b12'; // Very dark, almost black for near depth
+    
+    // Left Rock Frame
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, h - 250);
+    ctx.quadraticCurveTo(80, h - 200, 150, h - 180);
+    ctx.quadraticCurveTo(200, h - 120, 300, h);
+    ctx.fill();
+    
+    // Right Rock Frame
+    ctx.beginPath();
+    ctx.moveTo(w, h);
+    ctx.lineTo(w, h - 350);
+    ctx.quadraticCurveTo(w - 100, h - 280, w - 200, h - 220);
+    ctx.quadraticCurveTo(w - 300, h - 150, w - 450, h);
+    ctx.fill();
+
+    // Center bumps
+    ctx.beginPath();
+    ctx.moveTo(w/2 - 150, h);
+    ctx.quadraticCurveTo(w/2, h - 80, w/2 + 150, h);
+    ctx.fill();
+  }
+
+  // Initialize Entities
+  const godRays = Array.from({length: 6}, () => new GodRay());
+  const planktons = Array.from({length: 25}, () => new Plankton());
+  const bubbles = Array.from({length: 45}, () => new Bubble());
+  const fishes = Array.from({length: 10}, () => new Fish());
+  const jellyfishes = Array.from({length: 4}, () => new Jellyfish());
+  
+  // Distribute seaweed dynamically
+  const seaweeds = [];
+  function initSeaweed() {
+    seaweeds.length = 0;
+    const numSeaweeds = Math.floor(w / 150);
+    for(let i=0; i<numSeaweeds; i++) {
+      if (Math.random() > 0.3) {
+        seaweeds.push(new Seaweed(100 + i * 150 + Math.random()*50, Math.random() * 40));
+      }
+    }
+  }
+  initSeaweed();
+  window.addEventListener('resize', initSeaweed);
+
+  // Main Animation Loop
+  function animate() {
+    // Clear canvas
+    ctx.clearRect(0, 0, w, h);
+    
+    // Draw layers back-to-front for parallax
+    drawBackground();
+    
+    godRays.forEach(ray => { ray.update(); ray.draw(); });
+    planktons.forEach(p => { p.update(); p.draw(); });
+    
+    // Mid layer
+    seaweeds.forEach(s => { s.update(); s.draw(); });
+    jellyfishes.forEach(j => { j.update(); j.draw(); });
+    fishes.forEach(f => { f.update(); f.draw(); });
+    
+    // Foreground
+    drawForegroundRocks();
+    bubbles.forEach(b => { b.update(); b.draw(); });
+
+    requestAnimationFrame(animate);
+  }
+
+  // Start
+  animate();
+</script>
+</body>
+</html>
