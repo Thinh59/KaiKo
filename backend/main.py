@@ -193,7 +193,8 @@ def load_model():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT"
     ]:
         try:
             cursor.execute(col_sql)
@@ -259,9 +260,11 @@ def load_model():
             username TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL,
-            likes INTEGER DEFAULT 0
+            likes INTEGER DEFAULT 0,
+            image_url TEXT
         )
     ''')
+    cursor.execute("ALTER TABLE community_posts ADD COLUMN IF NOT EXISTS image_url TEXT")
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS post_comments (
@@ -677,6 +680,7 @@ class DebateResult(BaseModel):
 class AuthInput(BaseModel):
     username: str
     password: str
+    email: Optional[str] = None
 
 class DebateContext(BaseModel):
     topic: str
@@ -702,6 +706,7 @@ class FriendAction(BaseModel):
 class CommunityPostInput(BaseModel):
     username: str
     content: str
+    image_url: str = None
 
 class CommunityCommentInput(BaseModel):
     username: str
@@ -730,6 +735,12 @@ class JudgeProtectInput(BaseModel):
     judge: str
     disciple: str
     reason: str = ""
+
+class HintRequest(BaseModel):
+    topic: str
+    transcript_a: str
+    transcript_b: str
+    role: str
 
 def resolve_public_user_identifier(cursor, identifier: str, viewer: str | None = None):
     """Resolve a public user identifier without exposing usernames for nicknamed users."""
@@ -793,7 +804,7 @@ class TextAnalyzeInput(BaseModel):
 import random
 
 @app.get("/random-topic")
-async def get_random_topic():
+async def get_random_topic(category: str = None):
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {"success": True, "topic": random.choice(TRENDING_TOPICS)}
@@ -806,24 +817,60 @@ async def get_random_topic():
                 temperature=0.9,
             )
         )
-        prompt = "Hãy tạo 1 chủ đề tranh biện siêu thú vị, hài hước hoặc đang cực kỳ viral trên TikTok, Facebook, Reddit, hoặc một đề tập làm văn hài hước phá cách. Chỉ trả về đúng 1 câu ngắn gọn (dưới 15 chữ), không giải thích. Ví dụ: 'Có nên cấm Flexing trên mạng xã hội?' hoặc 'Tại sao Lão Hạc không ăn thịt chó?'"
+        prompt = "Hãy tạo 1 chủ đề tranh biện siêu thú vị, hài hước hoặc đang cực kỳ viral trên TikTok, Facebook, Reddit, hoặc một đề tập làm văn hài hước phá cách. Chỉ trả về đúng 1 câu ngắn gọn (dưới 15 chữ), không giải thích."
+        
+        if category and category != 'random':
+            category_names = {
+                'science': 'Khoa học (Vũ trụ, vật lý, sinh học, AI...)',
+                'history': 'Lịch sử (những giả thuyết thú vị hoặc bài học)',
+                'social': 'Mạng xã hội & Đời sống Gen Z',
+                'literature': 'Vấn đề nghị luận văn học, Thơ',
+                'math': 'Toán học hoặc tư duy logic',
+                'vietnamese': 'Tiếng Việt (ngữ pháp, từ lóng)',
+                'philosophy': 'Triết học & Tâm lý học'
+            }
+            cat_name = category_names.get(category, category)
+            prompt = f"Hãy tạo 1 chủ đề tranh biện cực kỳ thú vị và gây tranh cãi thuộc lĩnh vực: {cat_name}. Chỉ trả về đúng 1 câu ngắn gọn (dưới 15 chữ), KHÔNG giải thích thêm, KHÔNG dùng ngoặc kép."
+
         response = await asyncio.to_thread(gemini.generate_content, prompt)
-        topic = response.text.strip().replace('"', '')
+        topic = response.text.strip().replace('"', '').replace('*', '')
         if len(topic) > 10:
             return {"success": True, "topic": topic}
     except Exception as e:
-        print("Lỗi tạo topic bằng Gemini 2.5:", e)
+        print("Lỗi tạo topic bằng Gemini:", e)
         
     return {"success": True, "topic": random.choice(TRENDING_TOPICS)}
 
 @app.get("/")
 def root():
-    return {"status": "ok", "model_loaded": model is not None}
+    return {"status": "ok", "model_loaded": fallacy_model is not None}
+
+@app.post("/hint")
+async def get_hint(req: HintRequest):
+    if not os.getenv("GEMINI_API_KEY"):
+        return {"success": False, "error": "Chưa cấu hình Gemini"}
+    try:
+        model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
+        role_str = "Ủng hộ" if req.role == 'A' else "Phản đối"
+        prompt = f"""Bạn là chuyên gia tranh biện. Người dùng đang tranh biện chủ đề: "{req.topic}".
+Họ đóng vai: {role_str}.
+Lịch sử tranh biện:
+Phe Ủng hộ (A): {req.transcript_a}
+Phe Phản đối (B): {req.transcript_b}
+
+Dựa vào tình hình hiện tại, hãy gợi ý MỘT luận điểm ngắn gọn, sắc bén hoặc một câu hỏi vặn vẹo đối thủ để giúp người chơi (vai {req.role}) có thể dùng ngay. Không viết dài dòng.
+"""
+        resp = model.generate_content(prompt)
+        return {"success": True, "hint": resp.text.strip()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/register")
 def register(user: AuthInput):
     if not user.username or not user.password:
         return {"success": False, "error": "Vui lòng nhập đủ tên đăng nhập và mật khẩu"}
+    if hasattr(user, 'email') and user.email == "":
+        return {"success": False, "error": "Vui lòng nhập email"}
     
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -835,7 +882,10 @@ def register(user: AuthInput):
         return {"success": False, "error": "Tài khoản đã tồn tại"}
         
     pwd_hash = hashlib.sha256(user.password.encode()).hexdigest()
-    cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user.username, pwd_hash))
+    if user.email:
+        cursor.execute("INSERT INTO users (username, password_hash, email) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING", (user.username, pwd_hash, user.email))
+    else:
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s) ON CONFLICT DO NOTHING", (user.username, pwd_hash))
     conn.commit()
     conn.close()
     return {"success": True, "message": "Đăng ký thành công"}
@@ -1819,7 +1869,7 @@ def get_community_posts(limit: int = 30):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         cursor.execute("""
-            SELECT p.id, p.username, p.content, p.created_at, COALESCE(p.likes, 0) as likes,
+            SELECT p.id, p.username, p.content, p.created_at, COALESCE(p.likes, 0) as likes, p.image_url,
                    COALESCE(u.nickname, '') as nickname,
                    COUNT(c.id) as comment_count
             FROM community_posts p
@@ -1858,10 +1908,10 @@ def create_community_post(data: CommunityPostInput):
         from datetime import datetime, timezone
         now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-            INSERT INTO community_posts (username, content, created_at, likes)
-            VALUES (%s, %s, %s, 0)
-            RETURNING id, username, content, created_at, likes
-        """, (data.username, content[:1000], now))
+            INSERT INTO community_posts (username, content, created_at, likes, image_url)
+            VALUES (%s, %s, %s, 0, %s)
+            RETURNING id, username, content, created_at, likes, image_url
+        """, (data.username, content[:1000], now, data.image_url))
         post = dict(cursor.fetchone())
         conn.commit()
         post["comments"] = []
@@ -2174,10 +2224,10 @@ def get_server_announcements():
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         # Top player by level
-        cursor.execute("SELECT username, level FROM users ORDER BY level DESC, exp DESC LIMIT 1")
+        cursor.execute("SELECT username, level_real FROM users ORDER BY level_real DESC NULLS LAST LIMIT 1")
         top = cursor.fetchone()
         # Recent match
-        cursor.execute("SELECT winner, loser, created_at FROM match_history ORDER BY id DESC LIMIT 1")
+        cursor.execute("SELECT username, opponent, result FROM match_history ORDER BY id DESC LIMIT 1")
         recent = cursor.fetchone()
         # Total users
         cursor.execute("SELECT COUNT(*) as cnt FROM users")
@@ -2186,22 +2236,31 @@ def get_server_announcements():
         cursor.execute("SELECT COUNT(*) as cnt FROM match_history")
         total_matches = cursor.fetchone()['cnt']
 
+        topic = random.choice(TRENDING_TOPICS)
         announcements = [
             f"🌟 KaiKo Arena - Nơi tranh biện huyền thoại! Hiện có {total_users} võ sĩ đang hành đạo",
             f"⚔️ Tổng số trận đấu toàn server: {total_matches} trận - Chiến trường chưa bao giờ sôi động đến vậy!",
+            "📢 Bạn có thể đăng tin ở mục Cộng Đồng (thả thính, chia sẻ kinh nghiệm...)",
+            "🎉 Sự kiện hấp dẫn đang diễn ra tại Tab Sự Kiện, hãy tham gia ngay để nhận phần thưởng!",
+            f"🔥 Đang có phòng debate về '{topic}' - Hãy vào Xem Live để học hỏi ngay!",
         ]
-        if top:
-            announcements.append(f"👑 Đại Cao Thủ đang dẫn đầu bảng xếp hạng: [{top['username']}] - Cấp {top['level']}")
+        if top and top['level_real']:
+            announcements.append(f"👑 Đại Cao Thủ đang dẫn đầu bảng xếp hạng: [{top['username']}] - Cấp {top['level_real']}")
         if recent:
-            announcements.append(f"🥊 Trận vừa kết thúc: {recent['winner']} đánh bại {recent['loser']} - Huyết chiến vừa tàn!")
+            winner_name = recent['username'] if recent['result'] == 'win' else recent['opponent']
+            loser_name = recent['opponent'] if recent['result'] == 'win' else recent['username']
+            if recent['result'] == 'draw':
+                announcements.append(f"🥊 Trận vừa kết thúc: {recent['username']} và {recent['opponent']} bất phân thắng bại!")
+            else:
+                announcements.append(f"🥊 Trận vừa kết thúc: {winner_name} đánh bại {loser_name} - Huyết chiến vừa tàn!")
         announcements += [
             "🎓 Hệ thống Sư Đồ đã mở! Bái sư để nâng cao tu vi của bạn ngay hôm nay",
             "🦀 Huy hiệu 'Cua Hoàng Đế' đang chờ những tranh biện viên xuất sắc nhất",
-            "🔥 Tính năng Chat Cộng Đồng mới ra mắt - Kết nối với các đạo hữu ngay bây giờ!",
         ]
         return {"success": True, "announcements": announcements}
     except Exception as e:
-        return {"success": True, "announcements": ["🌟 Chào mừng đến với KaiKo Arena - Sân đấu tranh biện huyền thoại!"]}
+        print("GET SERVER ANNOUNCEMENTS ERROR:", e)
+        return {"success": True, "announcements": ["🌟 Lỗi Server: " + str(e)]}
     finally:
         conn.close()
 

@@ -6,10 +6,28 @@ const API_BASE = 'http://localhost:8000'
 
 export default function AuthPage({ onLogin }) {
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [isLogin, setIsLogin] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const getPasswordStrength = (pass) => {
+    if (pass.length === 0) return { label: '', color: 'transparent', width: '0%' };
+    let score = 0;
+    if (pass.length > 5) score += 1;
+    if (pass.length > 8) score += 1;
+    if (/[A-Z]/.test(pass)) score += 1;
+    if (/[0-9]/.test(pass)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+
+    if (score <= 2) return { label: 'Yếu', color: '#ef4444', width: '33%' };
+    if (score <= 4) return { label: 'Trung bình', color: '#eab308', width: '66%' };
+    return { label: 'Mạnh', color: '#22c55e', width: '100%' };
+  }
+  const strength = getPasswordStrength(password);
 
   // Clerk hooks (chỉ dùng nếu Clerk được cấu hình)
   const { signIn, isLoaded: signInLoaded } = useSignIn()
@@ -41,10 +59,23 @@ export default function AuthPage({ onLogin }) {
   const handleAuth = async (e) => {
     e.preventDefault()
     setErrorMsg('')
+
+    if (!isLogin) {
+      if (password !== confirmPassword) {
+        setErrorMsg('Mật khẩu xác nhận không khớp!')
+        return
+      }
+      if (!email) {
+        setErrorMsg('Vui lòng nhập email xác thực!')
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const endpoint = isLogin ? '/login' : '/register'
-      const res = await axios.post(`${API_BASE}${endpoint}`, { username, password })
+      const payload = isLogin ? { username, password } : { username, email, password }
+      const res = await axios.post(`${API_BASE}${endpoint}`, payload)
       if (res.data.success) {
         if (!isLogin) {
           alert('Đăng ký thành công! Hãy đăng nhập.')
@@ -64,17 +95,19 @@ export default function AuthPage({ onLogin }) {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
+      overflow: 'hidden',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '2rem',
+      boxSizing: 'border-box'
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem', width: '100%' }}>
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
-          <h1 style={{ fontSize: '3.5rem', margin: '0 0 0.5rem', color: '#ffe9c2', letterSpacing: '-1px', textShadow: '0 4px 20px rgba(0,0,0,0.75), 0 0 18px rgba(251,146,60,0.55)' }}>
+          <h1 style={{ fontSize: '3.5rem', margin: '0 0 0.5rem', color: '#ffe9c2', letterSpacing: '-1px', textShadow: '0 0 18px rgba(251,146,60,0.55)' }}>
             <span style={{ color: 'var(--accent-primary)', textShadow: '0 0 20px rgba(99, 102, 241, 0.5)' }}>Kai</span>Ko
           </h1>
           <p style={{ color: '#ffe8bf', fontSize: '1.1rem', textShadow: '0 2px 10px rgba(0,0,0,0.65)' }}>Nền tảng Tranh biện AI & Đối kháng</p>
@@ -124,14 +157,53 @@ export default function AuthPage({ onLogin }) {
               style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
               required
             />
-            <input
-              type="password"
-              placeholder="Mật khẩu"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
-              required
-            />
+            {!isLogin && (
+              <input
+                type="email"
+                placeholder="Email xác thực"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                style={{ padding: '12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
+                required
+              />
+            )}
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Mật khẩu"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '12px 40px 12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '1.2rem' }}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
+            {!isLogin && password.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '-8px', marginBottom: '4px' }}>
+                <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: strength.width, background: strength.color, transition: 'all 0.3s' }}></div>
+                </div>
+                <span style={{ fontSize: '0.8rem', color: strength.color, textAlign: 'right' }}>Độ mạnh: {strength.label}</span>
+              </div>
+            )}
+            {!isLogin && (
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Xác nhận mật khẩu"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', padding: '12px 40px 12px 16px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: '1rem', outline: 'none' }}
+                  required
+                />
+              </div>
+            )}
             {errorMsg && <p style={{ color: '#ef4444', fontSize: '0.9rem', margin: 0, textAlign: 'center' }}>{errorMsg}</p>}
             <button
               type="submit"
@@ -173,15 +245,7 @@ export default function AuthPage({ onLogin }) {
           👤 Tiếp tục với tư cách Khách
         </button>
 
-        {/* Khu vực test giám khảo */}
-        <div style={{ width: '100%', maxWidth: '400px', background: 'rgba(239, 68, 68, 0.08)', padding: '16px', borderRadius: '12px', border: '1px dashed rgba(239,68,68,0.4)', marginTop: '8px' }}>
-          <h3 style={{ color: '#ef4444', textAlign: 'center', marginTop: 0, marginBottom: '12px', fontSize: '0.95rem' }}>🧪 Tài khoản Giả lập (Demo Đồ Án)</h3>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={() => onLogin('Test_CuaNon')} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #9ca3af', background: 'rgba(0,0,0,0.4)', color: '#9ca3af', cursor: 'pointer', fontSize: '0.85rem' }}>Lv 5 (Cua Non)</button>
-            <button onClick={() => onLogin('Test_CuaCum')} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #3b82f6', background: 'rgba(0,0,0,0.4)', color: '#3b82f6', cursor: 'pointer', fontSize: '0.85rem' }}>Lv 45 (Cua Cùm)</button>
-            <button onClick={() => onLogin('Test_CuaHoangDe')} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #facc15', background: 'rgba(0,0,0,0.4)', color: '#facc15', cursor: 'pointer', fontSize: '0.85rem' }}>Lv 101 (Hoàng Đế)</button>
-          </div>
-        </div>
+
 
       </div>
     </div>

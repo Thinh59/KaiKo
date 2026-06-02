@@ -374,4 +374,8 @@ Fix bug:
 - Chỉnh nút thoát
 - Gợi ý, hỗ trợ khi bí luận (trả lời câu hỏi, phản biện,...) 
 - Thêm tương tác khi chat/video debate khi đối thủ debate để đánh qua lại. => thêm cho từng người chơi 1 con bot riêng = khung avarta,...
+- Chỉnh lúc đăng ký tài khoản thì có thể đăng ký tên đăng nhập nhưng phải nhập thêm gmail xác thực nữa và sẽ thêm nhập mật khẩu, check độ mạnh yếu của mật khẩu và xác nhận lại mật khẩu = cách nhập thêm 1 lần, có nút xem hay ẩn mật khẩu = con mắt.
+
+-Thêm nút chơi luôn hay gì đó khi người dùng không muốn nhập chủ đề khi solo với AI
+-Khung chat thì chỗ nhập liệu người dùng có thể dùng phím Shift+Enter để xuống dòng và khung nhập liệu cũng mở rộng ra để nhìn rõ hết các chữ đã nhập thay vì phải di chuyển qua lại để xem lại các chữ trước đó
 

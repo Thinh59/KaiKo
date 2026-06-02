@@ -34,7 +34,8 @@ export default function ReadyCheck({ matchInfo, onReady, onCancel, getDisplayNam
       <div className="glass-panel animate-fade-in" style={{ padding: '3.5rem', textAlign: 'center', width: '100%', maxWidth: '500px', border: '1px solid rgba(99, 102, 241, 0.3)', boxShadow: '0 0 50px rgba(99, 102, 241, 0.2)' }}>
         <h2 style={{ color: 'var(--text-primary)', fontSize: '2.5rem', marginBottom: '1rem', textShadow: '0 0 10px rgba(255,255,255,0.2)' }}>Đã tìm thấy trận!</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', marginBottom: '2.5rem' }}>
-          Đối thủ của bạn: <strong style={{ color: '#a855f7', fontSize: '1.4rem' }}>{matchInfo.opponentName || matchInfo.opponentId}</strong>
+          Đối thủ của bạn: <strong style={{ color: '#a855f7', fontSize: '1.4rem' }}>{matchInfo.opponentName || matchInfo.opponentId}</strong><br/>
+          Vai trò của bạn: <strong style={{ color: matchInfo.isHost ? '#10b981' : '#ef4444', fontSize: '1.4rem' }}>{matchInfo.isHost ? 'Ủng Hộ' : 'Phản Đối'}</strong>
         </p>
         
         <div style={{ 

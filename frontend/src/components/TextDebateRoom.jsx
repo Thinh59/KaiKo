@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import FallacyAlert from './FallacyAlert'
+import Avatar from './Avatar'
+import { useUser } from '@clerk/clerk-react'
 
 const API_BASE = 'http://localhost:8000'
 
 export default function TextDebateRoom({ roomData, roomInfo, mode, username, onFinish, onCancel, registerHandler, sendMessage }) {
+  const { user } = useUser()
   const [messages, setMessages] = useState([]) // { id, speaker, text, fallacy, isAiGenerated, isExcellent }
   const [input, setInput] = useState('')
   const [isAiThinking, setIsAiThinking] = useState(false)
+  const inputRef = useRef(null)
   
   const [fallacy, setFallacy] = useState(null)
   const [fallacySpeaker, setFallacySpeaker] = useState('')
@@ -16,6 +20,12 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
   const [bestFriends, setBestFriends] = useState([])
   const [selectedHelper, setSelectedHelper] = useState('')
   const [requestingHelp, setRequestingHelp] = useState(false)
+  
+  const [hint, setHint] = useState('')
+  const [gettingHint, setGettingHint] = useState(false)
+  
+  const [effectA, setEffectA] = useState(null)
+  const [effectB, setEffectB] = useState(null)
   
   const [systemAlert, setSystemAlert] = useState(null)
 
@@ -91,6 +101,17 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
 
     const cleanupChat = registerHandler('chat_msg', (data) => {
       setMessages(prev => [...prev, data.msg])
+      
+      const skillTypes = ['fire', 'lightning', 'bubble', 'rock', '💧', '🌪️', '☄️'];
+      const randomSkill = skillTypes[Math.floor(Math.random() * skillTypes.length)];
+      if (data.msg.speaker === 'B') {
+        setEffectA(randomSkill);
+        setTimeout(() => setEffectA(null), 1500);
+      } else {
+        setEffectB(randomSkill);
+        setTimeout(() => setEffectB(null), 1500);
+      }
+
       if (data.msg.fallacy && data.msg.speaker !== (isPlayerA ? 'A' : 'B')) {
         setFallacy(data.msg.fallacy)
         setFallacySpeaker(data.msg.speaker === 'A' ? roomData.playerA : roomData.playerB)
@@ -105,6 +126,17 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         setPhase('debate')
         setSystemAlert({ type: 'success', msg: `${data.speakerName} đã chốt chủ đề: ${data.topic}` })
         setTimeout(() => setSystemAlert(null), 4000)
+      }
+    })
+
+    const cleanupSkill = registerHandler('skill_attack', (data) => {
+      const { targetPlayer, skillType } = data;
+      if (targetPlayer === 'A') {
+        setEffectA(skillType);
+        setTimeout(() => setEffectA(null), 1500);
+      } else {
+        setEffectB(skillType);
+        setTimeout(() => setEffectB(null), 1500);
       }
     })
 
@@ -128,6 +160,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     return () => {
       cleanupChat && cleanupChat()
       cleanupTopic && cleanupTopic()
+      cleanupSkill && cleanupSkill()
       cleanupEndReq && cleanupEndReq()
       cleanupEndConfirm && cleanupEndConfirm()
       cleanupResult && cleanupResult()
@@ -162,6 +195,32 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     }
   }
 
+  const handleGetHint = async () => {
+    setGettingHint(true)
+    setHint('')
+    const transcriptA = messages.filter(m => m.speaker === 'A').map(m => m.text).join('. ')
+    const transcriptB = messages.filter(m => m.speaker === 'B').map(m => m.text).join('. ')
+    const role = isPlayerA ? 'A' : 'B'
+    try {
+      const res = await axios.post(`${API_BASE}/hint`, {
+        topic: currentTopic, transcript_a: transcriptA, transcript_b: transcriptB, role
+      })
+      if (res.data.success) {
+        setHint(res.data.hint)
+      } else {
+        setSystemAlert({ type: 'warning', msg: 'Không lấy được gợi ý: ' + res.data.error })
+        setTimeout(() => setSystemAlert(null), 4000)
+      }
+    } catch(err) {
+      setSystemAlert({ type: 'warning', msg: 'Lỗi khi lấy gợi ý.' })
+      setTimeout(() => setSystemAlert(null), 4000)
+    } finally {
+      setGettingHint(false)
+    }
+  }
+
+  // Removed explicit castSkill function since it's automated now
+
   const handleSubmitTopic = (e) => {
     e.preventDefault()
     if (!topicInput.trim()) return
@@ -179,12 +238,26 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     
     const userText = input.trim()
     setInput('')
+    if (inputRef.current) {
+      inputRef.current.style.height = '56px';
+    }
     
     const speakerLabel = isPlayerA ? 'A' : 'B'
     const speakerName = isPlayerA ? roomData.playerA : roomData.playerB
 
     const newMsg = { id: Date.now(), speaker: speakerLabel, text: userText, fallacy: null, isAiGenerated: false, isExcellent: false }
     setMessages(prev => [...prev, newMsg])
+
+    // Auto cast skill
+    const skillTypes = ['fire', 'lightning', 'bubble', 'rock', '💧', '🌪️', '☄️'];
+    const randomSkill = skillTypes[Math.floor(Math.random() * skillTypes.length)];
+    if (speakerLabel === 'A') {
+      setEffectB(randomSkill);
+      setTimeout(() => setEffectB(null), 1500);
+    } else {
+      setEffectA(randomSkill);
+      setTimeout(() => setEffectA(null), 1500);
+    }
 
     // Phân tích text
     try {
@@ -254,6 +327,12 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         
         const aiText = aiRes.data.response || 'Tôi không có phản hồi.'
         setMessages(prev => [...prev, { id: Date.now(), speaker: 'B', text: aiText, fallacy: null, isAiGenerated: false }])
+        
+        // AI Attack
+        const aiSkillTypes = ['fire', 'lightning', 'bubble', 'rock', '💧', '🌪️', '☄️'];
+        const aiSkill = aiSkillTypes[Math.floor(Math.random() * aiSkillTypes.length)];
+        setEffectA(aiSkill);
+        setTimeout(() => setEffectA(null), 1500);
       } catch(err) {
         setMessages(prev => [...prev, { id: Date.now(), speaker: 'B', text: 'AI đang bận, xin lỗi.', fallacy: null, isAiGenerated: false }])
       } finally {
@@ -341,14 +420,58 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
+  const getAvatarSrc = (name) => {
+    if (name.includes('AI')) return '/assets/avatars/CuaXanh.png'
+    const isMe = (name === roomData.playerA && isPlayerA) || (name === roomData.playerB && !isPlayerA)
+    const stored = localStorage.getItem('kaiko_avatar_' + name)
+    if (stored && stored !== 'none' && stored !== '') return stored
+    if (isMe && user?.imageUrl) return user.imageUrl
+    return `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`
+  }
+
+  const getFrameSrc = (name) => {
+    if (name.includes('AI')) return null
+    const isMe = (name === roomData.playerA && isPlayerA) || (name === roomData.playerB && !isPlayerA)
+    let frame = localStorage.getItem('kaiko_frame_' + name)
+    if (isMe) frame = localStorage.getItem('kaiko_frame') || frame
+    if (frame && frame !== 'none' && frame !== '') {
+      const frameFileMap = { wood: 'wood.png', silver: 'silver.png', gold: 'gold.png', diamond: 'diamond.png', fire: 'fire.png', diamond_plus: 'KimCuongPlus.png' }
+      return `/assets/frames/${frameFileMap[frame] || frame + '.png'}`
+    }
+    return null
+  }
+
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', position: 'relative' }}>
+    <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', height: '100vh', boxSizing: 'border-box', position: 'relative' }}>
       
       {systemAlert && (
-        <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: systemAlert.type === 'success' ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)', color: '#fff', padding: '10px 20px', borderRadius: '20px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', animation: 'slideDown 0.3s ease-out' }}>
+        <div style={{ position: 'absolute', top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: systemAlert.type === 'success' ? '#10b981' : '#ef4444', color: '#fff', padding: '10px 20px', borderRadius: '0px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', animation: 'slideDown 0.3s ease-out' }}>
           {systemAlert.msg}
         </div>
       )}
+
+      {/* Top Action Buttons (Fixed top-right) */}
+      <div style={{ position: 'fixed', top: '20px', right: '20px', display: 'flex', gap: '12px', zIndex: 1000 }}>
+        {bestFriends.length > 0 && mode?.includes('1v1') && (
+          <>
+            <select value={selectedHelper} onChange={e => setSelectedHelper(e.target.value)} style={{ background: '#fff', color: '#000', border: 'none', borderRadius: '30px', padding: '0 15px', height: '45px', outline: 'none', fontWeight: 'bold' }}>
+              {bestFriends.map(f => <option key={f.username} value={f.username}>{f.username}</option>)}
+            </select>
+            <button onClick={handleRequestBestFriendHelp} disabled={requestingHelp} style={{ height: '45px', borderRadius: '30px', background: '#10b981', color: '#fff', border: 'none', padding: '0 20px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+              {requestingHelp ? '⏳' : '🆘'}
+            </button>
+          </>
+        )}
+        <button onClick={handleGetHint} disabled={gettingHint} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#f59e0b', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} title="Gợi ý">
+          {gettingHint ? '⏳' : '💡'}
+        </button>
+        <button onClick={onCancel} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} title="Thoát">
+          ✖
+        </button>
+        <button onClick={handleEndClick} disabled={phase === 'scoring' || (endRequested && debateTimeLeft > 0)} style={{ padding: '0 24px', height: '45px', borderRadius: '30px', background: phase === 'scoring' ? '#6b7280' : '#3b82f6', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
+          {phase === 'scoring' ? 'Đang chấm điểm...' : (endRequested && debateTimeLeft > 0) ? 'Đang chờ...' : '🏁 Kết thúc'}
+        </button>
+      </div>
 
       {opponentWantsToEnd && phase === 'debate' && (
         <div style={{ position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)', zIndex: 1000, background: 'rgba(245,158,11,0.95)', color: '#000', padding: '15px 25px', borderRadius: '12px', fontWeight: 'bold', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -376,42 +499,93 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
             />
             <button type="submit" className="btn-primary" style={{ padding: '0 30px', borderRadius: '30px', fontSize: '1.2rem', fontWeight: 'bold' }}>Chốt!</button>
           </form>
+          {isSolo && (
+            <button onClick={() => setPhase('debate')} className="btn-secondary" style={{ marginTop: '20px', padding: '10px 30px', borderRadius: '30px', fontSize: '1.1rem', borderColor: '#10b981', color: '#10b981' }}>
+              ▶️ Chơi luôn (Chủ đề ngẫu nhiên)
+            </button>
+          )}
         </div>
       )}
 
       <FallacyAlert fallacy={fallacy} speaker={fallacySpeaker} />
       
-      <div className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <div>
-          <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.5rem' }}>💬 {currentTopic}</h2>
-          <p style={{ margin: '5px 0 0', color: 'var(--text-secondary)' }}>
-            <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{roomData.playerA} (Ủng Hộ)</span> 
-            {' '}vs{' '} 
-            <span style={{ color: '#a855f7', fontWeight: 'bold' }}>{roomData.playerB} (Phản Đối)</span>
-          </p>
+      {hint && (
+        <div style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid #38bdf8', padding: '10px 20px', borderRadius: '8px', marginBottom: '20px', color: '#bae6fd', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div><strong>💡 Gợi ý của AI:</strong> {hint}</div>
+          <button onClick={() => setHint('')} style={{ background: 'transparent', border: 'none', color: '#38bdf8', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {phase === 'debate' && (
-             <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: debateTimeLeft <= 30 ? '#ef4444' : '#10b981', marginRight: '15px', fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '5px 15px', borderRadius: '8px' }}>
-               ⏱ {formatTime(debateTimeLeft)}
-             </div>
-          )}
-          {bestFriends.length > 0 && mode?.includes('1v1') && (
-            <>
-              <select value={selectedHelper} onChange={e => setSelectedHelper(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '9px', maxWidth: '150px' }}>
-                {bestFriends.map(f => <option key={f.username} value={f.username}>{f.username}</option>)}
-              </select>
-              <button onClick={handleRequestBestFriendHelp} disabled={requestingHelp} className="btn-secondary" style={{ padding: '10px 14px', borderRadius: '8px', borderColor: 'rgba(16,185,129,0.5)', color: '#6ee7b7' }}>
-                {requestingHelp ? 'Đang gửi...' : '🆘 SOS'}
-              </button>
-            </>
-          )}
-          <button onClick={onCancel} className="btn-secondary" style={{ padding: '10px 20px' }}>Thoát</button>
-          <button onClick={handleEndClick} className="btn-primary" disabled={phase === 'scoring' || (endRequested && debateTimeLeft > 0)} style={{ padding: '10px 20px', background: phase === 'scoring' ? '#6b7280' : '#f59e0b', borderColor: phase === 'scoring' ? '#6b7280' : '#f59e0b' }}>
-            {phase === 'scoring' ? 'Đang chấm điểm...' : (endRequested && debateTimeLeft > 0) ? 'Đang chờ đối thủ...' : '🏁 Kết thúc'}
-          </button>
-        </div>
+      )}
+
+      <style>
+        {`
+          @keyframes moveRight {
+            0% { transform: translateX(0) scale(1); opacity: 1; }
+            80% { transform: translateX(160px) scale(1); opacity: 1; }
+            100% { transform: translateX(180px) scale(1.5); opacity: 0; }
+          }
+          @keyframes moveLeft {
+            0% { transform: translateX(0) scale(1); opacity: 1; }
+            80% { transform: translateX(-160px) scale(1); opacity: 1; }
+            100% { transform: translateX(-180px) scale(1.5); opacity: 0; }
+          }
+          @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+          }
+          .char-hurt {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+            filter: drop-shadow(0 0 10px red) sepia(1) hue-rotate(-50deg) saturate(5);
+          }
+        `}
+      </style>
+
+      {/* Topic Panel */}
+      <div style={{ width: 'fit-content', minWidth: '300px', maxWidth: '800px', margin: '0 auto 15px auto', background: '#6b7280', padding: '10px 30px', borderRadius: '0px', display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', boxShadow: 'var(--shadow-md)', border: '1px solid rgba(255,255,255,0.1)' }}>
+        <h2 style={{ margin: 0, color: '#ffffff', fontSize: '1.2rem', textAlign: 'center', fontWeight: 'bold' }}>💬 {currentTopic}</h2>
       </div>
+        
+      {/* Avatars and Timer row (Translucent Panel) */}
+      <div style={{ width: 'fit-content', margin: '0 auto 20px auto', padding: '15px 40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '40px', borderRadius: '30px', background: 'rgba(30, 41, 59, 0.85)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+          
+        {/* Player A (Ủng hộ) */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+          <div className={effectA ? 'char-hurt' : ''} style={{ position: 'relative', width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(16,185,129,0.3)' }}>
+            <img src={getAvatarSrc(roomData.playerA)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            {getFrameSrc(roomData.playerA) && (
+              <img src={getFrameSrc(roomData.playerA)} style={{ position: 'absolute', top: '-15%', left: '-15%', width: '130%', height: '130%', zIndex: 2, pointerEvents: 'none' }} onError={(e) => e.target.style.display = 'none'} />
+            )}
+          </div>
+          <strong style={{ color: 'var(--accent-primary)', display: 'block', marginTop: '6px', fontSize: '1rem' }}>{roomData.playerA}</strong>
+          <div style={{ fontSize: '0.75rem', color: roomData.isLocalHost ? '#10b981' : 'var(--text-secondary)', fontWeight: 'bold' }}>{roomData.isLocalHost ? '(Bạn - Ủng hộ)' : '(Ủng hộ)'}</div>
+          {effectB && <div style={{ position: 'absolute', top: '5px', left: '50px', fontSize: '2rem', animation: 'moveRight 0.8s linear forwards', zIndex: 10 }}>{effectB === 'fire' ? '🔥' : effectB === 'bubble' ? '🫧' : effectB === 'rock' ? '🪨' : effectB}</div>}
+        </div>
+
+        {/* Timer */}
+        {phase === 'debate' ? (
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: debateTimeLeft <= 60 ? '#ff4b4b' : '#38bdf8', textAlign: 'center', fontFamily: 'monospace', textShadow: '0 2px 10px rgba(0,0,0,0.2)', width: '120px' }}>
+            ⏱ {formatTime(debateTimeLeft)}
+          </div>
+        ) : (
+          <div style={{ width: '120px', textAlign: 'center', color: 'var(--text-secondary)' }}>Đang chờ...</div>
+        )}
+          
+        {/* Player B (Phản đối) */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+          <div className={effectB ? 'char-hurt' : ''} style={{ position: 'relative', width: '50px', height: '50px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(168,85,247,0.3)' }}>
+            <img src={getAvatarSrc(roomData.playerB)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            {getFrameSrc(roomData.playerB) && (
+              <img src={getFrameSrc(roomData.playerB)} style={{ position: 'absolute', top: '-15%', left: '-15%', width: '130%', height: '130%', zIndex: 2, pointerEvents: 'none' }} onError={(e) => e.target.style.display = 'none'} />
+            )}
+          </div>
+          <strong style={{ color: '#a855f7', display: 'block', marginTop: '6px', fontSize: '1rem' }}>{roomData.playerB}</strong>
+          <div style={{ fontSize: '0.75rem', color: !roomData.isLocalHost ? '#10b981' : 'var(--text-secondary)', fontWeight: 'bold' }}>{!roomData.isLocalHost ? '(Bạn - Phản đối)' : '(Phản đối)'}</div>
+          {effectA && <div style={{ position: 'absolute', top: '5px', right: '50px', fontSize: '2rem', animation: 'moveLeft 0.8s linear forwards', zIndex: 10 }}>{effectA === 'fire' ? '🔥' : effectA === 'bubble' ? '🫧' : effectA === 'rock' ? '🪨' : effectA}</div>}
+        </div>
+
+      </div>
+
+      {/* Action buttons were moved to the top */}
 
       <div className="glass-panel" style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
         {messages.length === 0 && (
@@ -424,25 +598,37 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         {messages.map((msg) => {
           const isA = msg.speaker === 'A'
           const isMe = (isPlayerA && isA) || (!isPlayerA && !isA)
+          const speakerName = isA ? roomData.playerA : roomData.playerB
           
           return (
-            <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px', textAlign: isMe ? 'right' : 'left' }}>
-                {isA ? `${roomData.playerA} (Ủng Hộ)` : `${roomData.playerB} (Phản Đối)`}
+            <div key={msg.id} style={{ alignSelf: isMe ? 'flex-end' : 'flex-start', maxWidth: '85%', display: 'flex', gap: '10px', flexDirection: isMe ? 'row-reverse' : 'row' }}>
+              
+              {/* Avatar Icon */}
+              <div style={{ flexShrink: 0, marginTop: '20px' }}>
+                <div style={{ position: 'relative', width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src={getAvatarSrc(speakerName)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  {getFrameSrc(speakerName) && (
+                    <img src={getFrameSrc(speakerName)} style={{ position: 'absolute', top: '-15%', left: '-15%', width: '130%', height: '130%', zIndex: 2, pointerEvents: 'none' }} onError={(e) => e.target.style.display = 'none'} />
+                  )}
+                </div>
               </div>
-              <div style={{
-                background: isMe ? 'rgba(99,102,241,0.15)' : 'rgba(168,85,247,0.15)',
-                border: `1px solid ${isMe ? 'rgba(99,102,241,0.3)' : 'rgba(168,85,247,0.3)'}`,
-                padding: '12px 18px',
-                borderRadius: '16px',
-                borderTopRightRadius: isMe ? '4px' : '16px',
-                borderTopLeftRadius: !isMe ? '4px' : '16px',
-                color: '#fff',
-                lineHeight: '1.5',
-                boxShadow: msg.isExcellent ? '0 0 15px rgba(16,185,129,0.5)' : 'none'
-              }}>
-                {msg.text}
-              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  {isA ? `${roomData.playerA} (Ủng Hộ)` : `${roomData.playerB} (Phản Đối)`}
+                </div>
+                <div style={{
+                  background: isMe ? '#4f46e5' : '#7c3aed',
+                  padding: '12px 18px',
+                  borderRadius: '16px',
+                  borderTopRightRadius: isMe ? '4px' : '16px',
+                  borderTopLeftRadius: !isMe ? '4px' : '16px',
+                  color: '#ffffff',
+                  lineHeight: '1.5',
+                  boxShadow: msg.isExcellent ? '0 0 15px rgba(16,185,129,0.5)' : '0 2px 5px rgba(0,0,0,0.2)'
+                }}>
+                  {msg.text}
+                </div>
               {(msg.fallacy || msg.isAiGenerated || msg.isExcellent) && (
                 <div style={{ marginTop: '5px', display: 'flex', gap: '5px', justifyContent: isMe ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
                   {msg.isExcellent && <span style={{ background: '#10b981', color: '#fff', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px' }}>🌟 Cực Phẩm</span>}
@@ -450,6 +636,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
                   {msg.isAiGenerated && <span style={{ background: '#f59e0b', color: '#fff', fontSize: '0.75rem', padding: '2px 8px', borderRadius: '10px' }}>🤖 Nghi vấn dùng AI</span>}
                 </div>
               )}
+              </div>
             </div>
           )
         })}
@@ -461,20 +648,30 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         <div ref={chatEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
-        <input 
-          type="text" 
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+        <textarea 
+          ref={inputRef}
           value={input} 
-          onChange={e => setInput(e.target.value)} 
-          placeholder={phase === 'scoring' ? "Trận đấu đã kết thúc..." : "Gõ lập luận của bạn vào đây..."}
+          onChange={e => {
+            setInput(e.target.value)
+            e.target.style.height = '56px'
+            e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+          }} 
+          onKeyDown={e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+          placeholder={phase === 'scoring' ? "Trận đấu đã kết thúc..." : "Gõ lập luận... (Shift + Enter để xuống dòng)"}
           disabled={isAiThinking || phase !== 'debate'}
-          style={{ flex: 1, padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: '1.1rem' }}
+          style={{ flex: 1, padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'var(--bg-glass)', color: 'var(--text-primary)', fontSize: '1.1rem', resize: 'none', height: '56px', maxHeight: '150px', outline: 'none' }}
         />
         <button 
           type="submit" 
           disabled={isAiThinking || phase !== 'debate'}
           className="btn-primary"
-          style={{ padding: '0 30px', borderRadius: '12px', fontWeight: 'bold' }}
+          style={{ padding: '0 30px', height: '56px', borderRadius: '12px', fontWeight: 'bold' }}
         >
           Gửi
         </button>

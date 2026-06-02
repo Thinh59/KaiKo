@@ -9,7 +9,8 @@ export default function ControlsBar({
   onStart,
   onStop,
   onNextTurn,
-  onEnd
+  onEnd,
+  onCancel
 }) {
   const isTimeRunningOut = timeLeft <= 10
   const isDisabled = isScoring || isAiThinking
@@ -27,11 +28,11 @@ export default function ControlsBar({
       <div style={{
         fontSize: '5rem',
         fontWeight: '800',
-        color: isTimeRunningOut ? '#ef4444' : 'var(--accent-primary)',
+        color: isTimeRunningOut ? '#ff4b4b' : '#38bdf8',
         marginBottom: '1rem',
         fontFamily: 'var(--font-mono)',
         letterSpacing: '4px',
-        textShadow: isTimeRunningOut ? '0 0 25px rgba(239,68,68,0.6)' : '0 0 20px rgba(99,102,241,0.4)',
+        textShadow: isTimeRunningOut ? '0 0 25px rgba(255,75,75,0.6)' : '0 0 20px rgba(56,189,248,0.4)',
         transition: 'color 0.3s ease, text-shadow 0.3s ease'
       }}>
         {String(timeLeft).padStart(2, '0')}<span style={{ fontSize: '2rem', opacity: 0.7, marginLeft: '4px' }}>s</span>
@@ -141,6 +142,25 @@ export default function ControlsBar({
           onMouseLeave={(e) => !isDisabled && (e.target.style.transform = 'translateY(0)')}
         >
           {isScoring ? '⏳ Đang chấm điểm...' : '✅ Kết thúc'}
+        </button>
+
+        <button
+          onClick={onCancel}
+          style={{
+            padding: '12px 18px',
+            background: 'rgba(239, 68, 68, 0.2)',
+            color: '#fca5a5',
+            border: '1px solid #ef4444',
+            borderRadius: 'var(--radius-full)',
+            cursor: 'pointer',
+            fontSize: '1.4rem',
+            transition: 'all 0.3s ease'
+          }}
+          title="Thoát"
+          onMouseEnter={(e) => (e.target.style.background = 'rgba(239, 68, 68, 0.4)')}
+          onMouseLeave={(e) => (e.target.style.background = 'rgba(239, 68, 68, 0.2)')}
+        >
+          ✖
         </button>
       </div>
 

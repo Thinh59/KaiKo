@@ -67,20 +67,7 @@ export default function HomePage({ onPlay, theme }) {
           </button>
         </div>
 
-        <div style={{ marginTop: '6rem', display: 'flex', gap: '4rem', justifyContent: 'center', opacity: 0.9 }}>
-          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🤖</div>
-            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Phân tích Real-time</div>
-          </div>
-          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>⚔️</div>
-            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Đối kháng 1v1</div>
-          </div>
-          <div className="glass-card" style={{ textAlign: 'center', padding: '20px', borderRadius: '16px', minWidth: '180px' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '10px' }}>🏆</div>
-            <div style={{ fontSize: '1.2rem', color: '#fff', fontWeight: 'bold' }}>Hệ thống Rank</div>
-          </div>
-        </div>
+
       </div>
     </div>
   )

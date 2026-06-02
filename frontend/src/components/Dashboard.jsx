@@ -323,6 +323,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [chatUnreadCount, setChatUnreadCount] = useState(0)
   const [communityPosts, setCommunityPosts] = useState([])
   const [communityInput, setCommunityInput] = useState('')
+  const [communityImage, setCommunityImage] = useState(null)
   const [commentInputs, setCommentInputs] = useState({})
   const [communityLoading, setCommunityLoading] = useState(false)
   const [liveRooms, setLiveRooms] = useState([])
@@ -336,13 +337,6 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (r.data.success) setServerAnnouncements(r.data.announcements)
     }).catch(() => { })
   }, [])
-
-  // Rotate ticker every 6s
-  useEffect(() => {
-    if (serverAnnouncements.length === 0) return
-    const t = setInterval(() => setTickerIdx(i => (i + 1) % serverAnnouncements.length), 6000)
-    return () => clearInterval(t)
-  }, [serverAnnouncements])
 
   // Load global chat history
   useEffect(() => {
@@ -437,15 +431,28 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     }
   }, [])
 
+  const handleCommunityImageUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Kích thước ảnh tối đa là 2MB")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => setCommunityImage(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+
   const handleCreateCommunityPost = async (e) => {
     e?.preventDefault()
     const content = communityInput.trim()
-    if (!content) return
+    if (!content && !communityImage) return
     try {
-      const res = await axios.post(`${API_BASE}/community-posts`, { username, content })
+      const res = await axios.post(`${API_BASE}/community-posts`, { username, content, image_url: communityImage })
       if (res.data.success) {
         setCommunityPosts(prev => [{ ...res.data.post, nickname: globalNicknames[username] || nickname || '', comments: [] }, ...prev])
         setCommunityInput('')
+        setCommunityImage(null)
       } else {
         alert(res.data.error || 'Không đăng được bài')
       }
@@ -901,9 +908,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       {/* ── Server Ticker ── */}
       {serverAnnouncements.length > 0 && (
         <div style={{
-          background: 'linear-gradient(90deg, rgba(99,102,241,0.15), rgba(168,85,247,0.15), rgba(99,102,241,0.15))',
+          background: '#1e293b',
           border: '1px solid rgba(99,102,241,0.3)',
-          borderRadius: '8px',
+          borderRadius: '0px',
           padding: '6px 16px',
           marginBottom: '10px',
           display: 'flex',
@@ -913,20 +920,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           height: '34px'
         }}>
           <span style={{ color: '#a78bfa', fontWeight: 'bold', fontSize: '0.75rem', flexShrink: 0, letterSpacing: '1px' }}>📢 SERVER</span>
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-            <div key={tickerIdx} style={{
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <div style={{
               color: '#e2e8f0',
               fontSize: '0.85rem',
               whiteSpace: 'nowrap',
-              animation: 'tickerSlide 0.5s ease',
+              animation: 'marquee 45s linear infinite',
+              display: 'inline-block',
+              paddingLeft: '100%'
             }}>
-              {serverAnnouncements[tickerIdx]}
+              {serverAnnouncements.join('    |    ')}
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
-            {serverAnnouncements.map((_, i) => (
-              <div key={i} onClick={() => setTickerIdx(i)} style={{ width: '6px', height: '6px', borderRadius: '50%', background: i === tickerIdx ? '#a78bfa' : 'rgba(255,255,255,0.2)', cursor: 'pointer', transition: 'background 0.3s' }} />
-            ))}
           </div>
         </div>
       )}
@@ -1079,9 +1083,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
           <button
             onClick={onLogout}
-            style={{ background: 'transparent', border: '1px solid var(--border-light)', color: 'var(--text-secondary)', padding: '6px 14px', borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all 0.25s ease', flexShrink: 0, fontFamily: 'var(--font-heading)' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
+            style={{ background: '#4b5563', border: 'none', color: '#fff', padding: '6px 14px', borderRadius: '4px', cursor: 'pointer', transition: 'all 0.25s ease', flexShrink: 0, fontFamily: 'var(--font-heading)', fontWeight: 'bold' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#374151'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#4b5563'; }}
           >
             Đăng xuất
           </button>
@@ -2069,19 +2073,53 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
               </div>
             )}
 
-            {/* THỐNG KÊ NGỤY BIỆN */}
+            {/* THỐNG KÊ TỔNG QUAN & NGỤY BIỆN */}
             {activeTab === 'stats' && (
-              <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', marginBottom: '1rem', textAlign: 'center' }}>📊 Phân Tích Ngụy Biện</h2>
-                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginBottom: '2rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
-
-                <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
-                  {Object.keys(fallacyStats).length === 0 ? (
-                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
-                      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
-                      Tuyệt vời! Bạn chưa mắc lỗi ngụy biện nào.
+              <div style={{ maxWidth: '900px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                <h2 style={{ fontSize: '2.5rem', color: 'var(--text-primary)', textAlign: 'center', margin: 0 }}>📊 Thống Kê Cá Nhân</h2>
+                
+                {/* Tổng Quan */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div style={{ background: 'var(--panel-bg)', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-light)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '1.1rem' }}>Tổng Số Trận</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{stats.total || 0}</div>
+                  </div>
+                  <div style={{ background: 'rgba(16, 185, 129, 0.1)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.3)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '1.1rem' }}>Tỉ Lệ Thắng</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#10b981' }}>
+                      {stats.total > 0 ? Math.round(((stats.wins || 0) / stats.total) * 100) : 0}%
                     </div>
-                  ) : (
+                  </div>
+                  <div style={{ background: 'rgba(245, 158, 11, 0.1)', padding: '24px', borderRadius: '16px', border: '1px solid rgba(245, 158, 11, 0.3)', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '1.1rem' }}>Điểm Trung Bình</div>
+                    <div style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#f59e0b' }}>{stats.avgScore || 0}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--panel-bg)', padding: '10px 20px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span style={{ color: '#10b981', fontWeight: 'bold' }}>{stats.wins || 0} Thắng</span>
+                   </div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--panel-bg)', padding: '10px 20px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{stats.losses || 0} Thua</span>
+                   </div>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--panel-bg)', padding: '10px 20px', borderRadius: '99px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{stats.draws || 0} Hòa</span>
+                   </div>
+                </div>
+
+                {/* Phân Tích Ngụy Biện */}
+                <div>
+                  <h3 style={{ fontSize: '1.8rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>Phân Tích Ngụy Biện</h3>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Thống kê các lỗi logic bạn thường gặp trong các cuộc tranh biện.</p>
+                  
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    {Object.keys(fallacyStats).length === 0 ? (
+                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
+                        Tuyệt vời! Bạn chưa mắc lỗi ngụy biện nào.
+                      </div>
+                    ) : (
                     <div>
                       {Object.entries(fallacyStats).sort((a, b) => b[1] - a[1]).map(([fallacy, count]) => (
                         <div key={fallacy} style={{ display: 'flex', alignItems: 'center', marginBottom: '15px', background: 'var(--input-bg)', padding: '15px', borderRadius: '12px' }}>
@@ -2094,6 +2132,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       ))}
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             )}
@@ -2251,8 +2290,20 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 </div>
                 <form onSubmit={handleCreateCommunityPost} style={{ background: 'var(--panel-bg)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   <textarea value={communityInput} onChange={e => setCommunityInput(e.target.value)} maxLength={1000} placeholder="Chia sẻ kinh nghiệm tranh biện, hỏi chiến thuật, hoặc đăng chủ đề muốn cộng đồng bàn luận..." style={{ minHeight: '94px', resize: 'vertical', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', borderRadius: '10px', padding: '12px', outline: 'none', fontSize: '1rem', lineHeight: 1.45 }} />
+                  {communityImage && (
+                    <div style={{ position: 'relative', width: 'fit-content' }}>
+                      <img src={communityImage} alt="Preview" style={{ maxHeight: '200px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)' }} />
+                      <button type="button" onClick={() => setCommunityImage(null)} style={{ position: 'absolute', top: '-10px', right: '-10px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{communityInput.length}/1000</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                      <label style={{ cursor: 'pointer', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.9rem', fontWeight: 'bold' }}>
+                        <span>📷 Đính kèm ảnh</span>
+                        <input type="file" accept="image/*" onChange={handleCommunityImageUpload} style={{ display: 'none' }} />
+                      </label>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{communityInput.length}/1000</span>
+                    </div>
                     <button type="submit" className="btn-primary" style={{ padding: '10px 20px', borderRadius: '8px' }}>Đăng bài</button>
                   </div>
                 </form>
@@ -2274,6 +2325,11 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                           <button onClick={() => handleLikePost(post.id)} style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content' }}>♥ {post.likes || 0}</button>
                         </div>
                         <div style={{ color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginBottom: '12px' }}>{post.content}</div>
+                        {post.image_url && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <img src={post.image_url} alt="Media" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                          </div>
+                        )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
                           {(post.comments || []).map(comment => (
                             <div key={comment.id} style={{ background: 'rgba(0,0,0,0.18)', borderRadius: '8px', padding: '8px 10px' }}>
@@ -2750,9 +2806,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
       {/* CSS for ticker animation */}
       <style>{`
-        @keyframes tickerSlide {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
         }
         @keyframes pulse {
           0%, 100% { transform: scale(1); }

@@ -34,6 +34,10 @@
   --rarity-epic: #a855f7;
   --rarity-legendary: #f59e0b;
   --rarity-mythic: #ef4444;
+
+  /* Chat Bubble Backgrounds - Dark Mode */
+  --chat-me-bg: rgba(99, 102, 241, 0.15);
+  --chat-opp-bg: rgba(168, 85, 247, 0.15);
 }
 
 /* ─── Bright Mode (Day Mode) ─── */
@@ -45,6 +49,10 @@ body.bright-mode {
   --text-secondary: #4338ca;
   --border-light: rgba(249, 115, 22, 0.4);
   --border-focus: rgba(249, 115, 22, 0.9);
+  
+  /* Chat Bubble Backgrounds - Bright Mode */
+  --chat-me-bg: rgba(59, 130, 246, 0.15);
+  --chat-opp-bg: rgba(217, 70, 239, 0.15);
   
   background-image:
     radial-gradient(ellipse at 10% 20%, rgba(249, 115, 22, 0.15), transparent 35%),

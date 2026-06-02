@@ -226,7 +226,8 @@ function App() {
     setMode(info.mode)
     if (info.mode === 'solo_ai' || info.mode === 'text_solo') {
       try {
-        const res = await axios.get(`${API_BASE}/random-topic`)
+        const url = info.category ? `${API_BASE}/random-topic?category=${info.category}` : `${API_BASE}/random-topic`
+        const res = await axios.get(url)
         if (res.data.success) setSoloTopic(res.data.topic)
       } catch(e) {
         console.warn("Failed to fetch random topic", e)

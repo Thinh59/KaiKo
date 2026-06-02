@@ -596,9 +596,9 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         <div>
           <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '1.8rem' }}>🎤 {roomData.topic}</h2>
           <p style={{ margin: '8px 0 0', color: 'var(--text-secondary)', fontSize: '1rem' }}>
-            <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{roomData.playerA}</span>
+            <span style={{ color: 'var(--accent-primary)', fontWeight: 'bold' }}>{roomData.playerA} {roomData.isLocalHost ? '(Bạn - Ủng hộ)' : '(Ủng hộ)'}</span>
             {' '}vs{' '}
-            <span style={{ color: '#a855f7', fontWeight: 'bold' }}>{playerBName}</span>
+            <span style={{ color: '#a855f7', fontWeight: 'bold' }}>{playerBName} {!roomData.isLocalHost ? '(Bạn - Phản đối)' : '(Phản đối)'}</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -711,6 +711,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
             onStop={handlePause}
             onNextTurn={handleNextTurn}
             onEnd={handleDebateEnd}
+            onCancel={onCancel}
           />
         </div>
       </div>
