@@ -1,0 +1,129 @@
+=== d:/NA/Kì 6/Công Nghệ Phần Mềm Cho Hệ Thống Trí Tuệ Nhân Tạo/Project/KaiKo/kaiko/ai_model/kaiko-train-fallacy.ipynb ===
+Requirement already satisfied: transformers in /usr/local/lib/python3.12/dist-packages (5.0.0)
+Requirement already satisfied: datasets in /usr/local/lib/python3.12/dist-packages (4.8.3)
+Requirement already satisfied: accelerate in /usr/local/lib/python3.12/dist-packages (1.12.0)
+Requirement already satisfied: scikit-learn in /usr/local/lib/python3.12/dist-packages (1.6.1)
+Requirement already satisfied: pandas in /usr/local/lib/python3.12/dist-packages (2.3.3)
+Requirement already satisfied: torch in /usr/local/lib/python3.12/dist-packages (2.10.0+cu128)
+Requirement already satisfied: filelock in /usr/local/lib/python3.12/dist-packages (from transformers) (3.24.3)
+Requirement already satisfied: huggingface-hub<2.0,>=1.3.0 in /usr/local/lib/python3.12/dist-packages (from transformers) (1.4.1)
+Requirement already satisfied: numpy>=1.17 in /usr/local/lib/python3.12/dist-packages (from transformers) (2.0.2)
+Requirement already satisfied: packaging>=20.0 in /usr/local/lib/python3.12/
+config.json:   0%|          | 0.00/615 [00:00<?, ?B/s]
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+tokenizer_config.json:   0%|          | 0.00/25.0 [00:00<?, ?B/s]
+sentencepiece.bpe.model:   0%|          | 0.00/5.07M [00:00<?, ?B/s]
+tokenizer.json: 0.00B [00:00, ?B/s]
+Map:   0%|          | 0/2096 [00:00<?, ? examples/s]
+Map:   0%|          | 0/524 [00:00<?, ? examples/s]
+model.safetensors:   0%|          | 0.00/1.12G [00:00<?, ?B/s]
+Loading weights:   0%|          | 0/197 [00:00<?, ?it/s]
+XLMRobertaForSequenceClassification LOAD REPORT from: FacebookAI/xlm-roberta-base
+Key                         | Status     | 
+----------------------------+------------+-
+lm_head.dense.bias          | UNEXPECTED | 
+roberta.pooler.dense.weight | UNEXPECTED | 
+lm_head.bias                | UNEXPECTED | 
+roberta.pooler.dense.bias   | UNEXPECTED | 
+lm_head.layer_norm.weight   | UNEXPECTED | 
+lm_head.layer_norm.bias     | UNEXPECTED | 
+lm_head.dense.weight        | UNEXPECTED | 
+classifier.dense.weight     | MISSING    | 
+classifier.out_proj.bias    | MISSING    | 
+classifier.out_proj.weight  | MISSING    | 
+classifier.dense.bias       | MISSING    | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING	:those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+Class weights: [np.float64(0.9736157562244518), np.float64(0.9736157562244518), np.float64(0.9879336349924586), np.float64(1.4710836608646827), np.float64(1.158267020335986), np.float64(0.5194290245836638), np.float64(0.7096424702058505), np.float64(1.4819004524886878), np.float64(3.4748010610079576), np.float64(1.1717352415026834), np.float64(1.0127560881329725), np.float64(0.6377799415774099), np.float64(1.4604236343366779)]
+
+Phân phối nhãn:
+label
+5     0.148092
+11    0.120611
+6     0.108397
+1     0.079008
+0     0.079008
+2     0.077863
+10    0.075954
+4     0.066412
+9     0.065649
+12    0.052672
+3     0.052290
+7     0.051908
+8     0.022137
+Name: proportion, dtype: float64
+
+BẮT ĐẦU HUẤN LUYỆN (TRAINING)...
+<IPython.core.display.HTML object>
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+There were missing keys in the checkpoint model loaded: ['roberta.embeddings.LayerNorm.weight', 'roberta.embeddings.LayerNorm.bias', 'roberta.encoder.layer.0.attention.output.LayerNorm.weight', 'roberta.encoder.layer.0.attention.output.LayerNorm.bias', 'roberta.encoder.layer.0.output.LayerNorm.weight', 'roberta.encoder.layer.0.output.LayerNorm.bias', 'roberta.encoder.layer.1.attention.output.LayerNorm.weight', 'roberta.encoder.layer.1.attention.output.LayerNorm.bias', 'roberta.encoder.layer.1.output.LayerNorm.weight', 'roberta.encoder.layer.1.output.LayerNorm.bias', 'roberta.encoder.layer.2.attention.output.LayerNorm.weight', 'roberta.encoder.layer.2.attention.output.LayerNorm.bias', 'roberta.encoder.layer.2.output.LayerNorm.weight', 'roberta.encoder.layer.2.output.LayerNorm.bias', 'roberta.encoder.layer.3.attention.output.LayerNorm.weight', 'roberta.encoder.layer.3.attention.output.LayerNorm.bias', 'roberta.encoder.layer.3.output.LayerNorm.weight', 'roberta.encoder.layer.3.output.Laye
+Đang lưu model...
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+HOÀN THÀNH! Bạn có thể tải thư mục ./kaiko_fallacy_model_final về máy.
+Đã nén xong! Tải file kaiko_argkp_model_final.zip về máy từ tab Output.
+=== d:/NA/Kì 6/Công Nghệ Phần Mềm Cho Hệ Thống Trí Tuệ Nhân Tạo/Project/KaiKo/kaiko/ai_model/kaiko-train-argKP.ipynb ===
+Requirement already satisfied: transformers in /usr/local/lib/python3.12/dist-packages (5.0.0)
+Requirement already satisfied: datasets in /usr/local/lib/python3.12/dist-packages (4.8.3)
+Requirement already satisfied: accelerate in /usr/local/lib/python3.12/dist-packages (1.12.0)
+Requirement already satisfied: scikit-learn in /usr/local/lib/python3.12/dist-packages (1.6.1)
+Requirement already satisfied: pandas in /usr/local/lib/python3.12/dist-packages (2.3.3)
+Requirement already satisfied: torch in /usr/local/lib/python3.12/dist-packages (2.10.0+cu128)
+Requirement already satisfied: filelock in /usr/local/lib/python3.12/dist-packages (from transformers) (3.24.3)
+Requirement already satisfied: huggingface-hub<2.0,>=1.3.0 in /usr/local/lib/python3.12/dist-packages (from transformers) (1.4.1)
+Requirement already satisfied: numpy>=1.17 in /usr/local/lib/python3.12/dist-packages (from transformers) (2.0.2)
+Requirement already satisfied: packaging>=20.0 in /usr/local/lib/python3.12/
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+config.json:   0%|          | 0.00/615 [00:00<?, ?B/s]
+tokenizer_config.json:   0%|          | 0.00/25.0 [00:00<?, ?B/s]
+sentencepiece.bpe.model:   0%|          | 0.00/5.07M [00:00<?, ?B/s]
+tokenizer.json: 0.00B [00:00, ?B/s]
+Đang tokenize tập Train...
+Map:   0%|          | 0/1592 [00:00<?, ? examples/s]
+Đang tokenize tập Test...
+Map:   0%|          | 0/398 [00:00<?, ? examples/s]
+model.safetensors:   0%|          | 0.00/1.12G [00:00<?, ?B/s]
+Loading weights:   0%|          | 0/197 [00:00<?, ?it/s]
+XLMRobertaForSequenceClassification LOAD REPORT from: FacebookAI/xlm-roberta-base
+Key                         | Status     | 
+----------------------------+------------+-
+lm_head.dense.bias          | UNEXPECTED | 
+lm_head.layer_norm.bias     | UNEXPECTED | 
+lm_head.dense.weight        | UNEXPECTED | 
+roberta.pooler.dense.weight | UNEXPECTED | 
+lm_head.bias                | UNEXPECTED | 
+roberta.pooler.dense.bias   | UNEXPECTED | 
+lm_head.layer_norm.weight   | UNEXPECTED | 
+classifier.out_proj.weight  | MISSING    | 
+classifier.dense.bias       | MISSING    | 
+classifier.dense.weight     | MISSING    | 
+classifier.out_proj.bias    | MISSING    | 
+
+Notes:
+- UNEXPECTED	:can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING	:those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+Class weights: 0=0.688, 1=1.832
+
+Phân phối nhãn:
+label
+0    0.727136
+1    0.272864
+Name: proportion, dtype: float64
+
+BẮT ĐẦU HUẤN LUYỆN (TRAINING)...
+<IPython.core.display.HTML object>
+/usr/local/lib/python3.12/dist-packages/sklearn/metrics/_classification.py:1565: UndefinedMetricWarning: Precision is ill-defined and being set to 0.0 due to no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", len(result))
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+There were missing keys in the checkpoint model loaded: ['roberta.embeddings.LayerNorm.weight', 'roberta.embeddings.LayerNorm.bias', 'roberta.encoder.layer.0.attention.output.LayerNorm.weight', 'roberta.encoder.layer.0.attention.output.LayerNorm.bias', 'roberta.encoder.layer.0.output.LayerNorm.weight', 'roberta.encoder.layer.0.output.LayerNorm.bias', 'roberta.encoder.layer.1.attention.output.LayerNorm.weight', 'roberta.encoder.layer.1.attention.output.LayerNorm.bias', 'roberta.encoder.layer.1.output.LayerNorm.weight', 'roberta.encoder.layer.1.output.LayerNorm.bias', 'roberta.encoder.layer.2.attention.output.LayerNorm.weight', 'roberta.encoder.layer.2.attention.output.LayerNorm.bias', 'roberta.encoder.layer.2.output.LayerNorm.weight', 'roberta.encoder.layer.2.output.LayerNorm.bias', 'roberta.encoder.layer.3.attention.output.LayerNorm.weight', 'roberta.encoder.layer.3.attention.output.LayerNorm.bias', 'roberta.encoder.layer.3.output.LayerNorm.weight', 'roberta.encoder.layer.3.output.Laye
+Đang lưu model...
+Writing model shards:   0%|          | 0/1 [00:00<?, ?it/s]
+HOÀN THÀNH! Bạn có thể tải thư mục ./kaiko_argkp_model_final về máy.
+Đã nén xong! Tải file kaiko_argkp_model_final.zip về máy từ tab Output.

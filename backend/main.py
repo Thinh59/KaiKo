@@ -194,7 +194,8 @@ def load_model():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS scores_json TEXT DEFAULT '{}'"
     ]:
         try:
             cursor.execute(col_sql)
@@ -615,7 +616,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng live không còn tồn tại."
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "debate_result"]:
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "end_reject", "debate_result", "opponent_banned"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn
@@ -645,10 +646,13 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             await manager.send_message_to_username(json.dumps(message), target_id)
                     else:
                         await manager.send_personal_message(json.dumps(message), target_id)
-                    if msg_type in ["transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "chat_msg"]:
+                    if msg_type in ["transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "chat_msg", "debate_result", "opponent_banned"]:
                         room_id = manager.find_room_for_players(client_id, target_id)
                         if room_id:
                             await manager.broadcast_to_spectators(room_id, message)
+                            if msg_type in ["debate_result", "opponent_banned", "debate_ended"]:
+                                manager.rooms.pop(room_id, None)
+                                manager.spectators.pop(room_id, None)
                     
     except WebSocketDisconnect:
         await manager.notify_opponent_disconnected(client_id)
@@ -676,6 +680,7 @@ class DebateResult(BaseModel):
     audio_scores_a: dict = {}
     video_scores_b: dict = {}
     audio_scores_b: dict = {}
+    mode: str = "video"
 
 class AuthInput(BaseModel):
     username: str
@@ -976,6 +981,7 @@ class SaveMatch(BaseModel):
     summary: str
     transcript_self: str = ""
     transcript_opp: str = ""
+    scores_json: str = "{}"
 
 @app.post("/save-match")
 def save_match(data: SaveMatch):
@@ -993,8 +999,8 @@ def save_match(data: SaveMatch):
             (username, opponent, topic, mode, result,
              score_self, score_opp, fallacies_self, fallacies_opp, 
              fallacies_list_self, fallacies_list_opp, summary, played_at,
-             transcript_self, transcript_opp)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             transcript_self, transcript_opp, scores_json)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
@@ -1002,7 +1008,8 @@ def save_match(data: SaveMatch):
         data.fallacies_self, data.fallacies_opp,
         fs_self_str, fs_opp_str,
         data.summary, played_at,
-        data.transcript_self, data.transcript_opp
+        data.transcript_self, data.transcript_opp,
+        data.scores_json
     ))
     match_id = cursor.fetchone()['id']
     
@@ -1218,6 +1225,23 @@ def get_events():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
+    from datetime import datetime, timezone, timedelta
+    import random
+    now_dt = datetime.now(timezone.utc)
+    now_str = now_dt.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Auto-rotate small open event if deadline passed or it's the default one
+    cursor.execute("SELECT id, deadline, title FROM events WHERE event_type = 'small' AND status = 'open' LIMIT 1")
+    ev1 = cursor.fetchone()
+    if ev1 and (ev1['deadline'] < now_str or "Đại Chiến Văn Mẫu" in ev1['title']):
+        topic = random.choice(TRENDING_TOPICS)
+        new_deadline = (now_dt + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+        new_title = "Đại Chiến: " + topic[:30] + "..."
+        new_desc = f"Tranh biện với chủ đề: {topic}"
+        cursor.execute("UPDATE events SET title=%s, description=%s, deadline=%s WHERE id=%s", (new_title, new_desc, new_deadline, ev1['id']))
+        cursor.execute("DELETE FROM event_participants WHERE event_id=%s", (ev1['id'],))
+        conn.commit()
+    
     cursor.execute("SELECT COUNT(*) as count FROM events WHERE event_type = 'small' AND status IN ('open', 'upcoming')")
     active_small = cursor.fetchone()['count'] > 0
     
@@ -1377,7 +1401,7 @@ def get_history(username: str, limit: int = 20):
     cursor.execute("""
         SELECT id, opponent, topic, mode, result,
                score_self, score_opp, fallacies_self, fallacies_opp,
-               summary, played_at, transcript_self, transcript_opp, visibility
+               summary, played_at, transcript_self, transcript_opp, visibility, scores_json
         FROM match_history
         WHERE username = %s
         ORDER BY played_at DESC
@@ -1422,22 +1446,26 @@ def get_leaderboard(limit: int = 10):
 # --- FRIENDS SYSTEM ---
 @app.get("/friends/{username}")
 def get_friends(username: str):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    # Lấy danh sách bạn bè kèm debate_count
-    cursor.execute("""
-        SELECT CASE WHEN user1=%s THEN user2 ELSE user1 END as friend,
-               COALESCE(debate_count, 0) as debate_count
-        FROM friends WHERE user1=%s OR user2=%s
-    """, (username, username, username))
-    friends = [{"username": row['friend'], "debate_count": row['debate_count']} for row in cursor.fetchall()]
-    
-    # Lấy lời mời kết bạn (những người gửi cho username)
-    cursor.execute("SELECT sender FROM friend_requests WHERE receiver = %s", (username,))
-    requests = [row['sender'] for row in cursor.fetchall()]
-    conn.close()
-    
-    return {"success": True, "friends": friends, "requests": requests}
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        # Lấy danh sách bạn bè kèm debate_count
+        cursor.execute("""
+            SELECT CASE WHEN user1=%s THEN user2 ELSE user1 END as friend,
+                   COALESCE(debate_count, 0) as debate_count
+            FROM friends WHERE user1=%s OR user2=%s
+        """, (username, username, username))
+        friends = [{"username": row['friend'], "debate_count": row['debate_count']} for row in cursor.fetchall()]
+        
+        # Lấy lời mời kết bạn (những người gửi cho username)
+        cursor.execute("SELECT sender FROM friend_requests WHERE receiver = %s", (username,))
+        requests = [row['sender'] for row in cursor.fetchall()]
+        conn.close()
+        
+        return {"success": True, "friends": friends, "requests": requests}
+    except Exception as e:
+        print(f"Error in get_friends: {e}")
+        return {"success": False, "friends": [], "requests": [], "error": str(e)}
 
 
 @app.post("/friend-request")
@@ -1773,7 +1801,36 @@ async def score_debate(result: DebateResult):
             )
         )
 
-        prompt = f"""Bạn là chuyên gia huấn luyện kỹ năng tranh biện chuyên nghiệp.
+        if result.mode.startswith("text"):
+            prompt = f"""Bạn là chuyên gia huấn luyện kỹ năng tranh biện chuyên nghiệp.
+Hãy chấm điểm trận tranh biện (CHAT BẰNG VĂN BẢN) sau (chỉ trả JSON, không giải thích thêm):
+
+CHỦ ĐỀ: {result.topic}
+
+{result.player_a} (ủng hộ):
+Lời phát biểu: {result.transcript_a}
+Ngụy biện: {', '.join(result.fallacies_a) if result.fallacies_a else 'Không có'}
+
+{result.player_b} (phản đối):
+Lời phát biểu: {result.transcript_b}
+Ngụy biện: {', '.join(result.fallacies_b) if result.fallacies_b else 'Không có'}
+
+Thang điểm: Logic 40đ · Từ vựng & Sắc sảo 20đ · Khúc chiết & Gợi hình 20đ · Phản biện 20đ
+Trừ: 5đ/ngụy biện
+
+JSON format (bắt buộc):
+{{
+  "player_a": {{"logic": 0, "vocabulary": 0, "grammar": 0, "rebuttal": 0, "deduct": 0, "total": 0,
+    "strengths": [], "weaknesses": [], "tips": []}},
+  "player_b": {{"logic": 0, "vocabulary": 0, "grammar": 0, "rebuttal": 0, "deduct": 0, "total": 0,
+    "strengths": [], "weaknesses": [], "tips": []}},
+  "winner": "",
+  "why": "",
+  "comment": "",
+  "quality": ""
+}}"""
+        else:
+            prompt = f"""Bạn là chuyên gia huấn luyện kỹ năng tranh biện chuyên nghiệp.
 Hãy chấm điểm và phân tích chi tiết trận tranh biện sau (chỉ trả JSON, không giải thích thêm):
 
 CHỦ ĐỀ: {result.topic}
@@ -1824,19 +1881,38 @@ JSON format (bắt buộc):
 def get_fallacy_stats(username: str):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute("SELECT fallacies_list_self FROM match_history WHERE username=%s AND fallacies_list_self != ''", (username,))
+    cursor.execute("SELECT fallacies_list_self, transcript_self FROM match_history WHERE username=%s ORDER BY played_at DESC LIMIT 10", (username,))
     rows = cursor.fetchall()
     conn.close()
     
     stats = {}
+    transcripts = []
     for row in rows:
-        fallacies = row['fallacies_list_self'].split(',')
-        for f in fallacies:
-            f = f.strip()
-            if f:
-                stats[f] = stats.get(f, 0) + 1
+        if row['fallacies_list_self']:
+            fallacies = row['fallacies_list_self'].split(',')
+            for f in fallacies:
+                f = f.strip()
+                if f:
+                    stats[f] = stats.get(f, 0) + 1
+        if row['transcript_self'] and len(row['transcript_self']) > 10:
+            transcripts.append(row['transcript_self'])
+            
+    analysis = "Chưa đủ dữ liệu hoặc bạn chưa mắc lỗi ngụy biện nào để phân tích."
+    if stats and transcripts:
+        try:
+            combined_text = "\n".join(transcripts)[:2000] # Giới hạn token
+            prompt = f"""Dựa trên lịch sử chat tranh biện sau của người dùng (tập trung vào các lỗi ngụy biện họ hay mắc phải là {list(stats.keys())}):
+{combined_text}
+
+Hãy đưa ra một đoạn nhận xét ngắn gọn (khoảng 3-4 câu) phân tích thói quen lập luận của họ và cho lời khuyên để khắc phục các ngụy biện trên."""
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            response = model.generate_content(prompt)
+            if response.text:
+                analysis = response.text
+        except Exception as e:
+            print("Lỗi generate fallacy analysis:", e)
     
-    return {"success": True, "stats": stats}
+    return {"success": True, "stats": stats, "analysis": analysis}
 
 # --- PROFILE & NOTIFICATIONS ---
 class UpdateProfile(BaseModel):

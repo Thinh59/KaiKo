@@ -483,6 +483,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         audio_scores_a: { loudPct: 22 },
         video_scores_b: { eyeContact: 70 },
         audio_scores_b: { loudPct: 18 },
+        mode: mode
       })
 
       if (res.data.success) {
@@ -494,7 +495,10 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
           rawUsernameA: roomData.rawUsernameA,
           rawUsernameB: roomData.rawUsernameB,
           transcript_a: finalTranscriptA,
-          transcript_b: finalTranscriptB
+          transcript_b: finalTranscriptB,
+          fallacies_a: fallaciesA,
+          fallacies_b: fallaciesB,
+          mode: mode
         })
       } else {
         alert('Lỗi chấm điểm: ' + (res.data.error || 'Không xác định'))

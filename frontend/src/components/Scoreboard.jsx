@@ -17,7 +17,7 @@ function Badge({ type, text }) {
   )
 }
 
-function PlayerCard({ name, rawName, currentUser, data, transcript }) {
+function PlayerCard({ name, rawName, currentUser, data, transcript, mode }) {
   const [tab, setTab] = useState('score')
   const [friendReqSent, setFriendReqSent] = useState(false)
 
@@ -93,8 +93,8 @@ function PlayerCard({ name, rawName, currentUser, data, transcript }) {
             <tbody>
               {[
                 ['Logic & Lập luận', data?.logic, 40],
-                ['Phong thái & Body language', data?.delivery, 20],
-                ['Giọng nói & Ngữ điệu', data?.voice, 20],
+                [mode?.startsWith('text') ? 'Từ vựng & Độ sắc sảo' : 'Phong thái & Body language', data?.vocabulary ?? data?.delivery, 20],
+                [mode?.startsWith('text') ? 'Khúc chiết & Gợi hình' : 'Giọng nói & Ngữ điệu', data?.grammar ?? data?.voice, 20],
                 ['Phản biện đối phương', data?.rebuttal, 20],
               ].map(([label, score, max]) => (
                 <tr key={label}>
@@ -292,8 +292,8 @@ export default function Scoreboard({ result, onRestart, currentUser }) {
       </div>
 
       <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <PlayerCard name={playerA} rawName={rawUsernameA} currentUser={currentUser} data={scores?.player_a} transcript={transcript_a} />
-        <PlayerCard name={playerB} rawName={rawUsernameB} currentUser={currentUser} data={scores?.player_b} transcript={transcript_b} />
+        <PlayerCard name={playerA} rawName={rawUsernameA} currentUser={currentUser} data={scores?.player_a} transcript={transcript_a} mode={result.mode} />
+        <PlayerCard name={playerB} rawName={rawUsernameB} currentUser={currentUser} data={scores?.player_b} transcript={transcript_b} mode={result.mode} />
       </div>
 
       {scores?.comment && (

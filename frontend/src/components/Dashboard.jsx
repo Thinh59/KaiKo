@@ -299,6 +299,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [showNotifications, setShowNotifications] = useState(false)
   const [achievements, setAchievements] = useState([])
   const [fallacyStats, setFallacyStats] = useState({})
+  const [fallacyAnalysis, setFallacyAnalysis] = useState('')
   const [mentorData, setMentorData] = useState({ masters: [], disciples: [], requests: [] })
   const [mentorInput, setMentorInput] = useState('')
   const [historyFilter, setHistoryFilter] = useState('all')
@@ -836,6 +837,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       const res = await axios.get(`${API_BASE}/fallacy-stats/${encodeURIComponent(username)}`)
       if (res.data.success) {
         setFallacyStats(res.data.stats)
+        setFallacyAnalysis(res.data.analysis || '')
       }
     } catch (e) { }
   }, [username, isGuest])
@@ -2130,6 +2132,13 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                           <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444', opacity: 0.8 }}>{count}</div>
                         </div>
                       ))}
+                      
+                      {fallacyAnalysis && (
+                        <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(59, 130, 246, 0.1)', borderLeft: '4px solid #3b82f6', borderRadius: '8px' }}>
+                          <h4 style={{ margin: '0 0 10px 0', color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '8px' }}><span>🤖</span> AI Phân Tích Lỗi Ngụy Biện</h4>
+                          <p style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: '0.95rem' }}>{fallacyAnalysis}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                   </div>

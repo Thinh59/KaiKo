@@ -154,16 +154,18 @@ export default function ModeSelector({ onSelect }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
           
-          <div
-            onClick={() => handleSelect('solo_ai')}
-            style={{ padding: '2rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.3s ease', textAlign: 'center' }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
-          >
-            <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🤖</div>
-            <h3 style={{ fontSize: '1.5rem', margin: '0 0 1rem', color: 'var(--text-primary)' }}>Solo vs AI</h3>
-            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Luyện tập 1-1 với trợ lý ảo AI Gemini.</p>
-          </div>
+          {visibility !== 'public' && (
+            <div
+              onClick={() => handleSelect('solo_ai')}
+              style={{ padding: '2rem', background: 'rgba(255, 255, 255, 0.05)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', cursor: 'pointer', transition: 'all 0.3s ease', textAlign: 'center' }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = 'var(--border-light)'; e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+            >
+              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🤖</div>
+              <h3 style={{ fontSize: '1.5rem', margin: '0 0 1rem', color: 'var(--text-primary)' }}>Solo vs AI</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Luyện tập 1-1 với trợ lý ảo AI Gemini.</p>
+            </div>
+          )}
 
           <div
             onClick={() => handleSelect('1v1')}

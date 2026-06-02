@@ -379,3 +379,9 @@ Fix bug:
 -Thêm nút chơi luôn hay gì đó khi người dùng không muốn nhập chủ đề khi solo với AI
 -Khung chat thì chỗ nhập liệu người dùng có thể dùng phím Shift+Enter để xuống dòng và khung nhập liệu cũng mở rộng ra để nhìn rõ hết các chữ đã nhập thay vì phải di chuyển qua lại để xem lại các chữ trước đó
 
+-Chỉnh thanh thông báo màu đục hơn, vuông góc chứ không bo góc
+- Nút đăng xuất nền panel màu đục hơn luôn
+-Cái panel chứa mấy nút có thể bỏ đi để lại các nút thôi
+
+
+-

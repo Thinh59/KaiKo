@@ -275,6 +275,8 @@ function App() {
         const oppFallacy  = iAmA ? (scores?.player_b?.deduct ?? 0) : (scores?.player_a?.deduct ?? 0)
         const transcSelf  = iAmA ? (result.transcript_a ?? '') : (result.transcript_b ?? '')
         const transcOpp   = iAmA ? (result.transcript_b ?? '') : (result.transcript_a ?? '')
+        const fallaciesSelfList = iAmA ? (result.fallacies_a ?? []) : (result.fallacies_b ?? [])
+        const fallaciesOppList  = iAmA ? (result.fallacies_b ?? []) : (result.fallacies_a ?? [])
 
         // Tên đối thủ (display name)
         const oppDisplayName = iAmA ? result.playerB : result.playerA
@@ -298,10 +300,13 @@ function App() {
           score_opp:       oppScore,
           fallacies_self:  selfFallacy,
           fallacies_opp:   oppFallacy,
+          fallacies_list_self: fallaciesSelfList,
+          fallacies_list_opp:  fallaciesOppList,
           summary:         scores?.why ?? '',
           transcript_self: transcSelf,
           transcript_opp:  transcOpp,
           visibility:      visibility,
+          scores_json:     JSON.stringify(scores || {})
         })
         if (saveRes.data.success) {
           setDebateResult(prev => prev ? { ...prev, matchId: saveRes.data.match_id, newLevel: saveRes.data.level } : prev)
@@ -320,17 +325,28 @@ function App() {
   }
 
   const handleViewHistoryMatch = (match) => {
+    let detailedScores = {};
+    try {
+      if (match.scores_json) {
+        const parsed = JSON.parse(match.scores_json);
+        if (parsed) detailedScores = parsed;
+      }
+    } catch(e) {}
+
     const fakeResult = {
       playerA: match.username,
       playerB: match.opponent,
       topic: match.topic,
+      mode: match.mode,
       transcript_a: match.transcript_self,
       transcript_b: match.transcript_opp,
       scores: {
-        player_a: { total: match.score_self, deduct: match.fallacies_self },
-        player_b: { total: match.score_opp, deduct: match.fallacies_opp },
+        player_a: detailedScores.player_a || { total: match.score_self, deduct: match.fallacies_self },
+        player_b: detailedScores.player_b || { total: match.score_opp, deduct: match.fallacies_opp },
         winner: match.result === 'win' ? match.username : match.result === 'lose' ? match.opponent : '',
-        why: match.summary || 'Đây là bản xem lại lịch sử trận đấu.'
+        why: match.summary || 'Đây là bản xem lại lịch sử trận đấu.',
+        comment: detailedScores.comment || '',
+        quality: detailedScores.quality || ''
       }
     }
     setDebateResult(fakeResult)

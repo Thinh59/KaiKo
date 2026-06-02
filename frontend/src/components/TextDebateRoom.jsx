@@ -17,6 +17,14 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
   const [fallacySpeaker, setFallacySpeaker] = useState('')
   const [fallaciesA, setFallaciesA] = useState([])
   const [fallaciesB, setFallaciesB] = useState([])
+  const messagesRef = useRef([])
+  const fallaciesARef = useRef([])
+  const fallaciesBRef = useRef([])
+
+  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { fallaciesARef.current = fallaciesA }, [fallaciesA])
+  useEffect(() => { fallaciesBRef.current = fallaciesB }, [fallaciesB])
+
   const [bestFriends, setBestFriends] = useState([])
   const [selectedHelper, setSelectedHelper] = useState('')
   const [requestingHelp, setRequestingHelp] = useState(false)
@@ -150,11 +158,22 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
       if (isPlayerA) executeScoring()
     })
 
+    const cleanupEndReject = registerHandler('end_reject', () => {
+      setEndRequested(false)
+      setSystemAlert({ type: 'warning', msg: 'Đối thủ đã TỪ CHỐI yêu cầu kết thúc sớm.' })
+      setTimeout(() => setSystemAlert(null), 4000)
+    })
+
     const cleanupResult = registerHandler('debate_result', (data) => {
       // Received from host
       if (!isPlayerA) {
         onFinish(data.result)
       }
+    })
+
+    const cleanupOpponentBanned = registerHandler('opponent_banned', () => {
+      alert("⛔ Đối thủ của bạn đã bị cấm chat do vi phạm ngôn từ thô tục. Trận đấu kết thúc.")
+      onCancel()
     })
 
     return () => {
@@ -163,7 +182,9 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
       cleanupSkill && cleanupSkill()
       cleanupEndReq && cleanupEndReq()
       cleanupEndConfirm && cleanupEndConfirm()
+      cleanupEndReject && cleanupEndReject()
       cleanupResult && cleanupResult()
+      cleanupOpponentBanned && cleanupOpponentBanned()
     }
   }, [isSolo, registerHandler, isPlayerA, roomData, phase, onFinish])
 
@@ -268,6 +289,9 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
       const { is_profanity, is_off_topic, is_excellent, is_fallacy, fallacy_name_vi, is_ai, ai_reason } = res.data
       
       if (is_profanity) {
+        if (!isSolo && sendMessage && roomInfo) {
+          sendMessage({ type: 'opponent_banned', target: roomInfo.opponentId })
+        }
         alert("⛔ TÀI KHOẢN CỦA BẠN ĐÃ BỊ CẤM CHAT (Vi phạm ngôn từ thô tục)!")
         onCancel()
         return
@@ -363,12 +387,14 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
 
   const handleRejectEnd = () => {
     setOpponentWantsToEnd(false)
-    // Could send a reject message, but ignoring is fine for now
+    if (!isSolo && sendMessage && roomInfo) {
+      sendMessage({ type: 'end_reject', target: roomInfo.opponentId })
+    }
   }
 
   const executeScoring = async () => {
-    const transcriptA = messages.filter(m => m.speaker === 'A').map(m => m.text).join('. ') || 'Người chơi chưa phát biểu.'
-    const transcriptB = messages.filter(m => m.speaker === 'B').map(m => m.text).join('. ') || 'Đối thủ chưa phát biểu.'
+    const transcriptA = messagesRef.current.filter(m => m.speaker === 'A').map(m => m.text).join('. ') || 'Người chơi chưa phát biểu.'
+    const transcriptB = messagesRef.current.filter(m => m.speaker === 'B').map(m => m.text).join('. ') || 'Đối thủ chưa phát biểu.'
     
     try {
       const res = await axios.post(`${API_BASE}/score`, {
@@ -377,10 +403,11 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         player_b: roomData.playerB,
         transcript_a: transcriptA,
         transcript_b: transcriptB,
-        fallacies_a: fallaciesA,
-        fallacies_b: fallaciesB,
+        fallacies_a: fallaciesARef.current,
+        fallacies_b: fallaciesBRef.current,
         video_scores_a: { eyeContact: 80 }, audio_scores_a: { loudPct: 50 },
         video_scores_b: { eyeContact: 80 }, audio_scores_b: { loudPct: 50 },
+        mode: mode
       })
       if (res.data.success) {
         const finalResult = {
@@ -391,7 +418,10 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
           rawUsernameA: roomData.rawUsernameA,
           rawUsernameB: roomData.rawUsernameB,
           transcript_a: transcriptA,
-          transcript_b: transcriptB
+          transcript_b: transcriptB,
+          fallacies_a: fallaciesARef.current,
+          fallacies_b: fallaciesBRef.current,
+          mode: mode
         }
         if (!isSolo && sendMessage && roomInfo) {
           sendMessage({ type: 'debate_result', target: roomInfo.opponentId, result: finalResult })

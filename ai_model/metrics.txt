@@ -1,0 +1,2 @@
+=== d:/NA/Kì 6/Công Nghệ Phần Mềm Cho Hệ Thống Trí Tuệ Nhân Tạo/Project/KaiKo/kaiko/ai_model/kaiko-train-fallacy.ipynb ===
+=== d:/NA/Kì 6/Công Nghệ Phần Mềm Cho Hệ Thống Trí Tuệ Nhân Tạo/Project/KaiKo/kaiko/ai_model/kaiko-train-argKP.ipynb ===
