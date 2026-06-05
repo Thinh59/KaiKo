@@ -111,6 +111,7 @@ def load_model():
             fallacies_self INTEGER DEFAULT 0,
             fallacies_opp INTEGER DEFAULT 0,
             summary TEXT DEFAULT '',
+            visibility TEXT DEFAULT 'private',
             played_at TEXT NOT NULL
         )
     ''')
@@ -173,6 +174,7 @@ def load_model():
         "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
         "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
         "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private'",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
@@ -964,6 +966,7 @@ class SaveMatch(BaseModel):
     summary: str
     transcript_self: str = ""
     transcript_opp: str = ""
+    visibility: str = "private"
     scores_json: str = "{}"
 
 @app.post("/save-match")
@@ -982,8 +985,8 @@ def save_match(data: SaveMatch):
             (username, opponent, topic, mode, result,
              score_self, score_opp, fallacies_self, fallacies_opp, 
              fallacies_list_self, fallacies_list_opp, summary, played_at,
-             transcript_self, transcript_opp, scores_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             transcript_self, transcript_opp, visibility, scores_json)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
@@ -992,6 +995,7 @@ def save_match(data: SaveMatch):
         fs_self_str, fs_opp_str,
         data.summary, played_at,
         data.transcript_self, data.transcript_opp,
+        "public" if data.visibility == "public" else "private",
         data.scores_json
     ))
     match_id = cursor.fetchone()['id']
