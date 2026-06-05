@@ -3,21 +3,29 @@ import { createRoot } from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
-import App from './App.jsx'
+import App, { AppWithClerk } from './App.jsx'
 
-// Import your publishable key
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+const CLERK_ENABLED = Boolean(PUBLISHABLE_KEY && PUBLISHABLE_KEY.startsWith('pk_'))
 
-if (!PUBLISHABLE_KEY) {
-  console.warn("Missing Publishable Key for Clerk!")
+if (!CLERK_ENABLED) {
+  console.warn('Missing or invalid VITE_CLERK_PUBLISHABLE_KEY. Clerk OAuth is disabled.')
 }
+
+const app = CLERK_ENABLED ? (
+  <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+    <BrowserRouter>
+      <AppWithClerk />
+    </BrowserRouter>
+  </ClerkProvider>
+) : (
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY || "missing_key"} afterSignOutUrl="/">
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </ClerkProvider>
+    {app}
   </StrictMode>,
 )
