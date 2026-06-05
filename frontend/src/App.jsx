@@ -397,7 +397,7 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
   } else if (page === 'dashboard') {
     content = (
       <ErrorBoundary>
-        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} theme={theme} setTheme={setTheme} />
+        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} theme={theme} setTheme={setTheme} clerkUser={user} />
       </ErrorBoundary>
     )
   } else if (page === 'mode') {
@@ -494,6 +494,7 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
         onFinish={handleDebateFinish}
         registerHandler={registerHandler}
         sendMessage={sendMessage}
+        clerkUser={user}
         onCancel={() => {
           if (mode !== 'text_solo') cancelMatch()
           setMode(null)
