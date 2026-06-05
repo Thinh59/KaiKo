@@ -23,6 +23,25 @@ def get_db():
     conn = psycopg2.connect(url)
     return conn
 
+def ensure_match_history_columns():
+    conn = get_db()
+    conn.autocommit = True
+    cursor = conn.cursor()
+    for col_sql in [
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private'",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS scores_json TEXT DEFAULT '{}'"
+    ]:
+        try:
+            cursor.execute(col_sql)
+        except Exception as e:
+            print(f"⚠️  Ensure match_history column failed: {e}")
+    cursor.close()
+    conn.close()
+
 
 app = FastAPI(title="KaiKo API")
 
@@ -170,22 +189,18 @@ def load_model():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS frame TEXT DEFAULT 'none'",
         "ALTER TABLE friends ADD COLUMN IF NOT EXISTS debate_count INTEGER DEFAULT 0",
         "ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS submission_text TEXT",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_self TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private'",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS scores_json TEXT DEFAULT '{}'"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT"
     ]:
         try:
             cursor.execute(col_sql)
         except Exception:
             conn.rollback()
+
+    ensure_match_history_columns()
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS submission_votes (
@@ -1383,6 +1398,7 @@ def vote_submission(data: VoteSubmission):
 @app.get("/history/{username}")
 def get_history(username: str, limit: int = 20):
     """Lấy lịch sử trận đấu của user"""
+    ensure_match_history_columns()
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
