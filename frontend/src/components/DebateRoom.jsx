@@ -8,7 +8,7 @@ import VideoGrid from './VideoGrid'
 import TranscriptPanel from './TranscriptPanel'
 import ControlsBar from './ControlsBar'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 const TURN_TIME = 90 // giây cho mỗi lượt
 
 // ── Web Speech TTS ──────────────────────────────────────────────────────────

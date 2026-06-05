@@ -4,7 +4,7 @@ import FallacyAlert from './FallacyAlert'
 import Avatar from './Avatar'
 import { useUser } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 export default function TextDebateRoom({ roomData, roomInfo, mode, username, onFinish, onCancel, registerHandler, sendMessage }) {
   const { user } = useUser()

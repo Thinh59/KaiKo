@@ -2,7 +2,7 @@ import { useState } from 'react'
 import axios from 'axios'
 import { useSignIn, useSignUp } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 export default function AuthPage({ onLogin }) {
   const [username, setUsername] = useState('')

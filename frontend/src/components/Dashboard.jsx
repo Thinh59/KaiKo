@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { useUser } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 const RESULT_META = {
   win: { label: 'Thắng', color: '#10b981', bg: 'rgba(16,185,129,0.15)', icon: '🏆' },

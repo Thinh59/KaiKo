@@ -126,7 +126,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from './config'
 
 function App() {
   const [page, setPage] = useState('home')
