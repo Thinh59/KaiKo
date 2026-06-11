@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import HomePage from './components/HomePage'
-import AuthPage from './components/AuthPage'
+import AuthPage, { AuthPageWithClerk } from './components/AuthPage'
 import Dashboard from './components/Dashboard'
 import ModeSelector from './components/ModeSelector'
 import RoomWaiting from './components/RoomWaiting'
@@ -126,9 +126,21 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from './config'
 
-function App() {
+export function AppWithClerk() {
+  const { isSignedIn, user } = useUser()
+  const { signOut } = useAuth()
+
+  return (
+    <App
+      clerkEnabled
+      clerkSession={{ isSignedIn, user, signOut }}
+    />
+  )
+}
+
+function App({ clerkEnabled = false, clerkSession = {} }) {
   const [page, setPage] = useState('home')
   const [username, setUsername] = useState('')
   const [debateResult, setDebateResult] = useState(null)
@@ -149,7 +161,7 @@ function App() {
   useEffect(() => {
     axios.get(`${API_BASE}/nicknames`)
       .then(res => { if (res.data.success) setGlobalNicknames(res.data.nicknames) })
-      .catch(e => {})
+      .catch(() => {})
   }, [])
   
   const getDisplayName = (u) => globalNicknames[u] || u
@@ -180,7 +192,8 @@ function App() {
       setPage('mode')
     })
     return () => {
-      // Dọn dẹp (tùy thuộc vào implement của registerHandler)
+      cleanupReady?.()
+      cleanupDecline?.()
     }
   }, [registerHandler, cancelMatch])
 
@@ -191,9 +204,16 @@ function App() {
     }
   }, [selfReady, oppReady, page, mode])
 
-  // Clerk Hooks
-  const { isSignedIn, user } = useUser()
-  const { signOut } = useAuth()
+  const {
+    isSignedIn = false,
+    user = null,
+    signOut = async () => {}
+  } = clerkSession
+
+  const handleLogin = React.useCallback((name) => {
+    setUsername(name)
+    setPage('dashboard')
+  }, [])
 
   // Tự động đăng nhập khi Clerk báo đã sign in
   useEffect(() => {
@@ -201,7 +221,7 @@ function App() {
       const name = user.firstName || user.username || user.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Player'
       handleLogin(name)
     }
-  }, [isSignedIn, user, page])
+  }, [isSignedIn, user, page, handleLogin])
 
   const handlePlayNowClick = () => {
     if (isSignedIn && username) {
@@ -209,11 +229,6 @@ function App() {
     } else {
       setPage('auth')
     }
-  }
-
-  const handleLogin = (name) => {
-    setUsername(name)
-    setPage('dashboard')
   }
 
   const handleLogout = async () => {
@@ -331,7 +346,9 @@ function App() {
         const parsed = JSON.parse(match.scores_json);
         if (parsed) detailedScores = parsed;
       }
-    } catch(e) {}
+    } catch {
+      detailedScores = {}
+    }
 
     const fakeResult = {
       playerA: match.username,
@@ -368,15 +385,19 @@ function App() {
 
   let content = null;
   if (window.location.pathname === '/sso-callback') {
-    content = <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />;
+    content = clerkEnabled
+      ? <AuthenticateWithRedirectCallback signUpForceRedirectUrl="/" />
+      : <AuthPage onLogin={handleLogin} />
   } else if (page === 'home') {
     content = <HomePage onPlay={handlePlayNowClick} theme={theme} />
   } else if (page === 'auth') {
-    content = <AuthPage onLogin={handleLogin} />
+    content = clerkEnabled
+      ? <AuthPageWithClerk onLogin={handleLogin} />
+      : <AuthPage onLogin={handleLogin} />
   } else if (page === 'dashboard') {
     content = (
       <ErrorBoundary>
-        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} theme={theme} setTheme={setTheme} />
+        <Dashboard username={username} onPlay={() => setPage('mode')} onLogout={handleLogout} onViewMatch={handleViewHistoryMatch} sendMessage={sendMessage} registerHandler={registerHandler} theme={theme} setTheme={setTheme} clerkUser={user} />
       </ErrorBoundary>
     )
   } else if (page === 'mode') {
@@ -473,6 +494,7 @@ function App() {
         onFinish={handleDebateFinish}
         registerHandler={registerHandler}
         sendMessage={sendMessage}
+        clerkUser={user}
         onCancel={() => {
           if (mode !== 'text_solo') cancelMatch()
           setMode(null)

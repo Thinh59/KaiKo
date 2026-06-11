@@ -2,12 +2,10 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import FallacyAlert from './FallacyAlert'
 import Avatar from './Avatar'
-import { useUser } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
-export default function TextDebateRoom({ roomData, roomInfo, mode, username, onFinish, onCancel, registerHandler, sendMessage }) {
-  const { user } = useUser()
+export default function TextDebateRoom({ roomData, roomInfo, mode, username, onFinish, onCancel, registerHandler, sendMessage, clerkUser = null }) {
   const [messages, setMessages] = useState([]) // { id, speaker, text, fallacy, isAiGenerated, isExcellent }
   const [input, setInput] = useState('')
   const [isAiThinking, setIsAiThinking] = useState(false)
@@ -455,7 +453,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     const isMe = (name === roomData.playerA && isPlayerA) || (name === roomData.playerB && !isPlayerA)
     const stored = localStorage.getItem('kaiko_avatar_' + name)
     if (stored && stored !== 'none' && stored !== '') return stored
-    if (isMe && user?.imageUrl) return user.imageUrl
+    if (isMe && clerkUser?.imageUrl) return clerkUser.imageUrl
     return `https://api.dicebear.com/7.x/bottts/svg?seed=${name}`
   }
 

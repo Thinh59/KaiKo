@@ -1,10 +1,9 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import google.generativeai as genai
 from dotenv import load_dotenv
-import torch
+import httpx
 import os
 import json
 import re
@@ -24,6 +23,25 @@ def get_db():
     conn = psycopg2.connect(url)
     return conn
 
+def ensure_match_history_columns():
+    conn = get_db()
+    conn.autocommit = True
+    cursor = conn.cursor()
+    for col_sql in [
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS visibility TEXT DEFAULT 'private'",
+        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS scores_json TEXT DEFAULT '{}'"
+    ]:
+        try:
+            cursor.execute(col_sql)
+        except Exception as e:
+            print(f"⚠️  Ensure match_history column failed: {e}")
+    cursor.close()
+    conn.close()
+
 
 app = FastAPI(title="KaiKo API")
 
@@ -35,9 +53,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Load model khi khởi động server ---
-FALLACY_MODEL_PATH = "./fallacy_model/kaiko_fallacy_model_final"
-ARGKP_MODEL_PATH = "./fallacy_model/kaiko_argkp_model_final"
+# --- AI inference service ---
+AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "").rstrip("/")
 
 LABEL_NAMES = [
     'ad hominem', 'ad populum', 'appeal to emotion',
@@ -62,47 +79,32 @@ LABEL_VI = {
     'intentional':          'Ngụy biện cố ý'
 }
 
-fallacy_tokenizer = None
-fallacy_model = None
+async def call_ai_service(path: str, payload: dict) -> Optional[dict]:
+    """Call the separate AI service; return None so existing fallbacks can handle failures."""
+    if not AI_SERVICE_URL:
+        return None
 
-argkp_tokenizer = None
-argkp_model = None
+    url = f"{AI_SERVICE_URL}{path}"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            return response.json()
+    except Exception as e:
+        print(f"Lỗi gọi AI service {url}: {e}")
+        return None
 
 @app.on_event("startup")
 def load_model():
-    global fallacy_tokenizer, fallacy_model, argkp_tokenizer, argkp_model
-    
-    # Load Fallacy Model
-    if os.path.exists(FALLACY_MODEL_PATH):
-        print("Đang load Fallacy Model...")
-        try:
-            fallacy_tokenizer = AutoTokenizer.from_pretrained(FALLACY_MODEL_PATH)
-            fallacy_model = AutoModelForSequenceClassification.from_pretrained(FALLACY_MODEL_PATH)
-            fallacy_model.eval()
-            print("✅ Load Fallacy Model xong!")
-        except Exception as e:
-            print(f"❌ Lỗi load Fallacy Model: {e}")
-    else:
-        print("⚠️  Chưa có Fallacy model. Sẽ sử dụng Gemini API làm phương án dự phòng.")
-
-    # Load ArgKP Model
-    if os.path.exists(ARGKP_MODEL_PATH):
-        print("Đang load ArgKP Model...")
-        try:
-            argkp_tokenizer = AutoTokenizer.from_pretrained(ARGKP_MODEL_PATH)
-            argkp_model = AutoModelForSequenceClassification.from_pretrained(ARGKP_MODEL_PATH)
-            argkp_model.eval()
-            print("✅ Load ArgKP Model xong!")
-        except Exception as e:
-            print(f"❌ Lỗi load ArgKP Model: {e}")
-    else:
-        print("⚠️  Chưa có ArgKP model.")
-
     # Config Gemini
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
         print("✅ Gemini API configured")
+    if AI_SERVICE_URL:
+        print(f"✅ AI service configured: {AI_SERVICE_URL}")
+    else:
+        print("⚠️  Chưa cấu hình AI_SERVICE_URL. /analyze sẽ dùng Gemini fallback.")
 
     # Init PostgreSQL DB
     conn = get_db()
@@ -128,6 +130,7 @@ def load_model():
             fallacies_self INTEGER DEFAULT 0,
             fallacies_opp INTEGER DEFAULT 0,
             summary TEXT DEFAULT '',
+            visibility TEXT DEFAULT 'private',
             played_at TEXT NOT NULL
         )
     ''')
@@ -186,21 +189,18 @@ def load_model():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS frame TEXT DEFAULT 'none'",
         "ALTER TABLE friends ADD COLUMN IF NOT EXISTS debate_count INTEGER DEFAULT 0",
         "ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS submission_text TEXT",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_self TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS fallacies_list_opp TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_self TEXT DEFAULT ''",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS transcript_opp TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS checkin_streak INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT",
-        "ALTER TABLE match_history ADD COLUMN IF NOT EXISTS scores_json TEXT DEFAULT '{}'"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT"
     ]:
         try:
             cursor.execute(col_sql)
         except Exception:
             conn.rollback()
+
+    ensure_match_history_columns()
 
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS submission_votes (
@@ -848,7 +848,7 @@ async def get_random_topic(category: str = None):
 
 @app.get("/")
 def root():
-    return {"status": "ok", "model_loaded": fallacy_model is not None}
+    return {"status": "ok", "ai_service_configured": bool(AI_SERVICE_URL)}
 
 @app.post("/hint")
 async def get_hint(req: HintRequest):
@@ -981,6 +981,7 @@ class SaveMatch(BaseModel):
     summary: str
     transcript_self: str = ""
     transcript_opp: str = ""
+    visibility: str = "private"
     scores_json: str = "{}"
 
 @app.post("/save-match")
@@ -999,8 +1000,8 @@ def save_match(data: SaveMatch):
             (username, opponent, topic, mode, result,
              score_self, score_opp, fallacies_self, fallacies_opp, 
              fallacies_list_self, fallacies_list_opp, summary, played_at,
-             transcript_self, transcript_opp, scores_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             transcript_self, transcript_opp, visibility, scores_json)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """, (
         data.username, data.opponent, data.topic, data.mode, data.result,
@@ -1009,6 +1010,7 @@ def save_match(data: SaveMatch):
         fs_self_str, fs_opp_str,
         data.summary, played_at,
         data.transcript_self, data.transcript_opp,
+        "public" if data.visibility == "public" else "private",
         data.scores_json
     ))
     match_id = cursor.fetchone()['id']
@@ -1396,6 +1398,7 @@ def vote_submission(data: VoteSubmission):
 @app.get("/history/{username}")
 def get_history(username: str, limit: int = 20):
     """Lấy lịch sử trận đấu của user"""
+    ensure_match_history_columns()
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
@@ -1564,37 +1567,27 @@ async def analyze_fallacy(input: TextInput):
     if len(input.text.strip()) < 10:
         return {"fallacy": None, "confidence": 0}
 
-    # Sử dụng HuggingFace Model nếu đã load
-    if fallacy_model is not None and fallacy_tokenizer is not None:
-        try:
-            tokens = fallacy_tokenizer(
-                input.text,
-                return_tensors='pt',
-                truncation=True,
-                max_length=256
-            )
-
-            with torch.no_grad():
-                logits = fallacy_model(**tokens).logits
-
-            probs     = torch.softmax(logits, dim=-1)[0]
-            top_idx   = probs.argmax().item()
-            confidence = round(probs[top_idx].item() * 100, 1)
-            label     = LABEL_NAMES[top_idx]
-
+    result = await call_ai_service("/predict/fallacy", {"text": input.text})
+    if result:
+        label = result.get("label")
+        scores = result.get("scores") or {}
+        confidence = result.get("confidence")
+        if confidence is None and label in scores:
+            confidence = round(float(scores[label]) * 100, 1)
+        confidence = float(confidence or 0)
+        is_fallacy = result.get("is_fallacy")
+        if is_fallacy is None:
             is_fallacy = label != 'fallacy of logic' and confidence >= 70
 
-            return {
-                "fallacy":      LABEL_VI.get(label, label) if is_fallacy else None,
-                "fallacy_en":   label,
-                "confidence":   confidence,
-                "is_fallacy":   is_fallacy,
-                "speaker":      input.speaker
-            }
-        except Exception as e:
-            print(f"Lỗi phân tích local model: {e}")
+        return {
+            "fallacy": result.get("label_vi") if is_fallacy else None,
+            "fallacy_en": label,
+            "confidence": confidence,
+            "is_fallacy": is_fallacy,
+            "speaker": input.speaker
+        }
             
-    # Fallback sử dụng Gemini nếu chưa có model
+    # Fallback sử dụng Gemini nếu AI service lỗi hoặc chưa cấu hình
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         return {"error": "Chưa có Model cục bộ và chưa config GEMINI_API_KEY", "fallacy": None, "confidence": 0}
@@ -1641,35 +1634,19 @@ async def check_argument(input: ArgInput):
     if len(input.argument.strip()) < 10:
         return {"match": False, "score": 0}
 
-    # Sử dụng ArgKP Model
-    if argkp_model is not None and argkp_tokenizer is not None:
-        try:
-            tokens = argkp_tokenizer(
-                input.argument,
-                input.topic,
-                return_tensors='pt',
-                padding="max_length",
-                truncation=True,
-                max_length=256
-            )
-
-            with torch.no_grad():
-                logits = argkp_model(**tokens).logits
-
-            probs = torch.softmax(logits, dim=-1)[0]
-            score = round(probs[1].item() * 100, 1) # Điểm khớp (Nhãn 1)
-            is_match = probs.argmax().item() == 1
-
-            return {
-                "match": is_match,
-                "score": score,
-                "argument": input.argument,
-                "topic": input.topic
-            }
-        except Exception as e:
-            print(f"Lỗi phân tích ArgKP model: {e}")
+    result = await call_ai_service(
+        "/predict/argkp",
+        {"argument": input.argument, "key_point": input.topic}
+    )
+    if result:
+        return {
+            "match": result.get("match", False),
+            "score": result.get("score", 0),
+            "argument": input.argument,
+            "topic": input.topic
+        }
             
-    return {"match": True, "score": 100} # Mặc định đúng nếu lỗi model
+    return {"match": True, "score": 100} # Mặc định đúng nếu lỗi AI service
 
 @app.post("/analyze-text")
 async def analyze_text(input: TextAnalyzeInput):

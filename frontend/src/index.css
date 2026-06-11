@@ -897,7 +897,7 @@ button {
   border: 1px solid rgba(245, 158, 11, 0.45);
   background-image:
     linear-gradient(135deg, rgba(14, 8, 3, 0.18), rgba(14, 8, 3, 0.08)),
-    url('/assets/backgrounds/play_hero_bg.png');
+    url('/assets/backgrounds/play_hero_bg.jpg');
   background-size: cover;
   background-position: center;
   overflow: hidden;

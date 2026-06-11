@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
-import { useUser } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 const RESULT_META = {
   win: { label: 'Thắng', color: '#10b981', bg: 'rgba(16,185,129,0.15)', icon: '🏆' },
@@ -259,7 +258,7 @@ const EventVotingModal = ({ event, onClose, username }) => {
   );
 };
 
-export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler, theme, setTheme }) {
+export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler, theme, setTheme, clerkUser = null }) {
   const [activeTab, setActiveTab] = useState('home')
   const [showDailyQuests, setShowDailyQuests] = useState(false)
   const [activeEvent, setActiveEvent] = useState(null)
@@ -269,8 +268,6 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
   const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0, total: 0, avgScore: 0 })
-
-  const { user } = useUser()
 
   const [avatarFrame, setAvatarFrame] = useState(localStorage.getItem('kaiko_frame') || 'none')
   const [hasCheckedIn, setHasCheckedIn] = useState(localStorage.getItem('kaiko_checkin_' + username) === new Date().toLocaleDateString('vi-VN'))
@@ -535,7 +532,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
   const [showBadgeSelector, setShowBadgeSelector] = useState(false)
 
-  const avatarUrl = selectedAvatar || user?.imageUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username
+  const avatarUrl = selectedAvatar || clerkUser?.imageUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + username
 
   const displayUsername = globalNicknames[username] || nickname || username
   const getDisplayName = (u) => globalNicknames[u] || u
@@ -2829,4 +2826,3 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     </div>
   )
 }
-

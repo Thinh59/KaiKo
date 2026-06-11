@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
 const COLOR = { good: '#10b981', warn: '#f59e0b', bad: '#ef4444', info: '#3b82f6' }
 

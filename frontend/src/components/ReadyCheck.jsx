@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { API_BASE } from '../config'
 
 export default function ReadyCheck({ matchInfo, onReady, onCancel, getDisplayName }) {
   const [timeLeft, setTimeLeft] = useState(30)
@@ -10,7 +11,7 @@ export default function ReadyCheck({ matchInfo, onReady, onCancel, getDisplayNam
         // Hết 30s không bấm sẵn sàng -> Bị trừ 1 điểm và tự động sẵn sàng
         alert("Hết 30s! Bạn đã bị trừ 1 điểm và tự động chuyển trạng thái Sẵn Sàng.")
         try {
-          fetch('http://localhost:8000/deduct-penalty', {
+          fetch(`${API_BASE}/deduct-penalty`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ username: localStorage.getItem('kaiko_username') || 'guest' })

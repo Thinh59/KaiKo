@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { WS_BASE } from '../config'
 
 export function useSignaling(playerName) {
   const [socket, setSocket] = useState(null)
@@ -10,7 +11,7 @@ export function useSignaling(playerName) {
 
   useEffect(() => {
     // Kết nối tới WebSocket server của FastAPI
-    const wsUrl = `ws://localhost:8000/ws/${playerName}_${Math.floor(Math.random()*10000)}`
+    const wsUrl = `${WS_BASE}/ws/${playerName}_${Math.floor(Math.random()*10000)}`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {

@@ -5,10 +5,15 @@ backend/.env
 backend/*.pyc
 backend/.pytest_cache/
 backend/fallacy_model/
+ai_service/.env
+ai_service/models/
+ai_model/kaiko_argkp_model_final/
+ai_model/kaiko_fallacy_model_final/
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/src/.env
 frontend/.env.local
 frontend/.env.*.local
 

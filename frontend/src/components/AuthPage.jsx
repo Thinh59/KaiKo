@@ -2,9 +2,22 @@ import { useState } from 'react'
 import axios from 'axios'
 import { useSignIn, useSignUp } from '@clerk/clerk-react'
 
-const API_BASE = 'http://localhost:8000'
+import { API_BASE } from '../config'
 
-export default function AuthPage({ onLogin }) {
+export function AuthPageWithClerk({ onLogin }) {
+  const { signIn, isLoaded: signInLoaded } = useSignIn()
+  const { signUp, isLoaded: signUpLoaded } = useSignUp()
+
+  return (
+    <AuthPage
+      onLogin={onLogin}
+      clerkEnabled
+      clerkAuth={{ signIn, signInLoaded, signUp, signUpLoaded }}
+    />
+  )
+}
+
+export default function AuthPage({ onLogin, clerkEnabled = false, clerkAuth = {} }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,9 +42,10 @@ export default function AuthPage({ onLogin }) {
   }
   const strength = getPasswordStrength(password);
 
-  // Clerk hooks (chỉ dùng nếu Clerk được cấu hình)
-  const { signIn, isLoaded: signInLoaded } = useSignIn()
-  const { signUp, isLoaded: signUpLoaded } = useSignUp()
+  const {
+    signIn,
+    signInLoaded = false
+  } = clerkAuth
 
   const handleGuest = () => {
     onLogin(`Guest_${Math.floor(Math.random() * 10000)}`)
@@ -39,7 +53,7 @@ export default function AuthPage({ onLogin }) {
 
   // Đăng nhập bằng Google (Clerk OAuth)
   const handleGoogleLogin = async () => {
-    if (!signInLoaded || !signIn) {
+    if (!clerkEnabled || !signInLoaded || !signIn) {
       alert('Đăng nhập Google chưa được cấu hình. Vui lòng dùng tài khoản KaiKo.')
       return
     }
@@ -86,7 +100,7 @@ export default function AuthPage({ onLogin }) {
       } else {
         setErrorMsg(res.data.error)
       }
-    } catch (err) {
+    } catch {
       setErrorMsg('Lỗi kết nối máy chủ')
     } finally {
       setLoading(false)
@@ -251,4 +265,3 @@ export default function AuthPage({ onLogin }) {
     </div>
   )
 }
-
