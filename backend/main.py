@@ -193,7 +193,9 @@ def load_model():
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS consecutive_losses INTEGER DEFAULT 0",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS level_real INTEGER DEFAULT 1",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE"
     ]:
         try:
             cursor.execute(col_sql)
@@ -274,6 +276,18 @@ def load_model():
             username TEXT NOT NULL,
             content TEXT NOT NULL,
             created_at TEXT NOT NULL
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS daily_quests (
+            username TEXT PRIMARY KEY,
+            date TEXT NOT NULL,
+            daily_wins INTEGER DEFAULT 0,
+            daily_posts INTEGER DEFAULT 0,
+            daily_comments INTEGER DEFAULT 0,
+            daily_videos INTEGER DEFAULT 0,
+            claimed_quests TEXT DEFAULT ''
         )
     ''')
 
@@ -576,27 +590,33 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 room_code = message.get("roomCode")
                 if room_code in manager.rooms and len(manager.rooms[room_code]["players"]) == 1:
                     opponent_id = manager.rooms[room_code]["players"][0]
-                    topic = manager.rooms[room_code]["topic"]
-                    manager.rooms[room_code]["players"].append(client_id)
-                    manager.rooms[room_code].setdefault("player_names", {})[client_id] = client_id.rsplit("_", 1)[0]
-                    manager.rooms[room_code].setdefault("levels", {})[client_id] = 1
-                    
-                    # Notify Guest
-                    await manager.send_personal_message(json.dumps({
-                        "type": "matched",
-                        "roomId": room_code,
-                        "isHost": False,
-                        "opponentId": opponent_id,
-                        "topic": topic
-                    }), client_id)
-                    # Notify Host
-                    await manager.send_personal_message(json.dumps({
-                        "type": "matched",
-                        "roomId": room_code,
-                        "isHost": True,
-                        "opponentId": client_id,
-                        "topic": topic
-                    }), opponent_id)
+                    if client_id.rsplit("_", 1)[0] == opponent_id.rsplit("_", 1)[0]:
+                        await manager.send_personal_message(json.dumps({
+                            "type": "error",
+                            "message": "Không thể tự đấu với chính mình!"
+                        }), client_id)
+                    else:
+                        topic = manager.rooms[room_code]["topic"]
+                        manager.rooms[room_code]["players"].append(client_id)
+                        manager.rooms[room_code].setdefault("player_names", {})[client_id] = client_id.rsplit("_", 1)[0]
+                        manager.rooms[room_code].setdefault("levels", {})[client_id] = 1
+                        
+                        # Notify Guest
+                        await manager.send_personal_message(json.dumps({
+                            "type": "matched",
+                            "roomId": room_code,
+                            "isHost": False,
+                            "opponentId": opponent_id,
+                            "topic": topic
+                        }), client_id)
+                        # Notify Host
+                        await manager.send_personal_message(json.dumps({
+                            "type": "matched",
+                            "roomId": room_code,
+                            "isHost": True,
+                            "opponentId": client_id,
+                            "topic": topic
+                        }), opponent_id)
                 else:
                     await manager.send_personal_message(json.dumps({
                         "type": "error",
@@ -606,6 +626,16 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 room_id = message.get("roomId")
                 if room_id in manager.rooms and manager.rooms[room_id].get("visibility") == "public":
                     manager.spectators.setdefault(room_id, set()).add(client_id)
+                    
+                    try:
+                        conn_dq = get_db()
+                        cur_dq = conn_dq.cursor()
+                        update_daily_quest(cur_dq, client_id.rsplit("_", 1)[0], "daily_videos", 1)
+                        conn_dq.commit()
+                        conn_dq.close()
+                    except:
+                        pass
+
                     await manager.send_personal_message(json.dumps({
                         "type": "spectator_joined",
                         "roomId": room_id,
@@ -710,8 +740,8 @@ class FriendAction(BaseModel):
 
 class CommunityPostInput(BaseModel):
     username: str
-    content: str
-    image_url: str = None
+    content: Optional[str] = ""
+    image_url: Optional[str] = None
 
 class CommunityCommentInput(BaseModel):
     username: str
@@ -870,6 +900,103 @@ Dựa vào tình hình hiện tại, hãy gợi ý MỘT luận điểm ngắn g
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def update_daily_quest(cursor, username: str, field: str, amount: int = 1):
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    cursor.execute("SELECT date FROM daily_quests WHERE username=%s", (username,))
+    row = cursor.fetchone()
+    if not row or row["date"] != today:
+        cursor.execute("""
+            INSERT INTO daily_quests (username, date, daily_wins, daily_posts, daily_comments, daily_videos, claimed_quests)
+            VALUES (%s, %s, 0, 0, 0, 0, '')
+            ON CONFLICT (username) DO UPDATE SET 
+            date=EXCLUDED.date, daily_wins=0, daily_posts=0, daily_comments=0, daily_videos=0, claimed_quests=''
+        """, (username, today))
+    
+    cursor.execute(f"UPDATE daily_quests SET {field} = {field} + %s WHERE username=%s", (amount, username))
+
+class ClaimQuestInput(BaseModel):
+    username: str
+    quest_id: str
+
+@app.get("/daily-quests/{username}")
+def get_daily_quests(username: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        cursor.execute("SELECT * FROM daily_quests WHERE username=%s AND date=%s", (username, today))
+        row = cursor.fetchone()
+        if not row:
+            # Init today's row
+            cursor.execute("""
+                INSERT INTO daily_quests (username, date) VALUES (%s, %s)
+                ON CONFLICT (username) DO UPDATE SET 
+                date=EXCLUDED.date, daily_wins=0, daily_posts=0, daily_comments=0, daily_videos=0, claimed_quests=''
+                RETURNING *
+            """, (username, today))
+            row = cursor.fetchone()
+            conn.commit()
+            
+        # Also check check-in
+        cursor.execute("SELECT last_checkin FROM users WHERE username=%s", (username,))
+        user_row = cursor.fetchone()
+        has_checked_in = user_row and user_row.get("last_checkin") == today
+        
+        return {"success": True, "progress": row, "has_checked_in": has_checked_in}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+@app.post("/daily-quests/claim")
+def claim_daily_quest(data: ClaimQuestInput):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        cursor.execute("SELECT * FROM daily_quests WHERE username=%s AND date=%s", (data.username, today))
+        row = cursor.fetchone()
+        if not row:
+            return {"success": False, "error": "Chưa có tiến trình"}
+            
+        claimed = row["claimed_quests"].split(",") if row["claimed_quests"] else []
+        if data.quest_id in claimed:
+            return {"success": False, "error": "Đã nhận thưởng nhiệm vụ này!"}
+            
+        # Process rewards based on quest_id
+        exp_reward = 0
+        point_reward = 0
+        if data.quest_id == "win_3" and row["daily_wins"] >= 3:
+            point_reward = 200
+        elif data.quest_id == "post_1" and row["daily_posts"] >= 1:
+            point_reward = 100
+        elif data.quest_id == "comment_3" and row["daily_comments"] >= 3:
+            point_reward = 100
+        elif data.quest_id == "video_1" and row["daily_videos"] >= 1:
+            point_reward = 150
+        elif data.quest_id == "checkin":
+            # Just reward
+            point_reward = 50
+        else:
+            return {"success": False, "error": "Chưa đủ điều kiện nhận!"}
+            
+        claimed.append(data.quest_id)
+        new_claimed = ",".join(filter(None, claimed))
+        cursor.execute("UPDATE daily_quests SET claimed_quests=%s WHERE username=%s", (new_claimed, data.username))
+        
+        if point_reward > 0:
+            cursor.execute("UPDATE users SET store_points = store_points + %s WHERE username=%s", (point_reward, data.username))
+            
+        conn.commit()
+        return {"success": True, "exp_reward": exp_reward, "point_reward": point_reward}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
 @app.post("/register")
 def register(user: AuthInput):
     if not user.username or not user.password:
@@ -901,11 +1028,13 @@ def login(user: AuthInput):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     pwd_hash = hashlib.sha256(user.password.encode()).hexdigest()
     
-    cursor.execute("SELECT username FROM users WHERE username = %s AND password_hash = %s", (user.username, pwd_hash))
+    cursor.execute("SELECT username, is_banned FROM users WHERE username = %s AND password_hash = %s", (user.username, pwd_hash))
     row = cursor.fetchone()
     conn.close()
     
     if row:
+        if row.get('is_banned', False):
+            return {"success": False, "error": "Tài khoản của bạn đã bị khóa do vi phạm cộng đồng!"}
         return {"success": True, "username": row['username']}
     else:
         return {"success": False, "error": "Sai tài khoản hoặc mật khẩu"}
@@ -1015,11 +1144,11 @@ def save_match(data: SaveMatch):
     ))
     match_id = cursor.fetchone()['id']
     
-    # Phân biệt điểm theo loại: Video/Solo win=5, Chat win=3; Video draw=1, Chat draw=0
     is_chat = data.mode.startswith('text_')
     if data.result == 'win':
         pts = 3 if is_chat else 5
         cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + %s WHERE username = %s", (pts, data.username))
+        update_daily_quest(cursor, data.username, "daily_wins", 1)
     elif data.result == 'draw' and not is_chat:
         cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 1 WHERE username = %s", (data.username,))
         
@@ -1124,6 +1253,12 @@ class PurchaseRequest(BaseModel):
     item_id: str
     price: int
 
+class CrabSyncRequest(BaseModel):
+    username: str
+    crab_level: int
+    crab_exp: int
+    points_earned: int
+
 @app.post("/purchase")
 def purchase_item(data: PurchaseRequest):
     """Mua vật phẩm bằng Điểm Tích Lũy"""
@@ -1147,7 +1282,21 @@ def purchase_item(data: PurchaseRequest):
     cursor.execute("INSERT INTO user_items (username, item_id, purchased_at) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (data.username, data.item_id, now))
     conn.commit()
     conn.close()
+    conn.close()
     return {"success": True, "remaining_points": current_points - data.price}
+
+@app.post("/crab-game/sync")
+def sync_crab_game(data: CrabSyncRequest):
+    """Đồng bộ trạng thái trò chơi Nuôi Cua và cộng điểm"""
+    if data.points_earned > 100:
+        return {"success": False, "error": "Chơi gian lận à?"}
+    conn = get_db()
+    cursor = conn.cursor()
+    if data.points_earned > 0:
+        cursor.execute("UPDATE users SET store_points = COALESCE(store_points, 0) + %s WHERE username=%s", (data.points_earned, data.username))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.get("/my-info/{username}")
 def get_my_info(username: str):
@@ -1156,13 +1305,15 @@ def get_my_info(username: str):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
     # Lấy thông tin user (points, avatar, frame, level, streak)
-    cursor.execute("SELECT store_points, avatar, frame, level_real, checkin_streak FROM users WHERE username=%s", (username,))
+    cursor.execute("SELECT store_points, avatar, frame, level_real, checkin_streak, role, is_banned FROM users WHERE username=%s", (username,))
     user_row = cursor.fetchone()
     store_points = user_row['store_points'] if user_row and user_row['store_points'] else 0
     avatar = user_row['avatar'] if user_row and user_row['avatar'] else ''
     frame = user_row['frame'] if user_row and user_row['frame'] else 'none'
     level_real = user_row['level_real'] if user_row and user_row['level_real'] else 1
     checkin_streak = user_row['checkin_streak'] if user_row and user_row['checkin_streak'] else 0
+    role = user_row['role'] if user_row and 'role' in user_row and user_row['role'] else 'user'
+    is_banned = user_row['is_banned'] if user_row and 'is_banned' in user_row else False
     
     # Lấy items
     cursor.execute("SELECT item_id FROM user_items WHERE username=%s", (username,))
@@ -1186,8 +1337,42 @@ def get_my_info(username: str):
         "achievements": achievements,
         "unread_notifications": unread,
         "level_real": level_real,
-        "checkin_streak": checkin_streak
+        "checkin_streak": checkin_streak,
+        "role": role,
+        "is_banned": is_banned
     }
+
+class AdminAction(BaseModel):
+    admin_name: str
+    target: str
+
+@app.post("/admin/ban")
+def admin_ban_user(data: AdminAction):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT role FROM users WHERE username=%s", (data.admin_name,))
+    row = cursor.fetchone()
+    if not row or row.get('role') != 'admin':
+        conn.close()
+        return {"success": False, "error": "Unauthorized"}
+    cursor.execute("UPDATE users SET is_banned = TRUE WHERE username=%s", (data.target,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.delete("/admin/community-posts/{post_id}")
+def admin_delete_post(post_id: int, admin_name: str):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cursor.execute("SELECT role FROM users WHERE username=%s", (admin_name,))
+    row = cursor.fetchone()
+    if not row or row.get('role') != 'admin':
+        conn.close()
+        return {"success": False, "error": "Unauthorized"}
+    cursor.execute("DELETE FROM community_posts WHERE id=%s", (post_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 class CheckinRequest(BaseModel):
     username: str
@@ -1197,9 +1382,20 @@ def server_checkin(data: CheckinRequest):
     """Server-side check-in: cộng 50 điểm vào store_points"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 50 WHERE username=%s", (data.username,))
+    
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    cursor.execute("SELECT last_checkin FROM users WHERE username=%s", (data.username,))
+    row = cursor.fetchone()
+    if row and row.get("last_checkin") == today:
+        conn.close()
+        return {"success": False, "error": "Bạn đã điểm danh hôm nay rồi!"}
+
+    cursor.execute("UPDATE users SET store_points = COALESCE(store_points,0) + 50, last_checkin = %s, checkin_streak = COALESCE(checkin_streak,0) + 1 WHERE username=%s", (today, data.username))
     if cursor.rowcount == 0:
-        cursor.execute("INSERT INTO users (username, password_hash, store_points) VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", (data.username, 'clerk_auth', 50))
+        cursor.execute("INSERT INTO users (username, password_hash, store_points, last_checkin, checkin_streak) VALUES (%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING", (data.username, 'clerk_auth', 50, today, 1))
+    
     conn.commit()
     cursor.execute("SELECT store_points FROM users WHERE username=%s", (data.username,))
     row = cursor.fetchone()
@@ -1235,13 +1431,18 @@ def get_events():
     # Auto-rotate small open event if deadline passed or it's the default one
     cursor.execute("SELECT id, deadline, title FROM events WHERE event_type = 'small' AND status = 'open' LIMIT 1")
     ev1 = cursor.fetchone()
-    if ev1 and (ev1['deadline'] < now_str or "Đại Chiến Văn Mẫu" in ev1['title']):
-        topic = random.choice(TRENDING_TOPICS)
-        new_deadline = (now_dt + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
-        new_title = "Đại Chiến: " + topic[:30] + "..."
-        new_desc = f"Tranh biện với chủ đề: {topic}"
-        cursor.execute("UPDATE events SET title=%s, description=%s, deadline=%s WHERE id=%s", (new_title, new_desc, new_deadline, ev1['id']))
-        cursor.execute("DELETE FROM event_participants WHERE event_id=%s", (ev1['id'],))
+    if ev1:
+        if ev1['deadline'] < now_str or "Đại Chiến Văn Mẫu" in ev1['title']:
+            topic = random.choice(TRENDING_TOPICS)
+            new_deadline = (now_dt + timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S')
+            new_title = "Đại Chiến Tuần Này"
+            new_desc = f"Tranh biện với chủ đề: {topic}"
+            cursor.execute("UPDATE events SET title=%s, description=%s, deadline=%s WHERE id=%s", (new_title, new_desc, new_deadline, ev1['id']))
+            cursor.execute("DELETE FROM event_participants WHERE event_id=%s", (ev1['id'],))
+            conn.commit()
+            ev1['deadline'] = new_deadline
+        
+        cursor.execute("UPDATE events SET status='open', deadline=%s WHERE title LIKE 'Bình Chọn Chủ Đề%%'", (ev1['deadline'],))
         conn.commit()
     
     cursor.execute("SELECT COUNT(*) as count FROM events WHERE event_type = 'small' AND status IN ('open', 'upcoming')")
@@ -1420,20 +1621,20 @@ def get_leaderboard(limit: int = 10):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    # Logic: 
-    # 1. Chỉ tính điểm TB (avg_score) cho những trận có phát sinh điểm (score_self > 0)
-    # 2. Sắp xếp theo số trận thắng (wins) trước, sau đó là điểm hiệu năng TB
+    # 1. Chỉ tính Tổng Điểm (total_score) cho những trận có phát sinh điểm (score_self > 0)
+    # 2. Sắp xếp theo Level, sau đó là Tổng Điểm, rồi mới đến Thắng
     cursor.execute("""
-        SELECT username, 
-               COUNT(id) as total_matches,
-               SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
-               SUM(CASE WHEN result = 'lose' THEN 1 ELSE 0 END) as losses,
-               -- Loại bỏ các trận 0 điểm khỏi mẫu số để không làm loãng điểm trung bình
-               ROUND(AVG(CASE WHEN score_self > 0 THEN score_self ELSE NULL END), 1) as avg_score
-        FROM match_history
-        GROUP BY username
-        HAVING COUNT(id) > 0
-        ORDER BY wins DESC, avg_score DESC
+        SELECT m.username, 
+               COALESCE(u.level_real, 1) as level,
+               COUNT(m.id) as total_matches,
+               SUM(CASE WHEN m.result = 'win' THEN 1 ELSE 0 END) as wins,
+               SUM(CASE WHEN m.result = 'lose' THEN 1 ELSE 0 END) as losses,
+               SUM(COALESCE(m.score_self, 0)) as total_score
+        FROM match_history m
+        LEFT JOIN users u ON m.username = u.username
+        GROUP BY m.username, u.level_real
+        HAVING COUNT(m.id) > 0
+        ORDER BY level DESC, total_score DESC, wins DESC
         LIMIT %s
     """, (limit,))
     rows = list(cursor.fetchall())
@@ -1441,8 +1642,8 @@ def get_leaderboard(limit: int = 10):
     
     # Fix giá trị null nếu user chưa có trận nào có điểm > 0
     for row in rows:
-        if row['avg_score'] is None:
-            row['avg_score'] = 0
+        if row['total_score'] is None:
+            row['total_score'] = 0
             
     return {"success": True, "leaderboard": rows}
 
@@ -1627,6 +1828,28 @@ async def analyze_fallacy(input: TextInput):
         
         
     return {"fallacy": None, "confidence": 0, "is_fallacy": False}
+
+@app.post("/analyze-manual")
+async def analyze_manual(input: TextInput):
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return {"success": False, "error": "Chưa có GEMINI_API_KEY"}
+    import google.generativeai as genai
+    genai.configure(api_key=api_key)
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        prompt = f"""Bạn là một chuyên gia tranh biện KaiKo. Hãy phân tích xem đoạn văn sau có mắc lỗi ngụy biện (logical fallacy) nào không.
+Đoạn văn: "{input.text}"
+Yêu cầu trả lời:
+- Kết luận: Có ngụy biện hay không? Nếu có thì là loại nào? (Tấn công cá nhân, bù nhìn, cá trích đỏ,...)
+- Giải thích: Tại sao lại bị lỗi đó? Lập luận ở đâu bị đứt gãy?
+- Cách phản bác: (Nếu có ngụy biện) Gợi ý cách người khác có thể phản bác lại câu này.
+Trả lời bằng Markdown.
+"""
+        response = await asyncio.to_thread(model.generate_content, prompt)
+        return {"success": True, "analysis": response.text.strip()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 @app.post("/check-argument")
 async def check_argument(input: ArgInput):
@@ -1952,9 +2175,9 @@ def get_community_posts(limit: int = 30):
 
 @app.post("/community-posts")
 def create_community_post(data: CommunityPostInput):
-    content = data.content.strip()
-    if not content:
-        return {"success": False, "error": "Nội dung bài viết không được để trống"}
+    content = data.content.strip() if data.content else ""
+    if not content and not data.image_url:
+        return {"success": False, "error": "Nội dung bài viết hoặc ảnh không được để trống"}
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
@@ -1966,6 +2189,9 @@ def create_community_post(data: CommunityPostInput):
             RETURNING id, username, content, created_at, likes, image_url
         """, (data.username, content[:1000], now, data.image_url))
         post = dict(cursor.fetchone())
+        
+        update_daily_quest(cursor, data.username, "daily_posts", 1)
+        
         conn.commit()
         post["comments"] = []
         post["comment_count"] = 0
@@ -2012,6 +2238,9 @@ def create_post_comment(post_id: int, data: CommunityCommentInput):
             RETURNING id, post_id, username, content, created_at
         """, (post_id, data.username, content[:500], now))
         comment = dict(cursor.fetchone())
+        
+        update_daily_quest(cursor, data.username, "daily_comments", 1)
+        
         conn.commit()
         return {"success": True, "comment": comment}
     except Exception as e:
