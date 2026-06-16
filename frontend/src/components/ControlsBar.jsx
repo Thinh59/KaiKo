@@ -16,13 +16,10 @@ export default function ControlsBar({
   const isDisabled = isScoring || isAiThinking
 
   return (
-    <div className="glass-panel" style={{
-      padding: '2rem',
+    <div style={{
       textAlign: 'center',
-      borderTop: '4px solid',
-      borderTopColor: isTimeRunningOut ? '#ef4444' : 'var(--accent-primary)',
       transition: 'all 0.3s ease',
-      boxShadow: isTimeRunningOut ? '0 -10px 20px rgba(239,68,68,0.2)' : 'var(--shadow-md)'
+      padding: '1rem',
     }}>
       {/* Timer */}
       <div style={{
@@ -147,20 +144,21 @@ export default function ControlsBar({
         <button
           onClick={onCancel}
           style={{
-            padding: '12px 18px',
+            padding: '12px 24px',
             background: 'rgba(239, 68, 68, 0.2)',
             color: '#fca5a5',
             border: '1px solid #ef4444',
             borderRadius: 'var(--radius-full)',
             cursor: 'pointer',
-            fontSize: '1.4rem',
+            fontSize: '1.1rem',
+            fontWeight: '600',
             transition: 'all 0.3s ease'
           }}
           title="Thoát"
           onMouseEnter={(e) => (e.target.style.background = 'rgba(239, 68, 68, 0.4)')}
           onMouseLeave={(e) => (e.target.style.background = 'rgba(239, 68, 68, 0.2)')}
         >
-          ✖
+          🚪 Thoát
         </button>
       </div>
 

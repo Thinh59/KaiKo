@@ -295,9 +295,13 @@ input::placeholder {
 }
 
 .floatMascotTopRight {
-  top: 80px;
+  top: 140px;
   right: 120px;
   /* Shifted left from the absolute right corner */
+  animation: floatTopRightAnim 4s ease-in-out infinite;
+}
+
+.draggableMascotAnim {
   animation: floatTopRightAnim 4s ease-in-out infinite;
 }
 

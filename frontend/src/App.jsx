@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { useUser, useAuth, AuthenticateWithRedirectCallback } from '@clerk/clerk-react'
 import HomePage from './components/HomePage'
@@ -14,14 +14,21 @@ import TextDebateRoom from './components/TextDebateRoom'
 import { useSignaling } from './hooks/useSignaling'
 
 const DIALOGUES = [
+  "Kani Kani cua ngon lắm nha ~~",
+  "Ông Chủ Cua có chương trình giảm giá siêu hời tại shop!!!",
+  "Ngang như cua thì mau mau nâng cấp...",
+  "MSSV của bạn sẽ tỏa sáng trên KaiKo aaaa",
   "(◕‿◕✿) Cố lên nhé!",
   "KaiKo siêu cấp vô địch! 🦀",
-  "Hãy trở thành vua tranh biện nào! 👑",
-  "Bạn đã xem bảng xếp hạng chưa? 🏆",
-  "Hôm nay kiếm được bao nhiêu điểm rồi? ⭐",
-  "Vote bài trong sự kiện để nhận điểm nha! 🎁",
   "Tranh luận vui vẻ, không quạu nha! ╰(▔∀▔)╯",
 ];
+
+const initSfxVol = parseFloat(localStorage.getItem('kaiko_sfx_volume') || '0.7');
+const mascotSound = new Audio('https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3');
+mascotSound.volume = initSfxVol * 0.5;
+
+const clickSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
+clickSound.volume = initSfxVol * 0.2;
 
 const ANIMATIONS = [
   'floatMascotTopRight',
@@ -29,10 +36,44 @@ const ANIMATIONS = [
   'bounceAround'
 ];
 
-function InteractiveMascot() {
+function InteractiveMascot({ username }) {
   const [dialogue, setDialogue] = useState(DIALOGUES[0]);
-  const [animClass, setAnimClass] = useState(ANIMATIONS[0]);
   const [showBubble, setShowBubble] = useState(false); // Ẩn mặc định
+  const [isInvisible, setIsInvisible] = useState(false);
+  
+  // Drag state
+  const [pos, setPos] = useState({ x: window.innerWidth - 120 - 80, y: 140 }); // Initial approx top right
+  const [isDragging, setIsDragging] = useState(false);
+  const relRef = useRef({ x: 0, y: 0 });
+  const hasMovedRef = useRef(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      // Keep within bounds
+      setPos(prev => ({
+        x: Math.min(Math.max(0, prev.x), window.innerWidth - 80),
+        y: Math.min(Math.max(0, prev.y), window.innerHeight - 80)
+      }));
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!username || username.startsWith('Guest_')) return;
+    const checkInvis = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/my-items/${encodeURIComponent(username)}`);
+        if (res.data.success && res.data.items.includes('mascot_invis')) {
+          setIsInvisible(true);
+        }
+      } catch (e) {}
+    };
+    checkInvis();
+    // Check periodically in case they just bought it
+    const interval = setInterval(checkInvis, 30000);
+    return () => clearInterval(interval);
+  }, [username]);
 
   // Tự động biến mất sau 5s
   useEffect(() => {
@@ -62,28 +103,52 @@ function InteractiveMascot() {
     return () => clearTimeout(randomTimer);
   }, []);
 
-  const handleClick = () => {
-    // Đổi thoại ngẫu nhiên (tránh trùng cái hiện tại)
-    let newD = dialogue;
-    while (newD === dialogue) {
-      newD = DIALOGUES[Math.floor(Math.random() * DIALOGUES.length)];
-    }
-    setDialogue(newD);
+  const handlePointerDown = (e) => {
+    setIsDragging(true);
+    hasMovedRef.current = false;
+    e.target.setPointerCapture(e.pointerId);
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    relRef.current = {
+      x: clientX - pos.x,
+      y: clientY - pos.y
+    };
+  };
 
-    // Đổi animation ngẫu nhiên
-    let newA = animClass;
-    while (newA === animClass) {
-      newA = ANIMATIONS[Math.floor(Math.random() * ANIMATIONS.length)];
-    }
-    setAnimClass(newA);
-    
-    // Hiện bubble
-    setShowBubble(true);
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    hasMovedRef.current = true;
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    setPos({
+      x: clientX - relRef.current.x,
+      y: clientY - relRef.current.y
+    });
+  };
+
+  const handlePointerUp = (e) => {
+    setIsDragging(false);
+    e.target.releasePointerCapture(e.pointerId);
+  };
+
+  const handleClick = (e) => {
+    if (hasMovedRef.current) return;
+    // Ẩn bubble khi ấn vào
+    setShowBubble(false);
+    mascotSound.currentTime = 0;
+    mascotSound.play().catch(e => {});
+    // Kích hoạt event mở Assistant
+    document.dispatchEvent(new CustomEvent('kaiko_open_assistant'));
   };
 
   return (
     <div 
-      className={`floating-mascot-interactive ${animClass}`} 
+      className={`floating-mascot-interactive draggableMascotAnim`} 
+      style={{ left: pos.x, top: pos.y, cursor: isDragging ? 'grabbing' : 'pointer', userSelect: 'none', touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onClick={handleClick}
     >
       {showBubble && (
@@ -94,7 +159,8 @@ function InteractiveMascot() {
       <img 
         src="/assets/mascots/mascot.png" 
         alt="Mascot" 
-        style={{ width: '130px', height: '130px', filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.6))', cursor: 'pointer' }} 
+        draggable="false"
+        style={{ width: '80px', height: '80px', filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.6))', cursor: 'pointer', opacity: isInvisible ? 0.15 : 1, transition: 'opacity 0.3s' }} 
         onError={e => { e.target.style.display='none'; }} 
       />
     </div>
@@ -148,6 +214,26 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
   const [soloTopic, setSoloTopic] = useState('AI có thay thế được con người?')
   const [globalNicknames, setGlobalNicknames] = useState({})
   const [theme, setTheme] = useState(() => localStorage.getItem('kaiko_theme') || 'dark')
+
+  useEffect(() => {
+    const playClick = () => {
+      clickSound.currentTime = 0;
+      clickSound.play().catch(e => {});
+    };
+    document.addEventListener('click', playClick);
+    
+    const handleSfxVol = (e) => {
+      const vol = e.detail;
+      clickSound.volume = vol * 0.2;
+      mascotSound.volume = vol * 0.5;
+    };
+    window.addEventListener('kaiko_sfx_volume_changed', handleSfxVol);
+    
+    return () => {
+      document.removeEventListener('click', playClick);
+      window.removeEventListener('kaiko_sfx_volume_changed', handleSfxVol);
+    };
+  }, []);
 
   useEffect(() => {
     if (theme === 'bright') {
@@ -218,7 +304,7 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
   // Tự động đăng nhập khi Clerk báo đã sign in
   useEffect(() => {
     if (isSignedIn && user && (page === 'auth' || page === 'home')) {
-      const name = user.firstName || user.username || user.primaryEmailAddress?.emailAddress?.split('@')[0] || 'Player'
+      const name = user.username || user.primaryEmailAddress?.emailAddress?.split('@')[0] || user.firstName || 'Player'
       handleLogin(name)
     }
   }, [isSignedIn, user, page, handleLogin])
@@ -519,7 +605,7 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
       {content}
       {page !== 'home' && page !== 'auth' && (
         <>
-          <InteractiveMascot />
+          <InteractiveMascot username={username} />
           <ErrorBoundary>
             <MusicPlayer />
           </ErrorBoundary>

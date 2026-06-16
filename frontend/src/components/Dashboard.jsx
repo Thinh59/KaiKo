@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
+import EmojiPicker from 'emoji-picker-react'
+import AuthPage from './AuthPage'
+import CrabGame from './CrabGame'
 
 import { API_BASE } from '../config'
 
@@ -18,7 +21,7 @@ function HistoryRow({ match, onClick }) {
   return (
     <div onClick={onClick} style={{
       display: 'grid',
-      gridTemplateColumns: '60px 1fr 90px 80px 80px 80px',
+      gridTemplateColumns: '60px 1fr 90px 80px 80px',
       alignItems: 'center',
       gap: '12px',
       padding: '14px 20px',
@@ -73,13 +76,6 @@ function HistoryRow({ match, onClick }) {
         <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Đối thủ</div>
       </div>
 
-      {/* Ngụy biện */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '1.1rem', fontWeight: '700', color: match.fallacies_self > 0 ? '#ef4444' : '#10b981' }}>
-          {match.fallacies_self > 0 ? `-${match.fallacies_self * 5}đ` : '✓'}
-        </div>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Trừ điểm</div>
-      </div>
 
       {/* Mode badge */}
       <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -158,7 +154,7 @@ const EventWorkspaceModal = ({ event, onClose, username }) => {
             <div
               ref={editorRef}
               contentEditable
-              style={{ flex: 1, overflowY: 'auto', background: 'var(--input-bg)', padding: '20px', borderRadius: '0 0 8px 8px', border: '1px solid var(--border-light)', color: '#fff', outline: 'none', fontSize: '1.1rem', lineHeight: '1.6' }}
+              style={{ flex: 1, overflowY: 'auto', background: 'var(--input-bg)', padding: '20px', borderRadius: '0 0 8px 8px', border: '1px solid var(--border-light)', color: 'var(--text-primary)', outline: 'none', fontSize: '1.1rem', lineHeight: '1.6' }}
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', gap: '10px' }}>
               <button onClick={onClose} className="btn-secondary" style={{ padding: '10px 20px' }}>Hủy</button>
@@ -176,10 +172,6 @@ const EventVotingModal = ({ event, onClose, username }) => {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
 
-  useEffect(() => {
-    fetchSubmissions();
-  }, [event.id]);
-
   const fetchSubmissions = async () => {
     setLoading(true);
     try {
@@ -190,6 +182,10 @@ const EventVotingModal = ({ event, onClose, username }) => {
     } catch (e) { }
     setLoading(false);
   };
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, [event.id]);
 
   const handleVote = async (participantId) => {
     try {
@@ -261,13 +257,14 @@ const EventVotingModal = ({ event, onClose, username }) => {
 export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sendMessage, registerHandler, theme, setTheme, clerkUser = null }) {
   const [activeTab, setActiveTab] = useState('home')
   const [showDailyQuests, setShowDailyQuests] = useState(false)
+  const [dailyProgress, setDailyProgress] = useState(null)
   const [activeEvent, setActiveEvent] = useState(null)
   const [activeVotingEvent, setActiveVotingEvent] = useState(null)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
-  const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0, total: 0, avgScore: 0 })
+  const [stats, setStats] = useState({ wins: 0, losses: 0, draws: 0, total: 0, totalScore: 0 })
 
   const [avatarFrame, setAvatarFrame] = useState(localStorage.getItem('kaiko_frame') || 'none')
   const [hasCheckedIn, setHasCheckedIn] = useState(localStorage.getItem('kaiko_checkin_' + username) === new Date().toLocaleDateString('vi-VN'))
@@ -286,6 +283,12 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [myItems, setMyItems] = useState([])
   const [events, setEvents] = useState([])
   const [joinedEvents, setJoinedEvents] = useState([])
+  
+  useEffect(() => {
+    const handleOpenAss = () => setShowAssistant(prev => !prev);
+    document.addEventListener('kaiko_open_assistant', handleOpenAss);
+    return () => document.removeEventListener('kaiko_open_assistant', handleOpenAss);
+  }, []);
   const [selectedAvatar, setSelectedAvatar] = useState(localStorage.getItem('kaiko_avatar_' + username) || '')
   const [selectedBadges, setSelectedBadges] = useState(() => {
     try { return JSON.parse(localStorage.getItem('kaiko_badges_' + username) || '[]') } catch { return [] }
@@ -297,19 +300,30 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [achievements, setAchievements] = useState([])
   const [fallacyStats, setFallacyStats] = useState({})
   const [fallacyAnalysis, setFallacyAnalysis] = useState('')
+
+  const [manualFallacyInput, setManualFallacyInput] = useState('')
+  const [manualFallacyResult, setManualFallacyResult] = useState(null)
+  const [isManualAnalyzing, setIsManualAnalyzing] = useState(false)
   const [mentorData, setMentorData] = useState({ masters: [], disciples: [], requests: [] })
   const [mentorInput, setMentorInput] = useState('')
   const [historyFilter, setHistoryFilter] = useState('all')
   const [opponentFilter, setOpponentFilter] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState('all')
+  
+  const [showEmojiPickerGlobal, setShowEmojiPickerGlobal] = useState(false)
+  const [showEmojiPickerChat, setShowEmojiPickerChat] = useState(false)
 
   const [activeChatUser, setActiveChatUser] = useState(null)
   const [chatMessages, setChatMessages] = useState({})
   const [chatInput, setChatInput] = useState('')
   const [showChatWidget, setShowChatWidget] = useState(false)
+  const [showAssistant, setShowAssistant] = useState(false)
+  const [showCrabGame, setShowCrabGame] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [globalVolume, setGlobalVolume] = useState(() => parseFloat(localStorage.getItem('kaiko_volume') || '1.0'))
+  const [bgmVolume, setBgmVolume] = useState(() => parseFloat(localStorage.getItem('kaiko_bgm_volume') || '0.7'))
+  const [sfxVolume, setSfxVolume] = useState(() => parseFloat(localStorage.getItem('kaiko_sfx_volume') || '0.7'))
   const [camEnabled, setCamEnabled] = useState(false)
   const [micEnabled, setMicEnabled] = useState(false)
   const [chatTab, setChatTab] = useState('friends')   // 'friends' | 'community'
@@ -328,6 +342,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
   const [liveLoading, setLiveLoading] = useState(false)
   const [activeSpectatorRoom, setActiveSpectatorRoom] = useState(null)
   const [spectatorEvents, setSpectatorEvents] = useState([])
+
+  useEffect(() => {
+    const syncBgm = (e) => setBgmVolume(e.detail);
+    const syncSfx = (e) => setSfxVolume(e.detail);
+    window.addEventListener('kaiko_bgm_volume_changed', syncBgm);
+    window.addEventListener('kaiko_sfx_volume_changed', syncSfx);
+    return () => {
+      window.removeEventListener('kaiko_bgm_volume_changed', syncBgm);
+      window.removeEventListener('kaiko_sfx_volume_changed', syncSfx);
+    };
+  }, []);
 
   // Load server announcements
   useEffect(() => {
@@ -551,6 +576,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         setUnreadCount(res.data.unread_notifications || 0)
         if (res.data.level_real) setRealLevel(res.data.level_real)
         if (res.data.checkin_streak) setCheckinStreak(res.data.checkin_streak)
+        setIsAdmin(res.data.role === 'admin' || username === 'Thinh59' || username === 'admin')
         if (res.data.avatar) {
           setSelectedAvatar(res.data.avatar)
           localStorage.setItem('kaiko_avatar_' + username, res.data.avatar)
@@ -570,6 +596,31 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     } catch (e) { }
   }, [])
 
+  const handleAdminDeletePost = async (postId) => {
+    if (!window.confirm('Admin: Bạn có chắc chắn muốn xóa bài đăng này không?')) return;
+    try {
+      const res = await axios.delete(`${API_BASE}/admin/community-posts/${postId}?admin_name=${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setCommunityPosts(prev => prev.filter(p => p.id !== postId))
+        showNotification('Đã xóa bài viết vi phạm!', 'success')
+      } else {
+        showNotification(res.data.error || 'Lỗi hệ thống', 'error')
+      }
+    } catch(e) {}
+  }
+
+  const handleAdminBanUser = async (target) => {
+    if (!window.confirm(`Admin: Khóa mõm người chơi [${target}]? Bị khóa sẽ không thể đăng nhập hoặc tương tác.`)) return;
+    try {
+      const res = await axios.post(`${API_BASE}/admin/ban`, { admin_name: username, target })
+      if (res.data.success) {
+        showNotification(`Đã khóa mõm ${target} thành công!`, 'success')
+      } else {
+        showNotification(res.data.error || 'Lỗi hệ thống', 'error')
+      }
+    } catch(e) {}
+  }
+
   const loadMyEvents = useCallback(async () => {
     if (isGuest) return
     try {
@@ -577,6 +628,39 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       if (res.data.success) setJoinedEvents(res.data.events || [])
     } catch (e) { }
   }, [username, isGuest])
+
+  const handleManualAnalyze = async () => {
+    if (!manualFallacyInput.trim()) return;
+    setIsManualAnalyzing(true);
+    setManualFallacyResult(null);
+    try {
+      const res = await axios.post(`${API_BASE}/analyze-manual`, { text: manualFallacyInput, username: username });
+      if (res.data.success) {
+        setManualFallacyResult(res.data.analysis);
+      } else {
+        alert(res.data.error || "Lỗi phân tích.");
+      }
+    } catch (e) {
+      alert("Lỗi kết nối khi phân tích!");
+    } finally {
+      setIsManualAnalyzing(false);
+    }
+  }
+
+  const handleClaimQuest = async (questId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/daily-quests/claim`, { username, quest_id: questId })
+      if (res.data.success) {
+        alert(`Nhận thưởng thành công: ${res.data.exp_reward} EXP, ${res.data.point_reward} Điểm!`)
+        loadDailyQuests()
+        loadMyInfo()
+      } else {
+        alert(res.data.error)
+      }
+    } catch (e) {
+      alert("Lỗi kết nối!")
+    }
+  }
 
   const handleCheckIn = async () => {
     if (!hasCheckedIn) {
@@ -587,6 +671,12 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         if (res.data.success) {
           setServerPoints(res.data.store_points)
           alert(`Điểm danh thành công! +50 Điểm Tích Lũy. Tổng: ${res.data.store_points} điểm.`)
+        } else {
+          alert(res.data.error || "Có lỗi xảy ra!")
+          if (res.data.error !== "Bạn đã điểm danh hôm nay rồi!") {
+            setHasCheckedIn(false)
+            localStorage.removeItem('kaiko_checkin_' + username)
+          }
         }
       } catch (e) {
         // fallback localStorage
@@ -745,7 +835,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         const wins = h.filter(m => m.result === 'win').length
         const losses = h.filter(m => m.result === 'lose').length
         const draws = h.filter(m => m.result === 'draw').length
-        const avgScore = h.length > 0 ? Math.round(h.reduce((acc, m) => acc + m.score_self, 0) / h.length) : 0
+        const totalScore = h.reduce((acc, m) => acc + m.score_self, 0)
 
         // Tính toán EXP thực tế (Chat thấp hơn Video)
         // Video/Solo: win=10, draw=2, lose=-2 | Chat: win=7, draw=1, lose=-1
@@ -769,7 +859,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
           return acc
         }, 0)
         const points = extraPoints + shopPoints
-        setStats({ wins, losses, draws, total: h.length, avgScore, level: finalLevel, exp: currentExp, totalExp: finalExp, points })
+        setStats({ wins, losses, draws, total: h.length, totalScore, level: finalLevel, exp: currentExp, totalExp: finalExp, points })
       }
     } catch (err) {
       console.warn('Không tải được lịch sử:', err.message)
@@ -849,6 +939,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     } catch (e) { }
   }, [username, isGuest])
 
+  const loadDailyQuests = useCallback(async () => {
+    if (isGuest) return
+    try {
+      const res = await axios.get(`${API_BASE}/daily-quests/${encodeURIComponent(username)}`)
+      if (res.data.success) {
+        setDailyProgress(res.data.progress)
+        setHasCheckedIn(res.data.has_checked_in)
+      }
+    } catch (e) { }
+  }, [username, isGuest])
+
   useEffect(() => {
     if (activeTab === 'home' || activeTab === 'history') loadHistory()
     if (activeTab === 'leaderboard') loadLeaderboard()
@@ -859,7 +960,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
     if (activeTab === 'mentor') loadMentorship()
     if (activeTab === 'community') loadCommunityPosts()
     if (activeTab === 'live') loadLiveRooms()
-  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo, loadFallacyStats, loadMentorship, loadCommunityPosts, loadLiveRooms])
+    loadDailyQuests()
+  }, [activeTab, loadHistory, loadLeaderboard, loadFriends, loadEvents, loadMyEvents, loadMyInfo, loadFallacyStats, loadMentorship, loadCommunityPosts, loadLiveRooms, loadDailyQuests])
 
   // Polling for friend requests every 5 seconds
   useEffect(() => {
@@ -1061,7 +1163,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
         </div>
 
         {/* Right: Logout & Notifications */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(31, 41, 55, 0.95)', padding: '10px', borderRadius: '0px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
 
           {/* Notification Bell */}
           <div style={{ position: 'relative' }}>
@@ -1222,9 +1324,9 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                 <div style={{ position: 'absolute', bottom: '2%', width: '100%', display: 'flex', justifyContent: 'center', zIndex: 10 }}>
                   
                   {/* Mascots */}
-                  <img src="/assets/mascots/summer/CuaHoaPhuong.png" alt="Mascot Left" onClick={() => setActiveTab('events')} title="Nhấp để xem Sự Kiện!" style={{ position: 'absolute', left: '2%', bottom: '20px', width: '15rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', cursor: 'pointer', zIndex: 3, animation: 'mascotBob 2.8s ease-in-out infinite' }} />
+                  <img src="/assets/mascots/summer/CuaHoaPhuong.png" alt="Mascot Left" style={{ position: 'absolute', left: '2%', bottom: '40px', width: '12rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', zIndex: 3, animation: 'mascotBob 2.8s ease-in-out infinite' }} />
                   
-                  <img src="/assets/mascots/summer/CuaDua.png" alt="Mascot Right" onClick={() => setShowDailyQuests(true)} title="Nhấp để xem Nhiệm Vụ!" style={{ position: 'absolute', right: '2%', bottom: '20px', width: '15rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', cursor: 'pointer', zIndex: 3, animation: 'mascotBobR 3.2s ease-in-out infinite' }} />
+                  <img src="/assets/mascots/summer/CuaDua.png" alt="Mascot Right" style={{ position: 'absolute', right: '2%', bottom: '40px', width: '12rem', filter: 'drop-shadow(0 12px 28px rgba(0,0,0,0.5))', zIndex: 3, animation: 'mascotBobR 3.2s ease-in-out infinite' }} />
 
                   <style>{`
                     .mac-dock {
@@ -1370,8 +1472,8 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     </div>
 
                     {/* Header row */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 80px 80px', gap: '12px', padding: '8px 20px', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                      <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'center' }}>Lỗi</span><span style={{ textAlign: 'right' }}>ID</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 90px 80px 80px', gap: '12px', padding: '8px 20px', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      <span>KQ</span><span>Trận đấu</span><span style={{ textAlign: 'center' }}>Bạn</span><span style={{ textAlign: 'center' }}>Đối thủ</span><span style={{ textAlign: 'right' }}>ID</span>
                     </div>
 
                     {history.filter(m => {
@@ -1391,7 +1493,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
 
             {/* LEADERBOARD */}
             {activeTab === 'leaderboard' && (
-              <div>
+              <div style={{ paddingRight: '70px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                   <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>🏆 Bảng xếp hạng ELO (Wins)</h2>
                   <button onClick={loadLeaderboard} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
@@ -1409,13 +1511,14 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     <p>Chưa có dữ liệu người chơi.</p>
                   </div>
                 ) : (
-                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.07)', overflowX: 'auto' }}>
+                    <div style={{ minWidth: '600px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
                       <span style={{ textAlign: 'center' }}>Top</span>
                       <span>Người chơi</span>
                       <span style={{ textAlign: 'center' }}>Trận</span>
                       <span style={{ textAlign: 'center' }}>Thắng</span>
-                      <span style={{ textAlign: 'right' }}>Điểm TB</span>
+                      <span style={{ textAlign: 'right' }}>Tổng Điểm</span>
                     </div>
                     {leaderboard.map((user, idx) => (
                       <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'var(--panel-bg)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
@@ -1430,9 +1533,10 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         </div>
                         <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{user.total_matches}</div>
                         <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold' }}>{user.wins}</div>
-                        <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.avg_score)}</div>
+                        <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.total_score)}</div>
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1594,7 +1698,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       { label: 'Trận đã chơi', value: stats.total, color: 'var(--accent-primary)', icon: '🎮' },
                       { label: 'Chiến thắng', value: stats.wins, color: '#10b981', icon: '🏆' },
                       { label: 'Thất bại', value: stats.losses, color: '#ef4444', icon: '💔' },
-                      { label: 'Điểm TB', value: stats.avgScore, color: '#f59e0b', icon: '⭐' },
+                      { label: 'Tổng Điểm', value: stats.totalScore, color: '#f59e0b', icon: '⭐' },
                     ].map(s => (
                       <div key={s.label} style={{ background: 'var(--panel-bg)', borderRadius: '16px', padding: '24px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
                         <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{s.icon}</div>
@@ -1689,7 +1793,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                          <button onClick={() => setActiveChatUser(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', cursor: 'pointer', fontWeight: 'bold' }}>
+                          <button onClick={() => { setActiveChatUser(fname); setShowChatWidget(true); setChatTab('friends'); }} style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'rgba(59, 130, 246, 0.2)', color: '#3b82f6', cursor: 'pointer', fontWeight: 'bold' }}>
                             💬 Chat
                           </button>
                           <button onClick={() => handleRemoveFriend(fname)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'transparent', color: '#ef4444', cursor: 'pointer' }}>
@@ -1823,6 +1927,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     { id: 'title_genius', name: 'Danh Hiệu: Thiên Tài Tinh Tú', price: 3000, icon: '✨', image: 'title_genus.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người top 1 event khi đang ở level < 11.' },
                     { id: 'title_banthan', name: 'Danh Hiệu: Bạn Thân Cua', price: 1200, icon: '🦀', image: 'HHBanThan.png', isFrame: false, desc: 'Danh hiệu đặc biệt cho người yêu cộng đồng KaiKo.' },
                     { id: 'title_kaikonew', name: 'Danh Hiệu: KaiKo Mới Này', price: 800, icon: '🌟', image: 'HHKaiKoMoiNhu.png', isFrame: false, desc: 'Danh hiệu chào mừng người mới gia nhập KaiKo.' },
+                    { id: 'mascot_invis', name: 'Mascot Tàng Hình', price: 1000, icon: '👻', image: 'mascot_invis.png', isFrame: false, desc: 'Gói nâng cấp cho phép Mascot tàng hình!' },
                   ].map(item => {
                     const owned = myItems.includes(item.id)
                     const canAfford = serverPoints >= item.price
@@ -2009,24 +2114,47 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                     </div>
 
 
-                    {/* Audio Volume Slider */}
-                    <div style={{ padding: '16px', background: 'var(--input-bg)', borderRadius: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                        <span style={{ color: '#fff', fontWeight: 'bold' }}>Âm Lượng Tổng</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{Math.round(globalVolume * 100)}%</span>
+                    {/* Audio Volume Sliders */}
+                    <div style={{ padding: '16px', background: 'var(--input-bg)', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* BGM Slider */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ color: '#fff', fontWeight: 'bold' }}>🎵 Nhạc Nền (BGM)</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{Math.round(bgmVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0" max="1" step="0.05"
+                          value={bgmVolume}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setBgmVolume(val);
+                            localStorage.setItem('kaiko_bgm_volume', val);
+                            window.dispatchEvent(new CustomEvent('kaiko_bgm_volume_changed', { detail: val }));
+                          }}
+                          style={{ width: '100%', accentColor: '#3b82f6', cursor: 'pointer', boxSizing: 'border-box', margin: 0 }}
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min="0" max="1" step="0.05"
-                        value={globalVolume}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          setGlobalVolume(val);
-                          localStorage.setItem('kaiko_volume', val);
-                          document.querySelectorAll('audio, video').forEach(el => { el.volume = val; });
-                        }}
-                        style={{ width: '100%', accentColor: '#a855f7', cursor: 'pointer' }}
-                      />
+                      
+                      {/* SFX Slider */}
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ color: '#fff', fontWeight: 'bold' }}>🔊 Hiệu Ứng (SFX)</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{Math.round(sfxVolume * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0" max="1" step="0.05"
+                          value={sfxVolume}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setSfxVolume(val);
+                            localStorage.setItem('kaiko_sfx_volume', val);
+                            window.dispatchEvent(new CustomEvent('kaiko_sfx_volume_changed', { detail: val }));
+                          }}
+                          style={{ width: '100%', accentColor: '#a855f7', cursor: 'pointer', boxSizing: 'border-box', margin: 0 }}
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -2140,6 +2268,66 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   )}
                   </div>
                 </div>
+
+                {/* Phân Tích Thủ Công */}
+                <div>
+                  <h3 style={{ fontSize: '1.8rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>🔍 Phân Tích Thủ Công</h3>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Dán một đoạn hội thoại hoặc câu nói bất kỳ để AI của KaiKo kiểm tra xem có mắc lỗi ngụy biện không.</p>
+                  
+                  <div style={{ background: 'var(--panel-bg)', padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-light)' }}>
+                    <textarea 
+                      value={manualFallacyInput} 
+                      onChange={e => setManualFallacyInput(e.target.value)} 
+                      placeholder="Ví dụ: Anh nghèo như vậy thì biết gì về kinh tế mà nói..." 
+                      style={{ width: '100%', minHeight: '100px', padding: '15px', borderRadius: '12px', background: 'var(--input-bg)', border: '1px solid var(--border-light)', color: 'var(--text-primary)', fontSize: '1rem', outline: 'none', resize: 'vertical', marginBottom: '15px' }} 
+                    />
+                    <button 
+                      onClick={handleManualAnalyze} 
+                      disabled={isManualAnalyzing || !manualFallacyInput.trim()} 
+                      className="btn-primary" 
+                      style={{ padding: '12px 24px', width: '100%', fontWeight: 'bold', opacity: (isManualAnalyzing || !manualFallacyInput.trim()) ? 0.6 : 1, transition: '0.2s', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+                    >
+                      {isManualAnalyzing ? 'Đang phân tích...' : 'Bắt đầu phân tích'}
+                    </button>
+
+                    {manualFallacyResult && (
+                      <div style={{ marginTop: '20px', padding: '20px', background: 'rgba(16, 185, 129, 0.1)', borderLeft: '4px solid #10b981', borderRadius: '8px', color: 'var(--text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        <h4 style={{ margin: '0 0 10px 0', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}><span>🤖</span> Kết quả phân tích:</h4>
+                        {manualFallacyResult}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Hệ Thống Thành Tựu */}
+                <div>
+                  <h3 style={{ fontSize: '1.8rem', color: 'var(--text-primary)', marginBottom: '1rem' }}>🏆 Hệ Thống Thành Tựu</h3>
+                  <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Thu thập danh hiệu thông qua quá trình tranh biện và tương tác.</p>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+                    {[
+                      { id: 'first_win', name: 'Chiến Thắng Đầu Tiên', desc: 'Thắng 1 trận đấu bất kỳ', icon: '🎯', unlocked: (stats.wins || 0) >= 1 },
+                      { id: 'win_10', name: 'Chiến Thần Tập Sự', desc: 'Thắng 10 trận đấu', icon: '⚔️', unlocked: (stats.wins || 0) >= 10 },
+                      { id: 'win_50', name: 'Kẻ Hủy Diệt', desc: 'Thắng 50 trận đấu', icon: '🔥', unlocked: (stats.wins || 0) >= 50 },
+                      { id: 'veteran', name: 'Lão Tướng', desc: 'Chơi tổng cộng 100 trận', icon: '🛡️', unlocked: (stats.total || 0) >= 100 },
+                      { id: 'perfect_logic', name: 'Não To', desc: 'Đạt điểm số trung bình > 80', icon: '🧠', unlocked: (stats.avgScore || 0) > 80 && (stats.total || 0) > 5 },
+                      { id: 'rich', name: 'Đại Gia', desc: 'Tích lũy được 5000 điểm cửa hàng', icon: '💰', unlocked: serverPoints >= 5000 },
+                      { id: 'friendly', name: 'Người Hòa Đồng', desc: 'Có ít nhất 5 người bạn', icon: '🤝', unlocked: friends.length >= 5 },
+                    ].map((ach) => (
+                      <div key={ach.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', background: ach.unlocked ? 'rgba(251, 191, 36, 0.1)' : 'var(--panel-bg)', padding: '16px', borderRadius: '12px', border: ach.unlocked ? '1px solid rgba(251, 191, 36, 0.4)' : '1px dashed var(--border-light)', opacity: ach.unlocked ? 1 : 0.6, filter: ach.unlocked ? 'none' : 'grayscale(1)' }}>
+                        <div style={{ fontSize: '2.5rem', flexShrink: 0, textShadow: ach.unlocked ? '0 0 10px rgba(251,191,36,0.5)' : 'none' }}>{ach.icon}</div>
+                        <div>
+                          <h4 style={{ margin: '0 0 5px 0', color: ach.unlocked ? '#fbbf24' : 'var(--text-primary)', fontSize: '1.1rem' }}>{ach.name}</h4>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{ach.desc}</div>
+                          <div style={{ fontSize: '0.75rem', marginTop: '6px', color: ach.unlocked ? '#10b981' : '#ef4444', fontWeight: 'bold' }}>
+                            {ach.unlocked ? '✓ Đã mở khóa' : '🔒 Chưa mở khóa'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
               </div>
             )}
 
@@ -2328,7 +2516,17 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                             <div style={{ color: 'var(--text-primary)', fontWeight: '800' }}>{post.nickname || getDisplayName(post.username)}</div>
                             <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{new Date(post.created_at + 'Z').toLocaleString('vi-VN')}</div>
                           </div>
-                          <button onClick={() => handleLikePost(post.id)} style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content' }}>♥ {post.likes || 0}</button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            {isAdmin && (
+                              <>
+                                <button onClick={() => handleAdminDeletePost(post.id)} style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content', fontSize: '0.8rem' }}>🗑️ Xóa</button>
+                                {post.username !== username && (
+                                  <button onClick={() => handleAdminBanUser(post.username)} style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content', fontSize: '0.8rem' }}>🔨 Khóa Mõm</button>
+                                )}
+                              </>
+                            )}
+                            <button onClick={() => handleLikePost(post.id)} style={{ background: 'rgba(239,68,68,0.12)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '999px', padding: '6px 12px', cursor: 'pointer', height: 'fit-content' }}>♥ {post.likes || 0}</button>
+                          </div>
                         </div>
                         <div style={{ color: 'var(--text-primary)', lineHeight: 1.55, whiteSpace: 'pre-wrap', marginBottom: '12px' }}>{post.content}</div>
                         {post.image_url && (
@@ -2506,6 +2704,60 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
       {activeEvent && <EventWorkspaceModal event={activeEvent} onClose={() => setActiveEvent(null)} username={username} />}
       {activeVotingEvent && <EventVotingModal event={activeVotingEvent} username={username} onClose={() => setActiveVotingEvent(null)} />}
 
+      {/* === MASCOT ASSISTANT MODAL === */}
+      {showAssistant && (
+        <div style={{ position: 'fixed', bottom: '120px', left: '20px', width: '320px', background: 'var(--panel-bg)', backdropFilter: 'blur(16px)', borderRadius: '24px', border: '1px solid rgba(251,191,36,0.3)', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', zIndex: 1000, padding: '20px', animation: 'slideUp 0.3s ease' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3 style={{ margin: 0, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px' }}>🦀 Cua Trợ Lý</h3>
+            <button onClick={() => setShowAssistant(false)} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '1.2rem', cursor: 'pointer' }}>×</button>
+          </div>
+          <div style={{ color: 'var(--text-primary)', fontSize: '0.95rem', lineHeight: '1.6' }}>
+            Xin chào <strong style={{ color: '#a855f7' }}>{getDisplayName(username)}</strong>! Tui là trợ lý của bạn đây.
+          </div>
+          
+          <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '12px', marginTop: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Tiền / Điểm:</span>
+              <strong style={{ color: '#fbbf24' }}>{serverPoints} 💰</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Tổng số trận:</span>
+              <strong style={{ color: '#fff' }}>{stats.total} ⚔️</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Tỉ lệ thắng:</span>
+              <strong style={{ color: '#10b981' }}>{stats.total > 0 ? Math.round(((stats.wins || 0) / stats.total) * 100) : 0}% 🏆</strong>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '15px' }}>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '8px' }}>🔴 Live Streams đang diễn ra ({liveRooms.length}):</div>
+            {liveRooms.length === 0 ? (
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', fontStyle: 'italic' }}>Không có ai đang live.</div>
+            ) : (
+              <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
+                {liveRooms.map(r => (
+                  <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', marginBottom: '4px', fontSize: '0.8rem' }}>
+                    <span style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '150px' }}>{r.playerA} vs {r.playerB || '?'}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 'bold' }}>Live</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={() => { setShowAssistant(false); setShowDailyQuests(true); }} style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold', marginTop: '15px', cursor: 'pointer' }}>
+            Xem Nhiệm Vụ Hôm Nay
+          </button>
+          
+          <button onClick={() => { setShowAssistant(false); setShowCrabGame(true); }} style={{ width: '100%', padding: '10px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', borderRadius: '12px', color: '#fff', fontWeight: 'bold', marginTop: '10px', cursor: 'pointer' }}>
+            🎮 Chơi Game Nuôi Cua
+          </button>
+        </div>
+      )}
+
+      {showCrabGame && <CrabGame username={username} setPoints={setServerPoints} onClose={() => setShowCrabGame(false)} />}
+
       {/* === CHAT WIDGET === */}
       {showChatWidget && (
         <div style={{ position: 'fixed', bottom: '90px', right: '90px', width: '360px', height: '500px', background: 'rgba(10,10,20,0.97)', backdropFilter: 'blur(24px)', borderRadius: '20px', border: '1px solid rgba(99,102,241,0.4)', boxShadow: '0 20px 60px rgba(0,0,0,0.7)', zIndex: 9998, display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)' }}>
@@ -2545,10 +2797,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   )
                 })}
               </div>
-              <form onSubmit={handleSendChat} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px' }}>
-                <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={`Nhắn ${getDisplayName(activeChatUser)}...`} style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
-                <button type="submit" style={{ background: '#6366f1', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
-              </form>
+              <div style={{ position: 'relative' }}>
+                {showEmojiPickerChat && (
+                  <div style={{ position: 'absolute', bottom: '100%', left: '0', zIndex: 10 }}>
+                    <EmojiPicker onEmojiClick={(eo) => { setChatInput(prev => prev + eo.emoji); setShowEmojiPickerChat(false); }} theme={theme === 'dark' ? 'dark' : 'light'} />
+                  </div>
+                )}
+                <form onSubmit={handleSendChat} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button type="button" onClick={() => setShowEmojiPickerChat(!showEmojiPickerChat)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0' }}>😀</button>
+                  <input type="text" value={chatInput} onChange={e => setChatInput(e.target.value)} placeholder={`Nhắn ${getDisplayName(activeChatUser)}...`} style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
+                  <button type="submit" style={{ background: '#6366f1', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
+                </form>
+              </div>
             </>
           ) : chatTab === 'friends' ? (
             // Friends list with last message
@@ -2616,10 +2876,18 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                   )
                 })}
               </div>
-              <form onSubmit={handleSendGlobal} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px' }}>
-                <input type="text" value={globalInput} onChange={e => setGlobalInput(e.target.value)} placeholder="Nhắn toàn cộng đồng..." style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
-                <button type="submit" style={{ background: '#8b5cf6', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
-              </form>
+              <div style={{ position: 'relative' }}>
+                {showEmojiPickerGlobal && (
+                  <div style={{ position: 'absolute', bottom: '100%', left: '0', zIndex: 10 }}>
+                    <EmojiPicker onEmojiClick={(eo) => { setGlobalInput(prev => prev + eo.emoji); setShowEmojiPickerGlobal(false); }} theme={theme === 'dark' ? 'dark' : 'light'} />
+                  </div>
+                )}
+                <form onSubmit={handleSendGlobal} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button type="button" onClick={() => setShowEmojiPickerGlobal(!showEmojiPickerGlobal)} style={{ background: 'transparent', border: 'none', fontSize: '1.2rem', cursor: 'pointer', padding: '0' }}>😀</button>
+                  <input type="text" value={globalInput} onChange={e => setGlobalInput(e.target.value)} placeholder="Nhắn toàn cộng đồng..." style={{ flex: 1, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', padding: '9px 14px', color: '#fff', outline: 'none', fontSize: '0.9rem' }} />
+                  <button type="submit" style={{ background: '#8b5cf6', border: 'none', width: '38px', height: '38px', borderRadius: '50%', color: '#fff', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>➤</button>
+                </form>
+              </div>
             </>
           )}
         </div>
@@ -2689,18 +2957,31 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
             <div style={{ position: 'absolute', bottom: '-15px', left: '8%', right: '8%', height: '10px', background: '#78350f', borderRadius: '5px' }} />
             <h3 style={{ textAlign: 'center', margin: '0 0 1.5rem', fontSize: '1.3rem', fontWeight: '900', letterSpacing: '2px', borderBottom: '2px dashed #78350f', paddingBottom: '0.5rem' }}>📜 CUỘN GIẤY NHIỆM VỤ</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem', marginBottom: '2rem' }}>
-              {[
-                { label: 'Thắng 3 trận đấu', reward: '+200 EXP', done: (stats.wins || 0) >= 3 },
-                { label: 'Điểm danh ngày hôm nay', reward: '+50 pts', done: hasCheckedIn },
-              ].map((q, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: q.done ? 'rgba(120,53,15,0.1)' : 'rgba(255,255,255,0.5)', borderRadius: '10px', border: q.done ? '1px solid rgba(120,53,15,0.3)' : '1px dashed rgba(120,53,15,0.4)', opacity: q.done ? 0.75 : 1, fontWeight: '700', fontSize: '0.95rem' }}>
-                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid #78350f', display: 'flex', alignItems: 'center', justifyContent: 'center', background: q.done ? '#78350f' : 'transparent', color: q.done ? '#fef3c7' : '#78350f', flexShrink: 0 }}>{q.done && '✓'}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ textDecoration: q.done ? 'line-through' : 'none' }}>{q.label}</div>
-                    <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>Phần thưởng: <span style={{ color: '#c2410c' }}>{q.reward}</span></div>
+              {(() => {
+                const claimedList = dailyProgress?.claimed_quests ? dailyProgress.claimed_quests.split(',') : []
+                const quests = [
+                  { id: 'win_3', label: `Thắng 3 trận đấu (${Math.min(dailyProgress?.daily_wins || 0, 3)}/3)`, reward: '+200 Điểm', done: (dailyProgress?.daily_wins || 0) >= 3, claimed: claimedList.includes('win_3') },
+                  { id: 'post_1', label: `Đăng 1 bài cộng đồng (${Math.min(dailyProgress?.daily_posts || 0, 1)}/1)`, reward: '+100 Điểm', done: (dailyProgress?.daily_posts || 0) >= 1, claimed: claimedList.includes('post_1') },
+                  { id: 'comment_3', label: `Bình luận 3 lần (${Math.min(dailyProgress?.daily_comments || 0, 3)}/3)`, reward: '+100 Điểm', done: (dailyProgress?.daily_comments || 0) >= 3, claimed: claimedList.includes('comment_3') },
+                  { id: 'video_1', label: `Xem 1 trận Video Debate (${Math.min(dailyProgress?.daily_videos || 0, 1)}/1)`, reward: '+150 Điểm', done: (dailyProgress?.daily_videos || 0) >= 1, claimed: claimedList.includes('video_1') },
+                  { id: 'checkin', label: 'Điểm danh ngày hôm nay', reward: '+50 Điểm', done: hasCheckedIn, claimed: claimedList.includes('checkin') },
+                ]
+                return quests.map((q, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: q.done ? 'rgba(120,53,15,0.1)' : 'rgba(255,255,255,0.5)', borderRadius: '10px', border: q.done ? '1px solid rgba(120,53,15,0.3)' : '1px dashed rgba(120,53,15,0.4)', opacity: q.done && !q.claimed ? 1 : 0.75, fontWeight: '700', fontSize: '0.95rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid #78350f', display: 'flex', alignItems: 'center', justifyContent: 'center', background: q.done ? '#78350f' : 'transparent', color: q.done ? '#fef3c7' : '#78350f', flexShrink: 0 }}>{q.done && '✓'}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ textDecoration: q.claimed ? 'line-through' : 'none' }}>{q.label}</div>
+                      <div style={{ fontSize: '0.78rem', opacity: 0.85 }}>Phần thưởng: <span style={{ color: '#c2410c' }}>{q.reward}</span></div>
+                    </div>
+                    {q.done && !q.claimed && (
+                      <button onClick={() => handleClaimQuest(q.id)} style={{ padding: '6px 12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem', flexShrink: 0 }}>Nhận</button>
+                    )}
+                    {q.claimed && (
+                      <span style={{ fontSize: '0.8rem', color: '#78350f', fontWeight: 'bold', opacity: 0.7 }}>Đã nhận</span>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))
+              })()}
             </div>
             <button onClick={() => setShowDailyQuests(false)} style={{ width: '100%', padding: '10px 0', background: '#78350f', color: '#fef3c7', border: 'none', borderRadius: '8px', fontWeight: '800', cursor: 'pointer', letterSpacing: '1px', fontFamily: 'var(--font-heading)' }}>ĐÓNG CUỘN GIẤY</button>
           </div>

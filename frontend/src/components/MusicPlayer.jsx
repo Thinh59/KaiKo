@@ -1,34 +1,52 @@
 import { useState, useEffect, useRef } from 'react'
 
-// Danh sách playlist YouTube có sẵn
+// Xóa Audio Tiếng Biển Cả và dùng YouTube BGM mặc định
+
 const PLAYLISTS = [
   {
-    id: 'PLBmMf6nCsZBk4LUPJx5xOmVAEJJZ-7hNl',
-    name: '🎵 Nhạc Hoa Ngữ Hot',
-    desc: 'C-Pop trending & ballads',
-    color: '#f472b6',
-    gradient: 'linear-gradient(135deg, #ec4899, #be185d)'
+    id: 'default_bgm',
+    type: 'videos',
+    videos: ['s9rup0Pxd4s'],
+    name: '🌊 Nhạc Nền Mặc Định',
+    desc: 'Bản lofi siêu chill',
+    color: '#8b5cf6',
+    gradient: 'linear-gradient(135deg, #6366f1, #a855f7)'
   },
   {
-    id: 'PLSdoVPM5WnndSQEXKERbh3iQGmkA2uxlR',
+    id: 'tiktok_viral',
+    type: 'videos',
+    videos: ['W1_U2x6vEUE', '1y6smkh6c-0', 'Q_O2n7B41oI'],
     name: '🔥 TikTok Viral VN',
     desc: 'Nhạc viral Việt Nam hot nhất',
     color: '#fb923c',
     gradient: 'linear-gradient(135deg, #f97316, #ea580c)'
   },
   {
-    id: 'PLDIoUOhQQPlXr63I44ovFy6oJEa4e2Pvq',
+    id: 'lofi_chill',
+    type: 'videos',
+    videos: ['jfKfPfyJRdk', '4xDzrJKXOOY', '1fueZCTYkpA'],
+    name: '☕ Lofi Chill',
+    desc: 'Study / Focus / Relax',
+    color: '#a78bfa',
+    gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)'
+  },
+  {
+    id: 'usuk_hits',
+    type: 'videos',
+    videos: ['iYbQ1uK1l0s', 'kJQP7kiw5Fk', 'JGwWNGJdvx8'],
     name: '🌍 USUK Hits',
     desc: 'Billboard & global top charts',
     color: '#60a5fa',
     gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
   },
   {
-    id: 'PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI',
-    name: '☕ Lofi Chill',
-    desc: 'Study / Focus / Relax',
-    color: '#a78bfa',
-    gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)'
+    id: 'nhac_hoa',
+    type: 'videos',
+    videos: ['wGz8p4rI_vI', 'M4X-b4y8YmE', 'B_B1a5OaF28'],
+    name: '🎵 Nhạc Hoa Ngữ',
+    desc: 'C-Pop trending & ballads',
+    color: '#f472b6',
+    gradient: 'linear-gradient(135deg, #ec4899, #be185d)'
   },
   {
     id: 'custom_list',
@@ -45,10 +63,14 @@ export default function MusicPlayer() {
   const [isOpen, setIsOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [selectedPlaylist, setSelectedPlaylist] = useState(null)
-  const [volume, setVolume] = useState(40)
+  const [volume, setVolume] = useState(() => {
+    const v = localStorage.getItem('kaiko_bgm_volume');
+    return v !== null ? parseFloat(v) * 100 : 70;
+  })
   const [playerReady, setPlayerReady] = useState(false)
   const [currentSong, setCurrentSong] = useState({ title: '', author: '' })
   const [showPlaylists, setShowPlaylists] = useState(true)
+  const [showAutoplayPrompt, setShowAutoplayPrompt] = useState(true)
   const playerRef = useRef(null)
   const songPollRef = useRef(null)
 
@@ -73,6 +95,18 @@ export default function MusicPlayer() {
       if (songPollRef.current) clearInterval(songPollRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    const handleBgmVol = (e) => {
+      const vol = e.detail;
+      setVolume(vol * 100);
+      if (playerRef.current && playerReady) {
+        playerRef.current.setVolume(vol * 100);
+      }
+    };
+    window.addEventListener('kaiko_bgm_volume_changed', handleBgmVol);
+    return () => window.removeEventListener('kaiko_bgm_volume_changed', handleBgmVol);
+  }, [playerReady]);
 
   const initPlayer = () => {
     if (playerRef.current) return
@@ -144,6 +178,8 @@ export default function MusicPlayer() {
   const handleVolume = (v) => {
     setVolume(v)
     if (playerRef.current && playerReady) playerRef.current.setVolume(v)
+    localStorage.setItem('kaiko_bgm_volume', (v / 100).toString());
+    window.dispatchEvent(new CustomEvent('kaiko_bgm_volume_changed', { detail: v / 100 }));
   }
 
   const openYouTube = () => {
@@ -159,6 +195,39 @@ export default function MusicPlayer() {
   return (
     <>
       {/* Floating container */}
+      {showAutoplayPrompt && !isPlaying && !isOpen && (
+        <button 
+          onClick={() => {
+            if (!playerReady) return;
+            setShowAutoplayPrompt(false);
+            if (!selectedPlaylist) {
+              loadPlaylist(PLAYLISTS[0]);
+            } else {
+              handlePlay();
+            }
+          }}
+          disabled={!playerReady}
+          style={{
+            position: 'fixed',
+            bottom: '90px',
+            right: '24px',
+            zIndex: 9999,
+            background: 'linear-gradient(135deg, #10b981, #059669)',
+            border: 'none',
+            borderRadius: '20px',
+            padding: '12px 24px',
+            color: '#fff',
+            fontWeight: 'bold',
+            fontSize: '1rem',
+            cursor: playerReady ? 'pointer' : 'not-allowed',
+            opacity: playerReady ? 1 : 0.6,
+            boxShadow: '0 8px 24px rgba(16,185,129,0.4)',
+            animation: playerReady ? 'pulseBtn 2s infinite' : 'none'
+          }}
+        >
+          {playerReady ? '🎵 Bật Nhạc Nền' : '⏳ Đang tải nhạc...'}
+        </button>
+      )}
 
       <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
 

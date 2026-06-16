@@ -12,8 +12,10 @@ export function useSpeechToText({ onTranscript }) {
   const accumulatedRef = useRef('')      // tích lũy text qua nhiều lần onresult
   const [isListening, setIsListening] = useState(false)
   const [liveText, setLiveText] = useState('')
+  const sessionDataRef = useRef(null)
 
-  const start = useCallback(() => {
+  const start = useCallback((sessionData = null) => {
+    sessionDataRef.current = sessionData
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
       alert('Trình duyệt không hỗ trợ nhận diện giọng nói. Hãy dùng Chrome hoặc Edge.')
@@ -69,7 +71,7 @@ export function useSpeechToText({ onTranscript }) {
           // Gửi ngay từng câu để phân tích real-time
           const words = finalChunk.trim()
           if (words.length >= 2 && onTranscript) {
-            onTranscript(words)
+            onTranscript(words, sessionDataRef.current)
           }
         }
       }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import axios from 'axios'
+import EmojiPicker from 'emoji-picker-react'
 import FallacyAlert from './FallacyAlert'
 import Avatar from './Avatar'
 
@@ -8,6 +9,7 @@ import { API_BASE } from '../config'
 export default function TextDebateRoom({ roomData, roomInfo, mode, username, onFinish, onCancel, registerHandler, sendMessage, clerkUser = null }) {
   const [messages, setMessages] = useState([]) // { id, speaker, text, fallacy, isAiGenerated, isExcellent }
   const [input, setInput] = useState('')
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [isAiThinking, setIsAiThinking] = useState(false)
   const inputRef = useRef(null)
   
@@ -493,8 +495,8 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         <button onClick={handleGetHint} disabled={gettingHint} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#f59e0b', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} title="Gợi ý">
           {gettingHint ? '⏳' : '💡'}
         </button>
-        <button onClick={onCancel} style={{ width: '45px', height: '45px', borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} title="Thoát">
-          ✖
+        <button onClick={onCancel} style={{ padding: '0 20px', height: '45px', borderRadius: '30px', background: '#ef4444', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }} title="Thoát">
+          🚪 Thoát
         </button>
         <button onClick={handleEndClick} disabled={phase === 'scoring' || (endRequested && debateTimeLeft > 0)} style={{ padding: '0 24px', height: '45px', borderRadius: '30px', background: phase === 'scoring' ? '#6b7280' : '#3b82f6', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)' }}>
           {phase === 'scoring' ? 'Đang chấm điểm...' : (endRequested && debateTimeLeft > 0) ? 'Đang chờ...' : '🏁 Kết thúc'}
@@ -591,7 +593,7 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
 
         {/* Timer */}
         {phase === 'debate' ? (
-          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: debateTimeLeft <= 60 ? '#ff4b4b' : '#38bdf8', textAlign: 'center', fontFamily: 'monospace', textShadow: '0 2px 10px rgba(0,0,0,0.2)', width: '120px' }}>
+          <div style={{ fontSize: '2rem', fontWeight: 'bold', color: debateTimeLeft <= 60 ? '#ff4b4b' : '#fbbf24', textAlign: 'center', fontFamily: 'monospace', textShadow: '0 2px 10px rgba(0,0,0,0.2)', width: '120px' }}>
             ⏱ {formatTime(debateTimeLeft)}
           </div>
         ) : (
@@ -676,34 +678,49 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         <div ref={chatEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
-        <textarea 
-          ref={inputRef}
-          value={input} 
-          onChange={e => {
-            setInput(e.target.value)
-            e.target.style.height = '56px'
-            e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
-          }} 
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit(e);
-            }
-          }}
-          placeholder={phase === 'scoring' ? "Trận đấu đã kết thúc..." : "Gõ lập luận... (Shift + Enter để xuống dòng)"}
-          disabled={isAiThinking || phase !== 'debate'}
-          style={{ flex: 1, padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'var(--bg-glass)', color: 'var(--text-primary)', fontSize: '1.1rem', resize: 'none', height: '56px', maxHeight: '150px', outline: 'none' }}
-        />
-        <button 
-          type="submit" 
-          disabled={isAiThinking || phase !== 'debate'}
-          className="btn-primary"
-          style={{ padding: '0 30px', height: '56px', borderRadius: '12px', fontWeight: 'bold' }}
-        >
-          Gửi
-        </button>
-      </form>
+      <div style={{ position: 'relative' }}>
+        {showEmojiPicker && (
+          <div style={{ position: 'absolute', bottom: '100%', left: '0', zIndex: 10 }}>
+            <EmojiPicker onEmojiClick={(eo) => { setInput(prev => prev + eo.emoji); setShowEmojiPicker(false); inputRef.current.focus(); }} theme="dark" />
+          </div>
+        )}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+          <button 
+            type="button" 
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)} 
+            disabled={isAiThinking || phase !== 'debate'}
+            style={{ background: 'var(--bg-glass)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '1.5rem', cursor: 'pointer', padding: '0 15px', height: '56px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            😀
+          </button>
+          <textarea 
+            ref={inputRef}
+            value={input} 
+            onChange={e => {
+              setInput(e.target.value)
+              e.target.style.height = '56px'
+              e.target.style.height = Math.min(e.target.scrollHeight, 150) + 'px'
+            }} 
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            placeholder={phase === 'scoring' ? "Trận đấu đã kết thúc..." : "Gõ lập luận... (Shift + Enter để xuống dòng)"}
+            disabled={isAiThinking || phase !== 'debate'}
+            style={{ flex: 1, padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', background: 'var(--bg-glass)', color: 'var(--text-primary)', fontSize: '1.1rem', resize: 'none', height: '56px', maxHeight: '150px', outline: 'none' }}
+          />
+          <button 
+            type="submit" 
+            disabled={isAiThinking || phase !== 'debate'}
+            className="btn-primary"
+            style={{ padding: '0 30px', height: '56px', borderRadius: '12px', fontWeight: 'bold' }}
+          >
+            Gửi
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

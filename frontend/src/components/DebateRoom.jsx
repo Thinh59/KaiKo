@@ -9,8 +9,14 @@ import TranscriptPanel from './TranscriptPanel'
 import ControlsBar from './ControlsBar'
 
 import { API_BASE } from '../config'
-const TURN_TIME = 90 // giây cho mỗi lượt
+const TURN_TIME = 180 // giây cho mỗi lượt
 
+const playTing = () => {
+  try {
+    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
+    audio.play().catch(e => console.log('Audio autoplay blocked', e))
+  } catch (e) {}
+}
 // ── Web Speech TTS ──────────────────────────────────────────────────────────
 function speakText(text, onEnd) {
   if (!('speechSynthesis' in window)) {
@@ -83,7 +89,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
 
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { liveText, start: startSpeech, stop: stopSpeech } = useSpeechToText({
-    onTranscript: useCallback((text) => handleTranscript(text), []),
+    onTranscript: useCallback((text, playerSession) => handleTranscript(text, playerSession), []),
   })
 
   const { start: startAudio, stop: stopAudio } = useAudioAnalysis()
@@ -184,8 +190,8 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
   }
 
   // ── Phân tích ngụy biện ─────────────────────────────────────────────────
-  const handleTranscript = useCallback(async (text) => {
-    const player = currentPlayerRef.current
+  const handleTranscript = useCallback(async (text, playerSession) => {
+    const player = playerSession || currentPlayerRef.current
     
     // Cập nhật local state
     if (player === 'A') {
@@ -262,7 +268,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         if (data.fromPlayer !== (roomData.isLocalHost ? 'A' : 'B')) {
            // Nếu lượt hiện tại là của mình, thì bật Mic
            if (currentPlayerRef.current === (roomData.isLocalHost ? 'A' : 'B')) {
-              startSpeech()
+              startSpeech(currentPlayerRef.current)
               startAudio()
            }
         }
@@ -277,6 +283,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         setCurrentPlayer(data.nextPlayer)
         setTotalRounds(p => p + 1)
         setTimeLeft(TURN_TIME)
+        playTing()
       }
     })
 
@@ -312,6 +319,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     setCurrentPlayer(next)
     setTotalRounds(p => p + 1)
     setTimeLeft(TURN_TIME)
+    playTing()
 
     const nextName = next === 'A' ? roomData.playerA : (remotePlayerName || roomData.playerB)
     showNotification(`⏰ Hết giờ! Đến lượt ${nextName}`, 'warning')
@@ -366,7 +374,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     const myRole = roomData.isLocalHost ? 'A' : 'B'
     
     if (currentPlayer === myRole) {
-      startSpeech()
+      startSpeech(currentPlayer)
       startAudio()
     }
 
@@ -418,6 +426,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     setTotalRounds(p => p + 1)
     setTimeLeft(TURN_TIME)
     setHint(null)
+    playTing()
 
     const nextName = next === 'A' ? roomData.playerA : (remotePlayerName || roomData.playerB)
     showNotification(`⏭️ Đến lượt ${nextName}`, 'info')
@@ -573,11 +582,11 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
           transform: 'translateX(-50%)',
           zIndex: 9999,
           padding: '14px 28px',
-          borderRadius: 'var(--radius-full)',
-          background: notification.type === 'success' ? 'rgba(16, 185, 129, 0.9)'
-            : notification.type === 'warning' ? 'rgba(245, 158, 11, 0.9)'
-            : notification.type === 'error' ? 'rgba(239, 68, 68, 0.9)'
-            : 'rgba(99, 102, 241, 0.9)',
+          borderRadius: '0px',
+          background: notification.type === 'success' ? '#10b981'
+            : notification.type === 'warning' ? '#f59e0b'
+            : notification.type === 'error' ? '#ef4444'
+            : '#6366f1',
           color: 'white',
           fontWeight: '600',
           fontSize: '1rem',
