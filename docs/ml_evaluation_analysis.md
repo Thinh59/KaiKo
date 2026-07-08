@@ -27,7 +27,7 @@ Dự án KaiKo sử dụng **2 ML model tự train** (không dùng Gemini API):
 | **Base Model** | `FacebookAI/xlm-roberta-base` (XLM-RoBERTa) |
 | **Task** | Binary Classification — argument có khớp key-point không? |
 | **Lý do chọn** | Sentence Pair Classification, hỗ trợ cặp câu, đa ngôn ngữ |
-| **Script** | `ai_model/kaiko-train-argKP.ipynb` |
+| **Script** | `ai_model/kaiko-train-arg.ipynb` |
 | **Model đã lưu** | `backend/fallacy_model/kaiko_argkp_model_final/` |
 
 ---

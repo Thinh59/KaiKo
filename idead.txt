@@ -384,4 +384,5 @@ Fix bug:
 -Cái panel chứa mấy nút có thể bỏ đi để lại các nút thôi
 
 
--
+09.07
+-Cái số trên video debate khi vào phòng debate nó bị chìm số đếm giây có thể thêm panel cho khu vực đếm giờ và nút đó
