@@ -56,28 +56,28 @@ app.add_middleware(
 # --- AI inference service ---
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "").rstrip("/")
 
+# Model ngụy biện (PA4) gộp 13 nhãn gốc -> 6 NHÓM. Các nhãn dưới đây khớp id2label
+# của model đã train (xem ai_model/kaiko-train-fallacy.ipynb, GROUP_MAP).
 LABEL_NAMES = [
-    'ad hominem', 'ad populum', 'appeal to emotion',
-    'circular reasoning', 'equivocation', 'fallacy of credibility',
-    'fallacy of extension', 'fallacy of logic', 'fallacy of relevance',
-    'false causality', 'false dilemma', 'faulty generalization', 'intentional'
+    'cong_kich_cam_xuc', 'so_dong_uy_tin', 'khai_quat_nhan_qua',
+    'luong_phan_bop_meo', 'lac_de_co_y', 'mo_ho_vong_vo_logic'
 ]
 
 LABEL_VI = {
-    'ad hominem':           'Công kích cá nhân',
-    'ad populum':           'Dựa vào số đông',
-    'appeal to emotion':    'Khai thác cảm xúc',
-    'circular reasoning':   'Lập luận vòng tròn',
-    'equivocation':         'Ngụy biện từ ngữ',
-    'fallacy of credibility': 'Ngụy biện uy tín',
-    'fallacy of extension': 'Bóp méo lập luận',
-    'fallacy of logic':     'Lập luận hợp lệ',
-    'fallacy of relevance': 'Lập luận lạc đề',
-    'false causality':      'Nhân quả giả',
-    'false dilemma':        'Lưỡng nan giả',
-    'faulty generalization':'Khái quát hóa sai',
-    'intentional':          'Ngụy biện cố ý'
+    'cong_kich_cam_xuc':    'Công kích & Cảm xúc',
+    'so_dong_uy_tin':       'Dựa số đông & Uy tín',
+    'khai_quat_nhan_qua':   'Khái quát hóa & Nhân quả sai',
+    'luong_phan_bop_meo':   'Lưỡng phân & Bóp méo lập luận',
+    'lac_de_co_y':          'Lạc đề & Cố ý đánh lạc hướng',
+    'mo_ho_vong_vo_logic':  'Mơ hồ, Vòng vo & Lỗi logic',
 }
+
+# Ngưỡng tin cậy tối thiểu để coi là có ngụy biện (mọi nhóm đều là ngụy biện).
+FALLACY_CONFIDENCE_THRESHOLD = 70.0
+
+# Ngưỡng quyết định "khớp chủ đề" cho ArgKP (chọn khi train PA4, xem
+# kaiko_argkp_model_final/decision_threshold.json). Dùng khi AI service trả xác suất thô.
+ARGKP_KHOP_THRESHOLD = 0.60
 
 async def call_ai_service(path: str, payload: dict) -> Optional[dict]:
     """Call the separate AI service; return None so existing fallbacks can handle failures."""
@@ -1778,10 +1778,12 @@ async def analyze_fallacy(input: TextInput):
         confidence = float(confidence or 0)
         is_fallacy = result.get("is_fallacy")
         if is_fallacy is None:
-            is_fallacy = label != 'fallacy of logic' and confidence >= 70
+            # Model 6 nhóm: mọi nhãn đều là ngụy biện -> chỉ dựa vào độ tin cậy.
+            is_fallacy = confidence >= FALLACY_CONFIDENCE_THRESHOLD
 
+        label_vi = result.get("label_vi") or LABEL_VI.get(label, label)
         return {
-            "fallacy": result.get("label_vi") if is_fallacy else None,
+            "fallacy": label_vi if is_fallacy else None,
             "fallacy_en": label,
             "confidence": confidence,
             "is_fallacy": is_fallacy,
@@ -1862,8 +1864,15 @@ async def check_argument(input: ArgInput):
         {"argument": input.argument, "key_point": input.topic}
     )
     if result:
+        # Ngưỡng quyết định (KHOP >= 0.60) do model chọn khi train, lưu tại
+        # kaiko_argkp_model_final/decision_threshold.json và áp trong AI service.
+        # Nếu service trả xác suất thô (prob_khop) mà không có "match", áp ngưỡng ở đây.
+        match = result.get("match")
+        prob = result.get("prob_khop", result.get("prob"))
+        if match is None and prob is not None:
+            match = float(prob) >= ARGKP_KHOP_THRESHOLD
         return {
-            "match": result.get("match", False),
+            "match": bool(match) if match is not None else False,
             "score": result.get("score", 0),
             "argument": input.argument,
             "topic": input.topic

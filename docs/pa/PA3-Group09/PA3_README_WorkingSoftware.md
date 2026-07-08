@@ -3,15 +3,11 @@
 > **CSC10011 – Software Engineering for AI-enabled Systems**  
 > **Group 09 | Submission: PA3**
 
----
-
-## 📌 Tổng quan
+## Tổng quan
 
 **KaiKo** là ứng dụng tranh biện AI thời gian thực, cho phép người dùng tranh luận 1v1 (video hoặc text) với sự hỗ trợ của mô hình học máy phát hiện ngụy biện logic và đánh giá lập luận. Hệ thống sử dụng XLM-RoBERTa (fine-tuned) kết hợp `gemini-3.1-flash-lite-preview` để cung cấp phản hồi thông minh và chấm điểm cuối trận.
 
----
-
-## ✅ Các tính năng đã hoàn thành
+## Các tính năng đã hoàn thành
 
 ### Use Case 1 – Tranh biện Video 1v1 (Real-time)
 - **Matchmaking tự động**: Người dùng nhấn "Tìm trận" → hệ thống ghép cặp theo cấp độ (tier-based matching, chênh lệch ≤ 10 level)
@@ -32,22 +28,21 @@
 ### Tính năng bổ sung đã hoạt động
 | Tính năng | Mô tả |
 |---|---|
-| 🔐 Đăng nhập | Clerk OAuth (Google) + username/password local |
-| 📊 Dashboard | Stats cá nhân, lịch sử trận, bảng xếp hạng, cửa hàng |
-| 👥 Kết bạn | Gửi/chấp nhận lời mời, xem profile bạn bè (Giới hạn tối đa 100 người) |
-| 💬 Chat | Chat riêng với bạn bè + chat cộng đồng toàn server |
-| 🎪 Sự kiện | Tham gia, nộp bài viết, bình chọn sự kiện |
-| 👁️ Spectate | Xem phòng tranh biện đang diễn ra (public rooms) |
-| 🏠 Tạo phòng | Tạo phòng code và mời bạn vào trực tiếp |
-| 🏆 Thành tích | Hệ thống achievement tự động mở khóa |
-| 🎵 Nhạc nền | Music player floating, điều chỉnh âm lượng |
-| 🦀 Mascot | Interactive mascot với animation và thoại ngẫu nhiên |
-| 📅 Điểm danh | Điểm danh hàng ngày nhận Điểm Tích Lũy |
-| 🛒 Cửa hàng | Mua khung avatar, huy hiệu, thẻ đổi nickname |
+| Đăng nhập | Clerk OAuth (Google) + username/password local |
+| Dashboard | Stats cá nhân, lịch sử trận, bảng xếp hạng, cửa hàng |
+| Kết bạn | Gửi/chấp nhận lời mời, xem profile bạn bè (Giới hạn tối đa 100 người) |
+| Chat | Chat riêng với bạn bè + chat cộng đồng toàn server |
+| Sự kiện | Tham gia, nộp bài viết, bình chọn sự kiện |
+| Spectate | Xem phòng tranh biện đang diễn ra (public rooms) |
+| Tạo phòng | Tạo phòng code và mời bạn vào trực tiếp |
+| Thành tích | Hệ thống achievement tự động mở khóa |
+| Nhạc nền | Music player floating, điều chỉnh âm lượng |
+| Mascot | Interactive mascot với animation và thoại ngẫu nhiên |
+| Điểm danh | Điểm danh hàng ngày nhận Điểm Tích Lũy |
+| Cửa hàng | Mua khung avatar, huy hiệu, thẻ đổi nickname |
 
----
 
-## 🚀 Hướng dẫn chạy ứng dụng
+## Hướng dẫn chạy ứng dụng
 
 ### Yêu cầu hệ thống
 - Python 3.10+
@@ -101,9 +96,8 @@ Nếu muốn chạy inference hoàn toàn local (không fallback Gemini):
 3. Giải nén vào `backend/fallacy_model/kaiko_argkp_model_final/`
 4. Restart uvicorn
 
----
 
-## ⚠️ Giới hạn và Lỗi đã biết
+## Giới hạn và Lỗi đã biết
 
 ### Giới hạn hiện tại
 | Vấn đề | Mô tả |
@@ -124,9 +118,8 @@ Nếu muốn chạy inference hoàn toàn local (không fallback Gemini):
 | Speech recognition không nhận tiếng Việt | Browser locale | Thay đổi ngôn ngữ browser sang `vi-VN` |
 | Mất kết nối WebSocket khi mạng yếu | Timeout không được handle đầy đủ | Tải lại trang, tìm trận lại |
 
----
 
-## 🗂️ Cấu trúc code chính
+## Cấu trúc code chính
 
 ```
 kaiko/
@@ -150,9 +143,8 @@ kaiko/
     └── *.ipynb / *.py       # Training scripts
 ```
 
----
 
-## 🤖 Chi tiết AI Features
+## Chi tiết AI Features
 
 ### Fallacy Detection (XLM-RoBERTa)
 - **Input**: Câu nói của người tranh biện (text)
@@ -171,25 +163,13 @@ kaiko/
 - **Endpoint**: `POST /score`
 - **Optimization**: Transcript được nén bằng `utils_preprocess.py` để tiết kiệm token
 
----
 
-## 📹 Video Demo
+## Video Demo
 
-**File video:** `PA3_KaiKo_Demo.mp4`  
-**Thời lượng:** 2–3 phút  
+**File video:** https://drive.google.com/file/d/1V2sQE0is9ct0oOD6Sd5jrV9M6tBUzUBI/view?usp=drive_link
 
-**Nội dung video:**
-1. (0:00–0:30) Đăng nhập → Dashboard overview
-2. (0:30–1:00) Chọn chế độ → Tìm trận Video 1v1 → ghép cặp
-3. (1:00–1:45) Tranh biện video: demo speech-to-text + fallacy alert pop-up
-4. (1:45–2:15) Kết thúc trận → Scoreboard với điểm AI và nhận xét
-5. (2:15–2:30) Demo Text 1v1 hoặc Solo vs AI (quick run)
-6. (2:30–2:50) Dashboard: xem lịch sử, leaderboard, tính năng social
-7. (2:50–3:00) Kết
 
----
-
-## 👥 Thông tin nhóm
+## Thông tin nhóm
 
 **Group 09**  
 *CSC10011 – Software Engineering for AI-enabled Systems*  

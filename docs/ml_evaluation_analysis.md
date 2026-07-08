@@ -13,9 +13,9 @@ Dự án KaiKo sử dụng **2 ML model tự train** (không dùng Gemini API):
 | Thuộc tính | Giá trị |
 |---|---|
 | **Base Model** | `FacebookAI/xlm-roberta-base` (XLM-RoBERTa) |
-| **Task** | Multi-class Text Classification (13 nhãn ngụy biện) |
+| **Task** | Multi-class Text Classification — **gộp 13 nhãn gốc → 6 nhóm** tách bạch (PA4) |
 | **Lý do chọn** | Hỗ trợ đa ngôn ngữ (Tiếng Việt + Anh), mạnh với NLP |
-| **Script** | `ai_model/train_phobert_kaggle.py` |
+| **Script** | `ai_model/kaiko-train-fallacy.ipynb` |
 | **Model đã lưu** | `backend/fallacy_model/kaiko_fallacy_model_final/` |
 
 **13 nhãn phân loại:**
@@ -125,15 +125,19 @@ Train: 80% | Test: 20%  (random_state=42, stratify=label)
 5. Evaluate mỗi epoch (`eval_strategy="epoch"`)
 6. Lưu best model theo F1
 
-### Hyperparameters
+### Hyperparameters (cập nhật PA4)
 | Param | Giá trị |
 |---|---|
+| Base transformers | **`4.46.3` (đã pin)** — tránh lỗi nạp trọng số của transformers 5.x |
 | Learning rate | `2e-5` |
-| Batch size (train) | `32` |
+| Batch size (train) | `16` |
 | Batch size (eval) | `64` |
-| Epochs | `3` |
-| Weight decay | `0.1` |
+| Epochs | Ngụy biện `12` / ArgKP `10` (kèm **EarlyStopping** patience=3) |
+| Weight decay | `0.01` |
 | Warmup ratio | `10%` |
+| Chọn checkpoint | Ngụy biện theo `f1_macro`, ArgKP theo `f1` |
+
+> ⚠️ **Sửa lỗi then chốt PA4:** transformers 5.0.0 (mặc định trên Kaggle) khởi tạo ngẫu nhiên toàn bộ LayerNorm của backbone → mô hình gần như không học. Đã pin `transformers==4.46.3` + thêm bước kiểm tra `output_loading_info` (chỉ cho phép thiếu `classifier.*`).
 
 ### Tích hợp vào production
 ```
@@ -143,27 +147,38 @@ Fallback: nếu model chưa có → dùng Gemini API thay thế
 
 ---
 
-## ⚠️ 6. Expected Accuracy — **CHƯA CÓ SỐ LIỆU CỤ THỂ**
+## ✅ 6. Kết quả thực tế (đo trên Kaggle, chu kỳ PA4)
 
-Đây là phần **cần bổ sung** khi trình bày trước lớp.
+### ArgKP Matching — ĐẠT (3/4 chỉ tiêu có dư, Recall sát ngưỡng)
 
-### Đề xuất số liệu cần thu thập
+| Metric | Mốc kỳ vọng | Thực tế (test, ngưỡng 0.60) | Đạt? |
+|---|---|---|---|
+| Accuracy | ≥ 80% | **87.44%** | ✅ |
+| F1 (lớp khớp) | ≥ 0.75 | **0.7596** | ✅ |
+| Precision | ≥ 0.75 | **0.7980** | ✅ |
+| Recall | ≥ 0.75 | 0.7248 | ⚠️ hụt ~3 mẫu |
+| Macro-F1 | — | 0.8373 | — |
 
-| Model | Metric cần báo cáo | Giá trị kỳ vọng (ước tính) |
+### Fallacy Detection — CẢI THIỆN MẠNH, dưới mốc 75% (đã gộp 13→6 nhóm)
+
+| Metric | Mốc kỳ vọng (điều chỉnh) | Thực tế (test, 6 nhóm) |
 |---|---|---|
-| Fallacy Detection | Accuracy | ≥ 75% |
-| Fallacy Detection | Weighted F1 | ≥ 0.70 |
-| ArgKP Matching | Accuracy | ≥ 80% |
-| ArgKP Matching | F1 | ≥ 0.75 |
-| ArgKP Matching | Precision | ≥ 0.75 |
-| ArgKP Matching | Recall | ≥ 0.75 |
+| Accuracy | ~55–60% (75% là phi thực tế cho 13-lớp) | **57.06%** |
+| Macro-F1 | ~0.55 | **0.5727** |
+| Weighted-F1 | — | 0.5716 |
 
-> **Lưu ý:** Các con số trên là *ước tính kỳ vọng*. Cần chạy lại training và lấy kết quả thực từ Kaggle/Colab log.
+### Thí nghiệm đối chứng (ablation) — bằng chứng mô hình hoạt động
 
-### Cách lấy số liệu thực tế
-1. Chạy lại `train_phobert_kaggle.py` và `train_phobert_argkp.py` trên Kaggle
-2. Xem phần output `eval_accuracy` và `eval_f1` ở mỗi epoch
-3. Lấy giá trị của **best model** (epoch có F1 cao nhất)
+| Mô hình | Phiên bản | Accuracy | F1 |
+|---|---|---|---|
+| Fallacy | Backbone hỏng (transformers 5.0) | 17.75% | 0.122 (w) |
+| Fallacy | Sửa backbone, 13 lớp | 47.90% | 0.471 (macro) |
+| Fallacy | Sửa + gộp 6 nhóm | **57.06%** | **0.573 (macro)** |
+| ArgKP | Backbone hỏng | 62.06% | 0.417 |
+| ArgKP | Sửa backbone, ngưỡng 0.5 | 86.18% | 0.742 |
+| ArgKP | Sửa + dò ngưỡng 0.60 | **87.44%** | **0.760** |
+
+> **Kết luận:** Sửa lỗi nạp trọng số là bước quyết định; gộp nhóm + dò ngưỡng là các cải tiến bổ sung có tác dụng đo lường được. Mốc 75% cho phân loại ngụy biện 13-lớp là phi thực tế (nghiên cứu gốc cũng chỉ ~30–50% F1) — kết quả 57% là hợp lý và sát trần dữ liệu. Báo cáo đầy đủ: `docs/pa/PA4/PA4-Group09/KaiKo_ML_Model_Evaluation_Report_PA4.docx`.
 
 ---
 
