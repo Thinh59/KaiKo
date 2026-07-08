@@ -3,6 +3,7 @@ import axios from 'axios'
 import { useSpeechToText } from '../hooks/useSpeechToText'
 import { useAudioAnalysis } from '../hooks/useAudioAnalysis'
 import { useWebRTC } from '../hooks/useWebRTC'
+import { useGestureAnalysis } from '../hooks/useGestureAnalysis'
 import FallacyAlert from './FallacyAlert'
 import VideoGrid from './VideoGrid'
 import TranscriptPanel from './TranscriptPanel'
@@ -15,7 +16,7 @@ const playTing = () => {
   try {
     const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
     audio.play().catch(e => console.log('Audio autoplay blocked', e))
-  } catch (e) {}
+  } catch { /* bỏ qua lỗi audio */ }
 }
 // ── Web Speech TTS ──────────────────────────────────────────────────────────
 function speakText(text, onEnd) {
@@ -86,6 +87,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
   const currentPlayerRef = useRef('A')
   const timerRef = useRef(null)
   const isRunningRef = useRef(false)
+  const opponentGestureRef = useRef(null)   // cử chỉ đối thủ (nhận qua WebSocket)
 
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { liveText, start: startSpeech, stop: stopSpeech } = useSpeechToText({
@@ -95,7 +97,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
   const { start: startAudio, stop: stopAudio } = useAudioAnalysis()
 
   const {
-    localVideoRef, remoteVideoRef, connected,
+    localVideoRef, remoteVideoRef,
     isCameraOn, isMicOn, initWebRTC, toggleCamera, toggleMic, stopAllMedia,
     localStream, remoteStream
   } = useWebRTC({
@@ -105,6 +107,13 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     sendMessage,
     registerHandler
   })
+
+  // ── Phân tích cử chỉ (MediaPipe) trên camera người chơi ──────────────────
+  const {
+    ready: gestureReady,
+    metrics: gestureMetrics,
+    getReport: getGestureReport,
+  } = useGestureAnalysis({ videoRef: localVideoRef, active: isRunning && isCameraOn })
 
   // Sync refs
   useEffect(() => { transcriptARef.current = transcriptA }, [transcriptA])
@@ -125,7 +134,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     try {
       await initWebRTC()
       setMediaGranted(true)
-    } catch (e) {
+    } catch {
       alert("Lỗi cấp quyền hoặc không tìm thấy thiết bị!")
     }
   }
@@ -154,7 +163,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         mode
       })
       showNotification(res.data.success ? '🆘 Đã gửi lời nhờ trợ giúp tới bạn thân.' : (res.data.error || 'Không gửi được lời nhờ trợ giúp'), res.data.success ? 'success' : 'warning')
-    } catch (err) {
+    } catch {
       showNotification('Không gửi được lời nhờ trợ giúp.', 'error')
     } finally {
       setRequestingHelp(false)
@@ -297,7 +306,22 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     registerHandler('emoji_react', (data) => {
       spawnEmoji(data.emoji, 'left')
     })
+
+    // Nhận điểm cử chỉ (MediaPipe) từ đối thủ
+    registerHandler('gesture_update', (data) => {
+      opponentGestureRef.current = data.report || null
+    })
   }, [mode, registerHandler, roomData.isLocalHost, startSpeech, startAudio, stopSpeech, stopAudio, spawnEmoji])
+
+  // Broadcast cử chỉ của mình sang đối thủ mỗi 3s (chỉ 1v1)
+  useEffect(() => {
+    if (mode === 'solo_ai' || !isRunning) return
+    const id = setInterval(() => {
+      const r = getGestureReport()
+      if (r) sendMessage({ type: 'gesture_update', target: roomInfo?.opponentId, report: r })
+    }, 3000)
+    return () => clearInterval(id)
+  }, [mode, isRunning, getGestureReport, sendMessage, roomInfo])
 
   // ── Hết giờ lượt hiện tại ──────────────────────────────────────────────
   const handleTimeUp = useCallback(() => {
@@ -479,6 +503,17 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     const finalTranscriptA = transcriptARef.current.trim() || 'Người chơi chưa phát biểu.'
     const finalTranscriptB = transcriptBRef.current.trim() || 'Đối thủ chưa phát biểu.'
 
+    // Điểm cử chỉ THẬT (MediaPipe). A = host, B = guest (nhãn chung 2 client).
+    // -> cử chỉ của mình vào slot theo vai trò, cử chỉ đối thủ vào slot còn lại.
+    const toVS = (g) => (g
+      ? { eyeContact: g.eyeContact, presence: g.presence, expressiveness: g.expressiveness, gesture: g.score }
+      : {})
+    const myGesture = getGestureReport()
+    const oppGesture = opponentGestureRef.current
+    const iAmA = roomData.isLocalHost
+    const videoScoresA = iAmA ? toVS(myGesture) : toVS(oppGesture)
+    const videoScoresB = iAmA ? toVS(oppGesture) : toVS(myGesture)
+
     try {
       const res = await axios.post(`${API_BASE}/score`, {
         topic: roomData.topic,
@@ -488,10 +523,10 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         transcript_b: finalTranscriptB,
         fallacies_a: fallaciesA,
         fallacies_b: fallaciesB,
-        video_scores_a: { eyeContact: 65 },
-        audio_scores_a: { loudPct: 22 },
-        video_scores_b: { eyeContact: 70 },
-        audio_scores_b: { loudPct: 18 },
+        video_scores_a: videoScoresA,
+        audio_scores_a: {},
+        video_scores_b: videoScoresB,
+        audio_scores_b: {},
         mode: mode
       })
 
@@ -507,6 +542,8 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
           transcript_b: finalTranscriptB,
           fallacies_a: fallaciesA,
           fallacies_b: fallaciesB,
+          gesture_a: videoScoresA.gesture ?? null,
+          gesture_b: videoScoresB.gesture ?? null,
           mode: mode
         })
       } else {
@@ -711,6 +748,42 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
               </div>
             </div>
           )}
+          {/* ── HUD Cử chỉ (MediaPipe) ── */}
+          {mode !== 'solo_ai' || isCameraOn ? (
+            <div className="glass-panel" style={{ padding: '14px', border: '1px solid rgba(56,189,248,0.25)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ color: '#7dd3fc', fontWeight: 800 }}>🎥 Cử chỉ (camera)</span>
+                <span style={{
+                  fontSize: '1.4rem', fontWeight: 800,
+                  color: gestureMetrics.score >= 60 ? '#4ade80' : gestureMetrics.score >= 35 ? '#fbbf24' : '#f87171'
+                }}>
+                  {gestureReady ? `${gestureMetrics.score}/100` : '…'}
+                </span>
+              </div>
+              {gestureReady ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {[
+                    { label: '👁️ Giao tiếp mắt', val: gestureMetrics.eyeContact },
+                    { label: '🙂 Biểu cảm', val: gestureMetrics.expressiveness },
+                    { label: '🎯 Hiện diện', val: gestureMetrics.presence },
+                  ].map((m) => (
+                    <div key={m.label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', width: '110px' }}>{m.label}</span>
+                      <div style={{ flex: 1, height: '6px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${m.val}%`, height: '100%', background: 'linear-gradient(90deg,#38bdf8,#818cf8)', transition: 'width 0.3s' }} />
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', width: '34px', textAlign: 'right' }}>{m.val}%</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                  Đang tải mô hình nhận diện cử chỉ… (cần bật camera + Internet)
+                </p>
+              )}
+            </div>
+          ) : null}
+
           {/* ── Controls Bar ── */}
           <ControlsBar
             timeLeft={timeLeft}

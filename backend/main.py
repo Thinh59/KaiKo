@@ -646,7 +646,7 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng live không còn tồn tại."
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "end_reject", "debate_result", "opponent_banned"]:
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "end_reject", "debate_result", "opponent_banned", "gesture_update"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn
@@ -2010,6 +2010,20 @@ async def score_debate(result: DebateResult):
             )
         )
 
+        # Mô tả dữ liệu cử chỉ (đo bằng MediaPipe ở client) để chấm mục Phong thái
+        va = result.video_scores_a or {}
+        if va.get("gesture") is not None:
+            gesture_a = (
+                f"\nDỮ LIỆU CỬ CHỈ (đo tự động bằng camera) của {result.player_a}: "
+                f"giao tiếp bằng mắt {va.get('eyeContact', '?')}%, "
+                f"biểu cảm {va.get('expressiveness', '?')}%, "
+                f"hiện diện trước camera {va.get('presence', '?')}%, "
+                f"điểm cử chỉ tổng {va.get('gesture', '?')}/100. "
+                f"Hãy dùng dữ liệu này làm căn cứ CHÍNH khi chấm mục Phong thái cho {result.player_a}.\n"
+            )
+        else:
+            gesture_a = ""
+
         if result.mode.startswith("text"):
             prompt = f"""Bạn là chuyên gia huấn luyện kỹ năng tranh biện chuyên nghiệp.
 Hãy chấm điểm trận tranh biện (CHAT BẰNG VĂN BẢN) sau (chỉ trả JSON, không giải thích thêm):
@@ -2051,7 +2065,7 @@ Ngụy biện: {', '.join(result.fallacies_a) if result.fallacies_a else 'Không
 {result.player_b} (phản đối):
 Lời phát biểu: {result.transcript_b}
 Ngụy biện: {', '.join(result.fallacies_b) if result.fallacies_b else 'Không có'}
-
+{gesture_a}
 Thang điểm: Logic 40đ · Phong thái 20đ · Giọng nói 20đ · Phản biện 20đ
 Trừ: 5đ/ngụy biện
 

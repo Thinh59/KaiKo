@@ -19,20 +19,46 @@ export default function ControlsBar({
     <div style={{
       textAlign: 'center',
       transition: 'all 0.3s ease',
-      padding: '1rem',
+      padding: '1.25rem',
+      background: 'var(--bg-glass, rgba(15,23,42,0.6))',
+      border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+      borderRadius: 'var(--radius-lg, 20px)',
+      backdropFilter: 'blur(12px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
     }}>
-      {/* Timer */}
+      {/* Timer Panel */}
       <div style={{
-        fontSize: '5rem',
-        fontWeight: '800',
-        color: isTimeRunningOut ? '#ff4b4b' : '#38bdf8',
-        marginBottom: '1rem',
-        fontFamily: 'var(--font-mono)',
-        letterSpacing: '4px',
-        textShadow: isTimeRunningOut ? '0 0 25px rgba(255,75,75,0.6)' : '0 0 20px rgba(56,189,248,0.4)',
-        transition: 'color 0.3s ease, text-shadow 0.3s ease'
+        background: 'rgba(0,0,0,0.35)',
+        border: `2px solid ${isTimeRunningOut ? 'rgba(255,75,75,0.55)' : 'rgba(56,189,248,0.45)'}`,
+        borderRadius: '16px',
+        padding: '0.6rem 1rem 0.8rem',
+        marginBottom: '1.25rem',
+        boxShadow: isTimeRunningOut
+          ? '0 0 24px rgba(255,75,75,0.35), inset 0 0 18px rgba(255,75,75,0.15)'
+          : '0 0 20px rgba(56,189,248,0.22), inset 0 0 18px rgba(56,189,248,0.10)',
+        transition: 'all 0.3s ease'
       }}>
-        {String(timeLeft).padStart(2, '0')}<span style={{ fontSize: '2rem', opacity: 0.7, marginLeft: '4px' }}>s</span>
+        <div style={{
+          fontSize: '0.72rem',
+          letterSpacing: '2px',
+          textTransform: 'uppercase',
+          color: 'var(--text-secondary)',
+          marginBottom: '2px'
+        }}>
+          ⏱️ Thời gian lượt
+        </div>
+        <div style={{
+          fontSize: '4.5rem',
+          fontWeight: '800',
+          color: isTimeRunningOut ? '#ff4b4b' : '#38bdf8',
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '4px',
+          lineHeight: 1.05,
+          textShadow: isTimeRunningOut ? '0 0 25px rgba(255,75,75,0.6)' : '0 0 20px rgba(56,189,248,0.4)',
+          transition: 'color 0.3s ease, text-shadow 0.3s ease'
+        }}>
+          {String(timeLeft).padStart(2, '0')}<span style={{ fontSize: '2rem', opacity: 0.7, marginLeft: '4px' }}>s</span>
+        </div>
       </div>
 
       {/* Current Turn Display */}

@@ -17,7 +17,7 @@ function Badge({ type, text }) {
   )
 }
 
-function PlayerCard({ name, rawName, currentUser, data, transcript, mode }) {
+function PlayerCard({ name, rawName, currentUser, data, transcript, mode, gesture }) {
   const [tab, setTab] = useState('score')
   const [friendReqSent, setFriendReqSent] = useState(false)
 
@@ -40,7 +40,7 @@ function PlayerCard({ name, rawName, currentUser, data, transcript, mode }) {
       } else {
         alert(res.data.error || 'Lỗi gửi kết bạn')
       }
-    } catch (e) {
+    } catch {
       alert('Không thể gửi lời mời kết bạn')
     }
   }
@@ -108,6 +108,12 @@ function PlayerCard({ name, rawName, currentUser, data, transcript, mode }) {
                 <td style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>Trừ điểm</td>
                 <td style={{ textAlign: 'right', fontWeight: '600', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>-{data?.deduct ?? 0}</td>
               </tr>
+              {gesture != null && !mode?.startsWith('text') && (
+                <tr style={{ color: '#38bdf8' }} title="Đo tự động bằng camera (MediaPipe): giao tiếp mắt, biểu cảm, hiện diện">
+                  <td style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>🎥 Cử chỉ đo được (camera)</td>
+                  <td style={{ textAlign: 'right', fontWeight: '600', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{gesture}<span style={{ color: 'var(--text-secondary)', fontWeight: 'normal', fontSize: '0.85rem' }}>/100</span></td>
+                </tr>
+              )}
               <tr>
                 <td style={{ padding: '16px 0 0', fontWeight: 'bold', fontSize: '1.1rem', color: 'var(--text-primary)' }}>Tổng</td>
                 <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1.5rem', color: 'var(--accent-primary)', padding: '16px 0 0' }}>{data?.total ?? '--'}</td>
@@ -198,7 +204,7 @@ function PostMatchReview({ result, currentUser }) {
       } else {
         setMessage(res.data.error || 'Không gửi được đánh giá')
       }
-    } catch (e) {
+    } catch {
       setMessage('Lỗi kết nối khi gửi đánh giá')
     }
   }
@@ -242,7 +248,7 @@ function JudgePanel({ result, currentUser }) {
     try {
       const res = await axios.post(`${API_BASE}/judge/adjust-score`, { judge: currentUser, target, score_delta: Number(delta), reason })
       setMessage(res.data.success ? `Đã điều chỉnh điểm. Level hiện tại: ${res.data.new_level}` : (res.data.error || 'Không điều chỉnh được'))
-    } catch (e) {
+    } catch {
       setMessage('Lỗi kết nối khi điều chỉnh điểm')
     }
   }
@@ -251,7 +257,7 @@ function JudgePanel({ result, currentUser }) {
     try {
       const res = await axios.post(`${API_BASE}/judge/protect-disciple`, { judge: currentUser, disciple, reason })
       setMessage(res.data.success ? `Đã bảo kê. Level đệ tử hiện tại: ${res.data.new_level}` : (res.data.error || 'Không bảo kê được'))
-    } catch (e) {
+    } catch {
       setMessage('Lỗi kết nối khi bảo kê')
     }
   }
@@ -292,8 +298,9 @@ export default function Scoreboard({ result, onRestart, currentUser }) {
       </div>
 
       <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <PlayerCard name={playerA} rawName={rawUsernameA} currentUser={currentUser} data={scores?.player_a} transcript={transcript_a} mode={result.mode} />
-        <PlayerCard name={playerB} rawName={rawUsernameB} currentUser={currentUser} data={scores?.player_b} transcript={transcript_b} mode={result.mode} />
+        <PlayerCard name={playerA} rawName={rawUsernameA} currentUser={currentUser} data={scores?.player_a} transcript={transcript_a} mode={result.mode} gesture={result.gesture_a} />
+        <PlayerCard name={playerB} rawName={rawUsernameB} currentUser={currentUser} data={scores?.player_b} transcript={transcript_b} mode={result.mode} gesture={result.gesture_b} />
+
       </div>
 
       {scores?.comment && (
