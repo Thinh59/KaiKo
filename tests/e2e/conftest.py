@@ -32,8 +32,8 @@ def _set_timeout(page: Page):
 def goto_auth(page: Page):
     """Mở trang chủ và bấm 'Start Now' để tới màn Đăng nhập."""
     page.goto(BASE_URL, wait_until="domcontentloaded")
-    # Nút 'Start Now' đưa người dùng chưa đăng nhập tới màn Auth
-    page.get_by_role("button", name="Start Now").first.click()
+    # Nút 'Start Now' có animation vô hạn -> click force để không chờ "ổn định"
+    page.get_by_role("button", name="Start Now").first.click(force=True)
     # Xác nhận đã ở form Đăng nhập KaiKo
     expect(page.get_by_placeholder("Tên đăng nhập")).to_be_visible()
 
@@ -43,7 +43,7 @@ def do_login(page: Page, username: str, password: str):
     goto_auth(page)
     page.get_by_placeholder("Tên đăng nhập").fill(username)
     page.get_by_placeholder("Mật khẩu").fill(password)
-    page.get_by_role("button", name="Đăng Nhập").click()
+    page.get_by_role("button", name="Đăng Nhập", exact=True).click(force=True)
 
 
 @pytest.fixture
