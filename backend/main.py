@@ -670,7 +670,32 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         "type": "error",
                         "message": "Phòng live không còn tồn tại."
                     }), client_id)
-            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "topic_submitted", "end_request", "end_confirm", "end_reject", "debate_result", "opponent_banned", "gesture_update"]:
+            elif msg_type == "topic_submitted":
+                # Server làm TRỌNG TÀI chủ đề: người gửi ĐẦU TIÊN thắng, chốt 1 chủ
+                # đề CHUNG rồi báo 'topic_confirmed' cho CẢ HAI → 2 bên không lệch topic.
+                target_id = message.get("target")
+                room_id = manager.find_room_for_players(client_id, target_id)
+                if room_id and room_id in manager.rooms:
+                    room = manager.rooms[room_id]
+                    if not room.get("topic_locked"):
+                        room["topic"] = message.get("topic") or room.get("topic")
+                        room["topic_locked"] = True
+                        room["topic_by"] = message.get("speakerName")
+                    confirm = json.dumps({
+                        "type": "topic_confirmed",
+                        "topic": room.get("topic"),
+                        "speakerName": room.get("topic_by")
+                    })
+                    for pid in room.get("players", []):
+                        await manager.send_personal_message(confirm, pid)
+                else:
+                    # Không tìm thấy phòng → vẫn echo lại cho người gửi để họ vào được
+                    await manager.send_personal_message(json.dumps({
+                        "type": "topic_confirmed",
+                        "topic": message.get("topic"),
+                        "speakerName": message.get("speakerName")
+                    }), client_id)
+            elif msg_type in ["offer", "answer", "ice-candidate", "transcript_update", "fallacy_detected", "debate_ended", "emoji_react", "player_ready", "player_declined", "control_action", "chat_msg", "chat", "end_request", "end_confirm", "end_reject", "debate_result", "opponent_banned", "gesture_update"]:
                 target_id = message.get("target")
                 if target_id:
                     # Chuyển tiếp tin nhắn
@@ -1674,34 +1699,41 @@ def get_history(username: str, limit: int = 20):
 
 @app.get("/leaderboard")
 def get_leaderboard(limit: int = 10):
-    """Lấy bảng xếp hạng công bằng: Ưu tiên Thắng, sau đó là Hiệu năng trận đấu thực tế"""
+    """Bảng xếp hạng theo ĐIỂM XẾP HẠNG tổng hợp (1 con số duy nhất) để thứ hạng
+    luôn khớp với điểm hiển thị:
+        ranking_points = tổng điểm các trận + (thắng × 30) − (thua × 10), tối thiểu 0
+    Nhờ vậy không còn cảnh 'điểm thấp mà hạng cao'."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
-    # 1. Chỉ tính Tổng Điểm (total_score) cho những trận có phát sinh điểm (score_self > 0)
-    # 2. Sắp xếp theo Level, sau đó là Tổng Điểm, rồi mới đến Thắng
+
     cursor.execute("""
-        SELECT m.username, 
+        SELECT m.username,
                COALESCE(u.level_real, 1) as level,
                COUNT(m.id) as total_matches,
                SUM(CASE WHEN m.result = 'win' THEN 1 ELSE 0 END) as wins,
                SUM(CASE WHEN m.result = 'lose' THEN 1 ELSE 0 END) as losses,
-               SUM(COALESCE(m.score_self, 0)) as total_score
+               SUM(COALESCE(m.score_self, 0)) as total_score,
+               GREATEST(0,
+                   SUM(COALESCE(m.score_self, 0))
+                   + SUM(CASE WHEN m.result = 'win' THEN 30 ELSE 0 END)
+                   - SUM(CASE WHEN m.result = 'lose' THEN 10 ELSE 0 END)
+               ) as ranking_points
         FROM match_history m
         LEFT JOIN users u ON m.username = u.username
         GROUP BY m.username, u.level_real
         HAVING COUNT(m.id) > 0
-        ORDER BY level DESC, total_score DESC, wins DESC
+        ORDER BY ranking_points DESC, wins DESC, level DESC
         LIMIT %s
     """, (limit,))
     rows = list(cursor.fetchall())
     conn.close()
-    
-    # Fix giá trị null nếu user chưa có trận nào có điểm > 0
+
     for row in rows:
         if row['total_score'] is None:
             row['total_score'] = 0
-            
+        if row.get('ranking_points') is None:
+            row['ranking_points'] = 0
+
     return {"success": True, "leaderboard": rows}
 
 # --- FRIENDS SYSTEM ---

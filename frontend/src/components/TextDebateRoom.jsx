@@ -77,8 +77,17 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
         setTopicTimeLeft(prev => {
           if (prev <= 1) {
             clearInterval(timer)
-            // Time ran out for topic race, fallback to roomData.topic and start debate
-            setPhase('debate')
+            // Hết giờ: chốt bằng chủ đề mặc định của phòng
+            if (isSolo) {
+              setPhase('debate')
+            } else if (sendMessage && roomInfo) {
+              // Qua server để cả 2 nhận CÙNG một chủ đề (ai gửi trước thắng)
+              sendMessage({ type: 'topic_submitted', target: roomInfo.opponentId, topic: roomData.topic || 'Chủ đề ngẫu nhiên', speakerName: '(hết giờ)' })
+              // An toàn: nếu server không phản hồi trong 2.5s thì tự vào bằng chủ đề phòng
+              setTimeout(() => setPhase(p => (p === 'topic_race' ? 'debate' : p)), 2500)
+            } else {
+              setPhase('debate')
+            }
             return 0
           }
           return prev - 1
@@ -128,13 +137,14 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
       }
     })
 
-    const cleanupTopic = registerHandler('topic_submitted', (data) => {
-      if (phase === 'topic_race') {
-        setCurrentTopic(data.topic)
-        setPhase('debate')
-        setSystemAlert({ type: 'success', msg: `${data.speakerName} đã chốt chủ đề: ${data.topic}` })
-        setTimeout(() => setSystemAlert(null), 4000)
-      }
+    // Server đã chốt chủ đề chung cho cả 2 → luôn đồng bộ theo đây (bỏ guard phase
+    // để dù mình vừa hết giờ / vừa gửi thì vẫn nhận đúng chủ đề chung).
+    const cleanupTopic = registerHandler('topic_confirmed', (data) => {
+      setCurrentTopic(data.topic)
+      setPhase('debate')
+      const by = data.speakerName && data.speakerName !== '(hết giờ)' ? ` (do ${data.speakerName} chốt)` : ''
+      setSystemAlert({ type: 'success', msg: `📌 Chủ đề: ${data.topic}${by}` })
+      setTimeout(() => setSystemAlert(null), 4000)
     })
 
     const cleanupSkill = registerHandler('skill_attack', (data) => {
@@ -246,9 +256,14 @@ export default function TextDebateRoom({ roomData, roomInfo, mode, username, onF
     e.preventDefault()
     if (!topicInput.trim()) return
     const newTopic = topicInput.trim()
-    setCurrentTopic(newTopic)
-    setPhase('debate')
-    if (!isSolo && sendMessage && roomInfo) {
+    if (isSolo) {
+      // Solo: không có đối thủ → chốt luôn tại chỗ
+      setCurrentTopic(newTopic)
+      setPhase('debate')
+    } else if (sendMessage && roomInfo) {
+      // 1v1: KHÔNG tự chốt. Gửi lên server, server quyết định 1 chủ đề CHUNG
+      // (ai gửi trước thắng) rồi báo 'topic_confirmed' cho cả 2 → không lệch nhau.
+      setSystemAlert({ type: 'info', msg: '⏳ Đang chốt chủ đề...' })
       sendMessage({ type: 'topic_submitted', target: roomInfo.opponentId, topic: newTopic, speakerName: isPlayerA ? roomData.playerA : roomData.playerB })
     }
   }

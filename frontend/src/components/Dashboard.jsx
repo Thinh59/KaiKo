@@ -1495,7 +1495,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
             {activeTab === 'leaderboard' && (
               <div style={{ paddingRight: '70px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>🏆 Bảng xếp hạng ELO (Wins)</h2>
+                  <h2 style={{ color: 'var(--text-primary)', margin: 0 }}>🏆 Bảng xếp hạng (Điểm = tổng điểm trận + thắng×30 − thua×10)</h2>
                   <button onClick={loadLeaderboard} style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 'var(--radius-full)', padding: '8px 18px', cursor: 'pointer', fontSize: '0.9rem' }}>
                     🔄 Làm mới
                   </button>
@@ -1518,7 +1518,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                       <span>Người chơi</span>
                       <span style={{ textAlign: 'center' }}>Trận</span>
                       <span style={{ textAlign: 'center' }}>Thắng</span>
-                      <span style={{ textAlign: 'right' }}>Tổng Điểm</span>
+                      <span style={{ textAlign: 'right' }}>Điểm XH</span>
                     </div>
                     {leaderboard.map((user, idx) => (
                       <div key={user.username} style={{ display: 'grid', gridTemplateColumns: '60px 1fr 100px 100px 120px', alignItems: 'center', padding: '16px 20px', borderBottom: idx < leaderboard.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none', background: username === user.username ? 'rgba(99,102,241,0.1)' : 'transparent', transition: 'background 0.2s' }} onMouseEnter={e => { if (username !== user.username) e.currentTarget.style.background = 'var(--panel-bg)' }} onMouseLeave={e => { if (username !== user.username) e.currentTarget.style.background = 'transparent' }}>
@@ -1533,7 +1533,7 @@ export default function Dashboard({ username, onPlay, onLogout, onViewMatch, sen
                         </div>
                         <div style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>{user.total_matches}</div>
                         <div style={{ textAlign: 'center', color: '#10b981', fontWeight: 'bold' }}>{user.wins}</div>
-                        <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.total_score)}</div>
+                        <div style={{ textAlign: 'right', color: 'var(--text-primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{Math.round(user.ranking_points ?? user.total_score)}</div>
                       </div>
                     ))}
                     </div>
