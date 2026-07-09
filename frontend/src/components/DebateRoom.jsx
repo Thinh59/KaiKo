@@ -18,26 +18,85 @@ const playTing = () => {
     audio.play().catch(e => console.log('Audio autoplay blocked', e))
   } catch { /* bỏ qua lỗi audio */ }
 }
-// ── Web Speech TTS ──────────────────────────────────────────────────────────
-function speakText(text, onEnd) {
-  if (!('speechSynthesis' in window)) {
-    onEnd?.()
-    return
+// ── TTS ───────────────────────────────────────────────────────────────────
+// Ưu tiên TTS phía SERVER (/tts, giọng gTTS cố định) → GIỐNG NHAU trên mọi máy,
+// không phụ thuộc giọng trình duyệt/HĐH. Nếu server lỗi mới fallback Web Speech.
+let _ttsAudio = null   // audio đang phát (server TTS) — để có thể dừng khi thoát
+
+function stopSpeaking() {
+  try { window.speechSynthesis.cancel() } catch { /* ignore */ }
+  if (_ttsAudio) {
+    try { _ttsAudio.pause(); _ttsAudio.src = '' } catch { /* ignore */ }
+    _ttsAudio = null
   }
+}
+
+// Chọn giọng vi ổn định nhất cho Web Speech (chỉ dùng khi fallback)
+function pickVietnameseVoice() {
+  const voices = window.speechSynthesis.getVoices() || []
+  const vi = voices.filter(v => (v.lang || '').toLowerCase().startsWith('vi'))
+  if (vi.length === 0) return null
+  return (
+    vi.find(v => /google/i.test(v.name)) ||
+    vi.find(v => (v.lang || '').toLowerCase() === 'vi-vn') ||
+    vi[0]
+  )
+}
+
+function speakWebSpeech(text, onEnd) {
+  if (!('speechSynthesis' in window)) { onEnd?.(); return }
   window.speechSynthesis.cancel()
-  const utter = new SpeechSynthesisUtterance(text)
-  utter.lang = 'vi-VN'
-  utter.rate = 1.0
-  utter.pitch = 1.0
+  let started = false
+  const speak = () => {
+    if (started) return
+    started = true
+    const utter = new SpeechSynthesisUtterance(text)
+    utter.lang = 'vi-VN'
+    utter.rate = 1.0
+    utter.pitch = 1.0
+    const viVoice = pickVietnameseVoice()
+    if (viVoice) utter.voice = viVoice
+    utter.onend = () => onEnd?.()
+    utter.onerror = () => onEnd?.()
+    window.speechSynthesis.speak(utter)
+  }
+  if ((window.speechSynthesis.getVoices() || []).length === 0) {
+    window.speechSynthesis.addEventListener('voiceschanged', speak, { once: true })
+    setTimeout(speak, 250)
+  } else {
+    speak()
+  }
+}
 
-  // Ưu tiên giọng tiếng Việt nếu có
-  const voices = window.speechSynthesis.getVoices()
-  const viVoice = voices.find(v => v.lang.startsWith('vi'))
-  if (viVoice) utter.voice = viVoice
-
-  utter.onend = () => onEnd?.()
-  utter.onerror = () => onEnd?.()
-  window.speechSynthesis.speak(utter)
+async function speakText(text, onEnd) {
+  stopSpeaking()
+  try {
+    const res = await fetch(`${API_BASE}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: 'vi' })
+    })
+    if (res.ok) {
+      const blob = await res.blob()
+      if (blob && blob.size > 0) {
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        _ttsAudio = audio
+        const cleanup = () => { URL.revokeObjectURL(url); if (_ttsAudio === audio) _ttsAudio = null }
+        audio.onended = () => { cleanup(); onEnd?.() }
+        audio.onerror = () => { cleanup(); speakWebSpeech(text, onEnd) }
+        try {
+          await audio.play()
+          return   // Đang phát bằng server TTS
+        } catch {
+          cleanup()   // Trình duyệt chặn autoplay → fallback
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('TTS server không dùng được, chuyển sang Web Speech:', e)
+  }
+  speakWebSpeech(text, onEnd)
 }
 
 export default function DebateRoom({ roomData, roomInfo, mode, username, remotePlayerName, onFinish, registerHandler, sendMessage, onCancel }) {
@@ -433,7 +492,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     stopSpeech()
     stopAudio()
     setIsRunning(false)
-    window.speechSynthesis.cancel()
+    stopSpeaking()
 
     const next = currentPlayer === 'A' ? 'B' : 'A'
     
@@ -497,7 +556,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
     stopAudio()
     stopAllMedia() // Tắt Camera & Mic ngay lập tức
     setIsRunning(false)
-    window.speechSynthesis.cancel()
+    stopSpeaking()
     setIsScoring(true)
 
     const finalTranscriptA = transcriptARef.current.trim() || 'Người chơi chưa phát biểu.'
@@ -556,6 +615,25 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
       setIsScoring(false)
     }
   }
+
+  // ── Thoát phòng: dừng MỌI thứ (kể cả AI đang nói) rồi mới rời ──────────────
+  const handleLeave = useCallback(() => {
+    stopSpeaking()
+    stopSpeech()
+    stopAudio()
+    stopAllMedia()
+    setIsRunning(false)
+    // Báo cho đối thủ biết mình đã rời phòng (chỉ 1v1)
+    if (mode !== 'solo_ai' && roomInfo?.opponentId) {
+      sendMessage({ type: 'player_declined', target: roomInfo.opponentId, reason: 'left' })
+    }
+    onCancel && onCancel()
+  }, [mode, roomInfo, sendMessage, stopSpeech, stopAudio, stopAllMedia, onCancel])
+
+  // Dọn dẹp khi unmount: đảm bảo AI không còn nói sau khi rời phòng
+  useEffect(() => {
+    return () => stopSpeaking()
+  }, [])
 
   const playerBName = remotePlayerName || roomData.playerB
 
@@ -797,7 +875,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
             onStop={handlePause}
             onNextTurn={handleNextTurn}
             onEnd={handleDebateEnd}
-            onCancel={onCancel}
+            onCancel={handleLeave}
           />
         </div>
       </div>

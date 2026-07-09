@@ -393,3 +393,12 @@ TODO:
 -Định danh người chơi bằng Biệt danh vẫn chưa được vì rõ ràng sau khi đấu xong không Thêm bạn đượC
 -Chưa có chỗ cho người dùng feedback hệ thống sau khi xong 1 màn chơi với AI và feedback cho toàn hệ thống
 -Cần chuẩn bị sẵn list tài khoản và mật khẩu vip theo các level hoặc max level để test hết các khung, chức năng, quyền,...
+
+-2 user cùng mở cam thì mặt tôi có nhưng mặt người còn lại không hiện trên màn hình mà màn hình bị đen
+
+
+-Trong video debate room, khi AI nói thì phần chữ do panel chế độ sáng quá nhạt và nhẹ nên là nó bị chìm chữ rồi
+-Khi 1 user out ra khỏi phòng video debate thì bên còn lại không được thông báo mà vẫn còn trong phòng debate như cũ?
+-Cách tính điểm sau khi video debate hơi sai sai: tổng điểm bị sai, chưa tính phần trăm của mediapipe hay là tính rồi mà tôi không biết công thức?
+-Khi chơi chế độ vào phòng thì người chơi chọn chủ đề, chọn hết tất cả video/chat debate, public/private,... rồi mới tới khúc tạo phòng mới hay nhập code: 
+như vậy thì khi mà 2 chủ đề khác nhau nhưng chỉ cần nhập đúng code thì nó vẫn vào được? không đúng logic

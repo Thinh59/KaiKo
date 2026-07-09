@@ -31,13 +31,13 @@ export default function TranscriptPanel({
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            background: 'rgba(0, 0, 0, 0.2)',
+            background: 'var(--bg-primary)',
             padding: '12px',
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.95rem',
             lineHeight: 1.6,
             marginBottom: '12px',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid var(--border-light)',
             color: 'var(--text-primary)',
             minHeight: '80px'
           }}>
@@ -47,7 +47,7 @@ export default function TranscriptPanel({
               <i style={{ color: 'var(--text-secondary)' }}>Chờ lời phát biểu...</i>
             )}
             {currentPlayer === 'A' && liveText && (
-              <p style={{ margin: '8px 0 0', color: 'var(--accent-primary)', fontStyle: 'italic', borderTop: '1px solid rgba(99,102,241,0.3)', paddingTop: '8px' }}>
+              <p style={{ margin: '8px 0 0', color: 'var(--accent-primary)', fontStyle: 'italic', fontWeight: 500, borderTop: '1px solid rgba(99,102,241,0.3)', paddingTop: '8px' }}>
                 🎤 {liveText}
               </p>
             )}
@@ -91,13 +91,13 @@ export default function TranscriptPanel({
           <div style={{
             flex: 1,
             overflowY: 'auto',
-            background: 'rgba(0, 0, 0, 0.2)',
+            background: 'var(--bg-primary)',
             padding: '12px',
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.95rem',
             lineHeight: 1.6,
             marginBottom: '12px',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid var(--border-light)',
             color: 'var(--text-primary)',
             minHeight: '80px'
           }}>
@@ -107,7 +107,7 @@ export default function TranscriptPanel({
               <i style={{ color: 'var(--text-secondary)' }}>Chờ lời phát biểu...</i>
             )}
             {aiSpeech && currentPlayer === 'B' && (
-              <p style={{ margin: '8px 0 0', color: '#a855f7', fontStyle: 'italic', borderTop: '1px solid rgba(168,85,247,0.3)', paddingTop: '8px' }}>
+              <p style={{ margin: '8px 0 0', color: '#7c3aed', fontStyle: 'italic', fontWeight: 500, borderTop: '1px solid rgba(168,85,247,0.3)', paddingTop: '8px' }}>
                 🤖 AI: {aiSpeech}
               </p>
             )}

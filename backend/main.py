@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -508,7 +509,8 @@ class ConnectionManager:
             }
             # Tự động random người nào là Host (Ủng Hộ) và người nào là Guest (Phản Đối)
             is_client_host = random.choice([True, False])
-            
+            fmt = "chat" if mode.startswith("text") else "video"
+
             # Báo cho client_id
             await self.send_personal_message(json.dumps({
                 "type": "matched",
@@ -516,7 +518,9 @@ class ConnectionManager:
                 "isHost": is_client_host,
                 "opponentId": opponent_id,
                 "opponentName": opponent_name,
-                "topic": topic
+                "topic": topic,
+                "visibility": visibility,
+                "format": fmt
             }), client_id)
             # Báo cho opponent_id
             await self.send_personal_message(json.dumps({
@@ -525,7 +529,9 @@ class ConnectionManager:
                 "isHost": not is_client_host,
                 "opponentId": client_id,
                 "opponentName": player_name,
-                "topic": topic
+                "topic": topic,
+                "visibility": visibility,
+                "format": fmt
             }), opponent_id)
             print(f"📢 Notification sent to both players in {room_id}")
         else:
@@ -573,17 +579,24 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                 
             elif msg_type == "create_room":
                 room_code = str(random.randint(10000, 99999))
+                # Dùng đúng chủ đề theo lĩnh vực (category) host chọn, không random bừa
+                fmt = "chat" if message.get("format") == "chat" else "video"
+                topic_res = await get_random_topic(message.get("category"))
+                topic = topic_res.get("topic") if isinstance(topic_res, dict) else random.choice(manager.topics)
                 manager.rooms[room_code] = {
                     "players": [client_id],
-                    "topic": random.choice(manager.topics),
-                    "mode": "custom",
+                    "topic": topic,
+                    "mode": "text_custom" if fmt == "chat" else "custom",
+                    "format": fmt,
                     "visibility": "public" if message.get("visibility") == "public" else "private",
                     "player_names": {client_id: client_id.rsplit("_", 1)[0]},
                     "levels": {client_id: 1}
                 }
                 await manager.send_personal_message(json.dumps({
                     "type": "room_created",
-                    "roomCode": room_code
+                    "roomCode": room_code,
+                    "topic": topic,
+                    "format": fmt
                 }), client_id)
 
             elif msg_type == "join_room":
@@ -596,18 +609,26 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             "message": "Không thể tự đấu với chính mình!"
                         }), client_id)
                     else:
-                        topic = manager.rooms[room_code]["topic"]
-                        manager.rooms[room_code]["players"].append(client_id)
-                        manager.rooms[room_code].setdefault("player_names", {})[client_id] = client_id.rsplit("_", 1)[0]
-                        manager.rooms[room_code].setdefault("levels", {})[client_id] = 1
-                        
-                        # Notify Guest
+                        room = manager.rooms[room_code]
+                        topic = room["topic"]
+                        fmt = room.get("format", "video")
+                        vis = room.get("visibility", "private")
+                        room["players"].append(client_id)
+                        guest_name = client_id.rsplit("_", 1)[0]
+                        room.setdefault("player_names", {})[client_id] = guest_name
+                        room.setdefault("levels", {})[client_id] = 1
+                        host_name = room.get("player_names", {}).get(opponent_id, opponent_id.rsplit("_", 1)[0])
+
+                        # Notify Guest — guest KẾ THỪA chủ đề & hình thức của phòng host
                         await manager.send_personal_message(json.dumps({
                             "type": "matched",
                             "roomId": room_code,
                             "isHost": False,
                             "opponentId": opponent_id,
-                            "topic": topic
+                            "opponentName": host_name,
+                            "topic": topic,
+                            "visibility": vis,
+                            "format": fmt
                         }), client_id)
                         # Notify Host
                         await manager.send_personal_message(json.dumps({
@@ -615,7 +636,10 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                             "roomId": room_code,
                             "isHost": True,
                             "opponentId": client_id,
-                            "topic": topic
+                            "opponentName": guest_name,
+                            "topic": topic,
+                            "visibility": vis,
+                            "format": fmt
                         }), opponent_id)
                 else:
                     await manager.send_personal_message(json.dumps({
@@ -879,6 +903,39 @@ async def get_random_topic(category: str = None):
 @app.get("/")
 def root():
     return {"status": "ok", "ai_service_configured": bool(AI_SERVICE_URL)}
+
+
+class TTSInput(BaseModel):
+    text: str
+    lang: str = "vi"
+
+
+def _synthesize_tts(text: str, lang: str) -> bytes:
+    """Sinh MP3 bằng gTTS (giọng Google cố định) — giống hệt trên mọi máy."""
+    from gtts import gTTS
+    import io
+    buf = io.BytesIO()
+    gTTS(text=text, lang=lang or "vi", slow=False).write_to_fp(buf)
+    return buf.getvalue()
+
+
+@app.post("/tts")
+async def text_to_speech(req: TTSInput):
+    """Trả về audio MP3 cho đoạn text. Dùng 1 giọng cố định cho mọi thiết bị,
+    tránh phụ thuộc giọng của trình duyệt/HĐH từng máy (Web Speech)."""
+    text = (req.text or "").strip()
+    if not text:
+        return Response(status_code=204)
+    # gTTS giới hạn ~ vài trăm ký tự/đoạn; cắt bớt cho an toàn (AI thường nói ngắn)
+    text = text[:600]
+    try:
+        audio = await asyncio.to_thread(_synthesize_tts, text, req.lang)
+        return Response(content=audio, media_type="audio/mpeg",
+                        headers={"Cache-Control": "no-store"})
+    except Exception as e:
+        print("Lỗi TTS:", e)
+        # 502 -> frontend sẽ tự fallback sang Web Speech
+        return Response(status_code=502)
 
 @app.post("/hint")
 async def get_hint(req: HintRequest):
@@ -1713,6 +1770,14 @@ def send_friend_request(data: FriendAction):
         
     try:
         cursor.execute("INSERT INTO friend_requests (sender, receiver) VALUES (%s, %s) ON CONFLICT (sender, receiver) DO NOTHING", (data.user, target_username))
+        # rowcount == 1 nếu là lời mời MỚI, == 0 nếu đã tồn tại (tránh spam thông báo)
+        if cursor.rowcount and cursor.rowcount > 0:
+            from datetime import datetime, timezone
+            now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(
+                "INSERT INTO notifications (username, type, message, created_at) VALUES (%s, %s, %s, %s)",
+                (target_username, 'friend_request', f"👋 {data.user} đã gửi cho bạn lời mời kết bạn!", now_str)
+            )
         conn.commit()
     except Exception as e:
         print("Lỗi gửi lời mời:", e)
@@ -1992,6 +2057,51 @@ Hãy đưa ra luận điểm phản biện lại đối thủ một cách đanh 
         print(f"Lỗi tạo phản hồi AI: {e}")
         return {"success": False, "error": str(e), "response": "Xin lỗi, tôi đang gặp trục trặc kỹ thuật và không thể suy nghĩ ngay lúc này."}
 
+def _finalize_scores(scores, result):
+    """Tính lại điểm một cách TẤT ĐỊNH (không phụ thuộc phép tính của LLM):
+    - Video: mục Phong thái (delivery, 20đ) lấy TRỰC TIẾP từ điểm MediaPipe
+      (delivery = gesture/100 * 20). Giọng nói/Logic/Phản biện giữ theo LLM.
+    - Trừ điểm ngụy biện: 5đ mỗi lỗi (đếm từ danh sách thật ở server).
+    - total = tổng các mục con - điểm trừ, kẹp trong [0, 100].
+    """
+    is_text = (result.mode or "").startswith("text")
+    gesture_by_player = {
+        "player_a": (result.video_scores_a or {}),
+        "player_b": (result.video_scores_b or {}),
+    }
+    deduct_by_player = {
+        "player_a": 5 * len(result.fallacies_a or []),
+        "player_b": 5 * len(result.fallacies_b or []),
+    }
+
+    def _num(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return 0.0
+
+    for key in ("player_a", "player_b"):
+        p = scores.get(key)
+        if not isinstance(p, dict):
+            continue
+
+        if is_text:
+            components = [p.get("logic"), p.get("vocabulary"), p.get("grammar"), p.get("rebuttal")]
+        else:
+            gesture = gesture_by_player[key].get("gesture")
+            if gesture is not None:
+                # MediaPipe quyết định mục Phong thái
+                p["delivery"] = max(0, min(20, round(_num(gesture) / 100 * 20)))
+            components = [p.get("logic"), p.get("delivery"), p.get("voice"), p.get("rebuttal")]
+
+        deduct = deduct_by_player[key]
+        p["deduct"] = deduct
+        total = sum(_num(c) for c in components) - deduct
+        p["total"] = int(max(0, min(100, round(total))))
+
+    return scores
+
+
 @app.post("/score")
 async def score_debate(result: DebateResult):
     """Chấm điểm toàn bộ trận tranh biện bằng LLM"""
@@ -2012,17 +2122,22 @@ async def score_debate(result: DebateResult):
 
         # Mô tả dữ liệu cử chỉ (đo bằng MediaPipe ở client) để chấm mục Phong thái
         va = result.video_scores_a or {}
-        if va.get("gesture") is not None:
-            gesture_a = (
-                f"\nDỮ LIỆU CỬ CHỈ (đo tự động bằng camera) của {result.player_a}: "
-                f"giao tiếp bằng mắt {va.get('eyeContact', '?')}%, "
-                f"biểu cảm {va.get('expressiveness', '?')}%, "
-                f"hiện diện trước camera {va.get('presence', '?')}%, "
-                f"điểm cử chỉ tổng {va.get('gesture', '?')}/100. "
-                f"Hãy dùng dữ liệu này làm căn cứ CHÍNH khi chấm mục Phong thái cho {result.player_a}.\n"
+        vb = result.video_scores_b or {}
+
+        def _gesture_desc(player_name, v):
+            if v.get("gesture") is None:
+                return ""
+            return (
+                f"\nDỮ LIỆU CỬ CHỈ (đo tự động bằng camera) của {player_name}: "
+                f"giao tiếp bằng mắt {v.get('eyeContact', '?')}%, "
+                f"biểu cảm {v.get('expressiveness', '?')}%, "
+                f"hiện diện trước camera {v.get('presence', '?')}%, "
+                f"điểm cử chỉ tổng {v.get('gesture', '?')}/100. "
+                f"Hãy dùng dữ liệu này làm căn cứ CHÍNH khi chấm mục Phong thái cho {player_name}.\n"
             )
-        else:
-            gesture_a = ""
+
+        gesture_a = _gesture_desc(result.player_a, va)
+        gesture_b = _gesture_desc(result.player_b, vb)
 
         if result.mode.startswith("text"):
             prompt = f"""Bạn là chuyên gia huấn luyện kỹ năng tranh biện chuyên nghiệp.
@@ -2065,7 +2180,7 @@ Ngụy biện: {', '.join(result.fallacies_a) if result.fallacies_a else 'Không
 {result.player_b} (phản đối):
 Lời phát biểu: {result.transcript_b}
 Ngụy biện: {', '.join(result.fallacies_b) if result.fallacies_b else 'Không có'}
-{gesture_a}
+{gesture_a}{gesture_b}
 Thang điểm: Logic 40đ · Phong thái 20đ · Giọng nói 20đ · Phản biện 20đ
 Trừ: 5đ/ngụy biện
 
@@ -2086,14 +2201,14 @@ JSON format (bắt buộc):
         # Try parse entire response as JSON first
         try:
             scores = json.loads(text)
-            return {"success": True, "scores": scores}
+            return {"success": True, "scores": _finalize_scores(scores, result)}
         except json.JSONDecodeError:
             pass
         # Fall back to regex extraction
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             scores = json.loads(match.group())
-            return {"success": True, "scores": scores}
+            return {"success": True, "scores": _finalize_scores(scores, result)}
         return {"success": False, "error": "Không parse được JSON từ Gemini", "raw": text[:500]}
 
     except Exception as e:

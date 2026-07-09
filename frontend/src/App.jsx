@@ -261,6 +261,10 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
   // 1. Chuyển từ waiting -> ready_check
   useEffect(() => {
     if (matchInfo && page === 'waiting') {
+      // Đồng bộ hình thức (video/chat) theo phòng — quan trọng cho guest vào bằng code
+      if (matchInfo.format) {
+        setMode(matchInfo.format === 'chat' ? 'text_1v1' : '1v1')
+      }
       setPage('ready_check')
       setSelfReady(false)
       setOppReady(false)
@@ -272,8 +276,12 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
     const cleanupReady = registerHandler('player_ready', () => {
       setOppReady(true)
     })
-    const cleanupDecline = registerHandler('player_declined', () => {
-      alert("Đối thủ đã từ chối trận đấu, hoặc đang bận (AFK)!")
+    const cleanupDecline = registerHandler('player_declined', (data) => {
+      if (data?.reason === 'left' || data?.reason === 'disconnect') {
+        alert("Đối thủ đã rời khỏi phòng tranh biện.")
+      } else {
+        alert("Đối thủ đã từ chối trận đấu, hoặc đang bận (AFK)!")
+      }
       cancelMatch()
       setPage('mode')
     })
@@ -334,10 +342,12 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
         console.warn("Failed to fetch random topic", e)
       }
       setPage(info.mode === 'text_solo' ? 'text_debate' : 'debate')
-    } else if (info.mode === 'custom_create') {
+    } else if (info.mode === 'custom_create' || info.mode === 'text_custom_create') {
+      const fmt = info.mode.startsWith('text_') ? 'chat' : 'video'
       setPage('waiting')
-      createRoom(info.visibility || 'private')
-    } else if (info.mode === 'custom_join') {
+      createRoom(info.visibility || 'private', info.category, fmt)
+    } else if (info.mode === 'join_by_code') {
+      // Guest chỉ cần code — chủ đề/hình thức sẽ kế thừa từ phòng của host
       setPage('waiting')
       joinRoom(info.roomCode)
     } else {
@@ -582,7 +592,12 @@ function App({ clerkEnabled = false, clerkSession = {} }) {
         sendMessage={sendMessage}
         clerkUser={user}
         onCancel={() => {
-          if (mode !== 'text_solo') cancelMatch()
+          if (mode !== 'text_solo') {
+            if (currentMatch?.opponentId) {
+              sendMessage({ type: 'player_declined', target: currentMatch.opponentId, reason: 'left' })
+            }
+            cancelMatch()
+          }
           setMode(null)
           setPage('mode')
         }}

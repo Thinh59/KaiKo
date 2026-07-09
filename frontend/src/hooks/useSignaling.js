@@ -30,7 +30,8 @@ export function useSignaling(playerName) {
           opponentId: data.opponentId,
           opponentName: data.opponentName || data.opponentId,
           topic: data.topic,
-          visibility: data.visibility || 'private'
+          visibility: data.visibility || 'private',
+          format: data.format || 'video'
         })
       } else if (data.type === 'room_created') {
         setCreatedRoomCode(data.roomCode)
@@ -74,10 +75,10 @@ export function useSignaling(playerName) {
     }
   }
 
-  const createRoom = (visibility = 'private') => {
+  const createRoom = (visibility = 'private', category = null, format = 'video') => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setRoomError(null)
-      socketRef.current.send(JSON.stringify({ type: 'create_room', visibility }))
+      socketRef.current.send(JSON.stringify({ type: 'create_room', visibility, category, format }))
     }
   }
 
