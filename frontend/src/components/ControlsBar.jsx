@@ -2,6 +2,7 @@ export default function ControlsBar({
   timeLeft,
   isRunning,
   currentPlayer,
+  isMyTurn = true,
   playerAName,
   playerBName,
   isScoring,
@@ -14,6 +15,8 @@ export default function ControlsBar({
 }) {
   const isTimeRunningOut = timeLeft <= 10
   const isDisabled = isScoring || isAiThinking
+  const turnLocked = !isMyTurn                 // không phải lượt của mình → khóa điều khiển
+  const controlsDisabled = isDisabled || turnLocked
 
   return (
     <div style={{
@@ -88,7 +91,18 @@ export default function ControlsBar({
         flexWrap: 'wrap',
         marginBottom: '1rem'
       }}>
-        {(!isRunning && !isAiThinking) ? (
+        {turnLocked ? (
+          <button
+            disabled
+            style={{
+              padding: '12px 24px', background: 'rgba(255,255,255,0.06)', color: '#94a3b8',
+              border: '1px solid rgba(255,255,255,0.15)', borderRadius: 'var(--radius-full)',
+              cursor: 'not-allowed', fontSize: '1.1rem', fontWeight: '600'
+            }}
+          >
+            ⏳ Lượt của đối phương
+          </button>
+        ) : (!isRunning && !isAiThinking) ? (
           <button
             onClick={onStart}
             disabled={isDisabled}
@@ -128,20 +142,21 @@ export default function ControlsBar({
 
         <button
           onClick={onNextTurn}
-          disabled={isDisabled}
+          disabled={controlsDisabled}
+          title={turnLocked ? 'Chỉ người đang tới lượt mới được chuyển lượt' : 'Chuyển lượt cho đối phương'}
           style={{
             padding: '12px 24px',
-            background: isDisabled ? 'rgba(255,255,255,0.05)' : 'rgba(255, 255, 255, 0.1)',
-            color: isDisabled ? 'var(--text-secondary)' : 'white',
+            background: controlsDisabled ? 'rgba(255,255,255,0.05)' : 'rgba(255, 255, 255, 0.1)',
+            color: controlsDisabled ? 'var(--text-secondary)' : 'white',
             border: '1px solid rgba(255, 255, 255, 0.2)',
             borderRadius: 'var(--radius-full)',
-            cursor: isDisabled ? 'not-allowed' : 'pointer',
+            cursor: controlsDisabled ? 'not-allowed' : 'pointer',
             fontSize: '1.1rem',
             fontWeight: '600',
             transition: 'all 0.3s ease'
           }}
-          onMouseEnter={(e) => !isDisabled && (e.target.style.background = 'rgba(255, 255, 255, 0.2)')}
-          onMouseLeave={(e) => !isDisabled && (e.target.style.background = 'rgba(255, 255, 255, 0.1)')}
+          onMouseEnter={(e) => !controlsDisabled && (e.target.style.background = 'rgba(255, 255, 255, 0.2)')}
+          onMouseLeave={(e) => !controlsDisabled && (e.target.style.background = 'rgba(255, 255, 255, 0.1)')}
         >
           ⏭️ Chuyển lượt
         </button>

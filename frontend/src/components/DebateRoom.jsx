@@ -158,7 +158,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
   const {
     localVideoRef, remoteVideoRef,
     isCameraOn, isMicOn, initWebRTC, toggleCamera, toggleMic, stopAllMedia,
-    localStream, remoteStream
+    localStream, remoteStream, connected, iceState
   } = useWebRTC({
     roomId: roomInfo?.roomId,
     isHost: roomInfo?.isHost,
@@ -352,6 +352,13 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
         setTotalRounds(p => p + 1)
         setTimeLeft(TURN_TIME)
         playTing()
+        // Thông báo cho người đến lượt
+        const myRoleNow = roomData.isLocalHost ? 'A' : 'B'
+        if (data.nextPlayer === myRoleNow) {
+          showNotification('🎤 Đến lượt bạn phát biểu! Nhấn "Bắt đầu".', 'success')
+        } else {
+          showNotification('⏳ Đối phương đang phát biểu, vui lòng chờ...', 'info')
+        }
       }
     })
 
@@ -636,6 +643,10 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
   }, [])
 
   const playerBName = remotePlayerName || roomData.playerB
+  // Vai của mình: host = A (Ủng hộ), guest = B (Phản đối). Chỉ được điều khiển
+  // (Bắt đầu/Tạm dừng/Chuyển lượt) KHI ĐANG LÀ LƯỢT CỦA MÌNH.
+  const myRole = roomData.isLocalHost ? 'A' : 'B'
+  const isMyTurn = currentPlayer === myRole
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (!mediaGranted) {
@@ -757,6 +768,9 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
           localVideoRef={localVideoRef}
           localStream={localStream}
           remoteStream={remoteStream}
+          connected={connected}
+          iceState={iceState}
+          isSolo={mode === 'solo_ai'}
           remoteName={playerBName}
           localName={roomData.playerA}
           isCameraOn={isCameraOn}
@@ -867,6 +881,7 @@ export default function DebateRoom({ roomData, roomInfo, mode, username, remoteP
             timeLeft={timeLeft}
             isRunning={isRunning}
             currentPlayer={currentPlayer}
+            isMyTurn={isMyTurn}
             playerAName={roomData.playerA}
             playerBName={playerBName}
             isScoring={isScoring}

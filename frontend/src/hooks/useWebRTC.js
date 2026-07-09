@@ -1,24 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-
-// STUN để tìm địa chỉ public, TURN để relay khi 2 peer ở sau NAT đối xứng
-// (mạng công ty/trường/4G). Thiếu TURN là nguyên nhân phổ biến nhất khiến
-// video đối phương bị đen khi 2 người khác mạng.
-// ⚠️ TURN công cộng bên dưới chỉ dùng để dev/demo. Production nên tự dựng
-// coturn hoặc dùng dịch vụ TURN có credential riêng.
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp'
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
-  ]
-}
+import { ICE_SERVERS, HAS_TURN } from '../config'
 
 export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHandler }) {
   const localVideoRef = useRef(null)
@@ -36,6 +17,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
   const [remoteStream, setRemoteStream] = useState(null)
 
   const [connected, setConnected] = useState(false)
+  const [iceState, setIceState] = useState('new')   // trạng thái ICE để hiển thị/chẩn đoán
   const [isCameraOn, setIsCameraOn] = useState(true)
   const [isMicOn, setIsMicOn] = useState(true)
   const [error, setError] = useState(null)
@@ -67,8 +49,12 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
 
     const pc = new RTCPeerConnection(ICE_SERVERS)
     pcRef.current = pc
+    if (!HAS_TURN) {
+      console.warn('[WebRTC] Chưa cấu hình TURN (VITE_TURN_*). 2 người KHÁC MẠNG có thể không kết nối được — hãy test cùng mạng trước, hoặc thêm TURN.')
+    }
 
     pc.ontrack = event => {
+      console.log('[WebRTC] ontrack:', event.track.kind, 'streams:', event.streams.length)
       const [stream] = event.streams
       if (stream) {
         setRemoteStream(stream)
@@ -78,8 +64,20 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
 
     pc.onicecandidate = event => {
       if (event.candidate) {
+        console.log('[WebRTC] gửi ICE candidate:', event.candidate.type, event.candidate.protocol)
         sendMessage({ type: 'ice-candidate', target: opponentId, candidate: event.candidate })
+      } else {
+        console.log('[WebRTC] Đã gom xong ICE candidates')
       }
+    }
+
+    pc.onicecandidateerror = event => {
+      // errorCode 701 thường là TURN server không phản hồi / sai credential
+      console.warn('[WebRTC] ICE candidate error:', event.errorCode, event.errorText, event.url)
+    }
+
+    pc.onconnectionstatechange = () => {
+      console.log('[WebRTC] connectionState:', pc.connectionState)
     }
 
     // Perfect negotiation: tự tạo offer khi có thay đổi track (thêm/đổi camera…)
@@ -87,6 +85,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
       try {
         makingOfferRef.current = true
         await pc.setLocalDescription()
+        console.log('[WebRTC] onnegotiationneeded → gửi OFFER tới', opponentId)
         sendMessage({ type: 'offer', target: opponentId, offer: pc.localDescription })
       } catch (err) {
         console.error('Lỗi onnegotiationneeded:', err)
@@ -97,9 +96,12 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
 
     pc.oniceconnectionstatechange = () => {
       const st = pc.iceConnectionState
+      console.log('[WebRTC] iceConnectionState:', st)
+      setIceState(st)
       setConnected(st === 'connected' || st === 'completed')
       // Thử khôi phục khi mất kết nối tạm thời
       if (st === 'failed') {
+        console.warn('[WebRTC] ICE FAILED — nhiều khả năng thiếu TURN hoặc 2 máy khác mạng. Thử restartIce()...')
         try { pc.restartIce() } catch { /* trình duyệt cũ không hỗ trợ */ }
       }
     }
@@ -120,11 +122,13 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
       try {
         const offerCollision = makingOfferRef.current || pc.signalingState !== 'stable'
         ignoreOfferRef.current = !politeRef.current && offerCollision
+        console.log('[WebRTC] nhận OFFER — collision:', offerCollision, 'polite:', politeRef.current, 'ignore:', ignoreOfferRef.current)
         if (ignoreOfferRef.current) return   // impolite peer bỏ qua khi tranh chấp
 
         await pc.setRemoteDescription(new RTCSessionDescription(data.offer))
         await flushPendingCandidates()
         await pc.setLocalDescription()
+        console.log('[WebRTC] → gửi ANSWER')
         sendMessage({ type: 'answer', target: opponentId, answer: pc.localDescription })
       } catch (err) {
         console.error('Lỗi xử lý offer:', err)
@@ -135,6 +139,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
       const pc = pcRef.current
       if (!pc) return
       try {
+        console.log('[WebRTC] nhận ANSWER — signalingState:', pc.signalingState)
         // Bỏ qua answer lạc (không có offer đang chờ)
         if (pc.signalingState !== 'have-local-offer') return
         await pc.setRemoteDescription(new RTCSessionDescription(data.answer))
@@ -317,6 +322,7 @@ export function useWebRTC({ roomId, isHost, opponentId, sendMessage, registerHan
     localVideoRef,
     remoteVideoRef,
     connected,
+    iceState,
     isCameraOn,
     isMicOn,
     error,

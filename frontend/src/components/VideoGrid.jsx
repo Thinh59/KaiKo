@@ -18,6 +18,9 @@ export default function VideoGrid({
   localVideoRef,
   localStream,
   remoteStream,
+  connected,
+  iceState,
+  isSolo,
   remoteName,
   localName,
   isCameraOn,
@@ -27,6 +30,15 @@ export default function VideoGrid({
   isAiSpeaking,
   isUserSpeaking   // pass true when isRunning && currentPlayer==='A'
 }) {
+  // Trạng thái kết nối hiển thị cho người dùng (chỉ khi 1v1, chưa có video đối phương)
+  const connLabel = (() => {
+    if (isSolo || remoteStream) return null
+    if (iceState === 'failed') return '⚠️ Kết nối thất bại — cần TURN server (2 máy khác mạng)'
+    if (iceState === 'disconnected') return '⚠️ Mất kết nối, đang thử lại…'
+    if (connected) return null
+    if (iceState === 'checking' || iceState === 'new') return '🔄 Đang kết nối tới đối phương…'
+    return null
+  })()
   // Inject animation styles once
   const styleInjected = useRef(false)
   useEffect(() => {
@@ -106,6 +118,16 @@ export default function VideoGrid({
             }}>
               {isAiSpeaking ? '🔊 Đang phát biểu...' : (remoteName || 'Chờ đối phương...')}
             </p>
+            {connLabel && (
+              <p style={{
+                color: iceState === 'failed' ? '#f87171' : '#7dd3fc',
+                marginTop: '8px',
+                fontSize: '0.9rem',
+                fontWeight: 500
+              }}>
+                {connLabel}
+              </p>
+            )}
           </div>
         )}
 
