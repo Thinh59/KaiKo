@@ -20,11 +20,11 @@ export default function ControlsBar({
       textAlign: 'center',
       transition: 'all 0.3s ease',
       padding: '1.25rem',
-      background: 'var(--bg-glass, rgba(15,23,42,0.6))',
-      border: '1px solid var(--border-light, rgba(255,255,255,0.1))',
+      background: 'rgba(15, 23, 42, 0.9)',   // nền tối CỐ ĐỊNH -> đọc rõ ở cả bright/dark mode
+      border: '1px solid rgba(56,189,248,0.3)',
       borderRadius: 'var(--radius-lg, 20px)',
       backdropFilter: 'blur(12px)',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
     }}>
       {/* Timer Panel */}
       <div style={{
@@ -42,7 +42,7 @@ export default function ControlsBar({
           fontSize: '0.72rem',
           letterSpacing: '2px',
           textTransform: 'uppercase',
-          color: 'var(--text-secondary)',
+          color: '#7dd3fc',
           marginBottom: '2px'
         }}>
           ⏱️ Thời gian lượt
@@ -65,8 +65,8 @@ export default function ControlsBar({
       <div style={{
         fontSize: '1.2rem',
         marginBottom: '2rem',
-        color: 'var(--text-secondary)',
-        background: isAiThinking ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.05)',
+        color: '#cbd5e1',
+        background: isAiThinking ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.08)',
         padding: '10px 20px',
         borderRadius: 'var(--radius-full)',
         display: 'inline-block',

@@ -387,4 +387,9 @@ Fix bug:
 09.07
 -Cái số trên video debate khi vào phòng debate nó bị chìm số đếm giây có thể thêm panel cho khu vực đếm giờ và nút đó
 -Check xem có Mediapipe chưa, hay cái video debate đó đã hoàn chỉnh như mong đợi của idead.txt chưa
-
+TODO:
+-Check kỹ các lỗi giao diện
+-Check lại video debate: giao diện còn kỳ lạ
+-Định danh người chơi bằng Biệt danh vẫn chưa được vì rõ ràng sau khi đấu xong không Thêm bạn đượC
+-Chưa có chỗ cho người dùng feedback hệ thống sau khi xong 1 màn chơi với AI và feedback cho toàn hệ thống
+-Cần chuẩn bị sẵn list tài khoản và mật khẩu vip theo các level hoặc max level để test hết các khung, chức năng, quyền,...

@@ -12,3 +12,13 @@ Kaiko@hcmus
 
 Neon:
 postgresql://neondb_owner:npg_S9WJvBcChV2N@ep-cool-dust-ao74kco7.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+
+
+Username	Level	Khung/Quyền
+kaiko_lv1	1	Chưa có khung
+kaiko_lv11	11	Khung Gỗ
+kaiko_lv31	31	Khung Bạc
+kaiko_lv61	61	Khung Vàng
+kaiko_lv91	91	Khung Kim Cương
+kaiko_lv101	101	Giám khảo + Admi
