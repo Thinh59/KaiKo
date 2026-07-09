@@ -1,4 +1,5 @@
 export default function RoomWaiting({ onCancel, roomError, createdRoomCode, mode }) {
+  const isJoining = mode === 'join_by_code' || mode === 'custom_join' || mode === 'text_custom_join'
   return (
     <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div className="glass-panel animate-fade-in" style={{ width: '100%', maxWidth: '600px', padding: '4rem 2rem', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -30,10 +31,10 @@ export default function RoomWaiting({ onCancel, roomError, createdRoomCode, mode
             </div>
 
             <h2 style={{ fontSize: '2rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              {mode === 'custom_join' ? 'Đang vào phòng...' : 'Đang tìm đối thủ...'}
+              {isJoining ? 'Đang vào phòng...' : 'Đang tìm đối thủ...'}
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: '3rem' }}>
-              {mode === 'custom_join' ? 'Đang kết nối tới phòng của bạn bè.' : 'Hệ thống đang ghép cặp bạn với người chơi khác. Vui lòng chờ trong giây lát.'}
+              {isJoining ? 'Đang kết nối tới phòng của bạn bè. Nếu chờ quá lâu, hãy kiểm tra lại mã code.' : 'Hệ thống đang ghép cặp bạn với người chơi khác. Vui lòng chờ trong giây lát.'}
             </p>
           </>
         )}

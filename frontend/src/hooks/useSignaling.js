@@ -79,6 +79,8 @@ export function useSignaling(playerName) {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setRoomError(null)
       socketRef.current.send(JSON.stringify({ type: 'create_room', visibility, category, format }))
+    } else {
+      setRoomError('Mất kết nối tới máy chủ. Vui lòng tải lại trang và thử lại.')
     }
   }
 
@@ -86,6 +88,8 @@ export function useSignaling(playerName) {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       setRoomError(null)
       socketRef.current.send(JSON.stringify({ type: 'join_room', roomCode }))
+    } else {
+      setRoomError('Mất kết nối tới máy chủ. Vui lòng tải lại trang và thử lại.')
     }
   }
 
