@@ -1,218 +1,143 @@
-# 🎤 KaiKo — Tranh Biện AI
+# 🦀 KaiKo — Nền tảng Tranh Biện AI
 
-Ứng dụng tranh biện AI với phát hiện ngụy biện, phân tích video/audio, và chấm điểm thông minh bằng LLM.
+Ứng dụng tranh biện 1v1 **thời gian thực** (video hoặc chat) tích hợp AI: phát hiện ngụy biện,
+đối sánh lập luận với chủ đề, phân tích cử chỉ qua camera, và chấm điểm thông minh bằng LLM.
 
-**Stack:** React · FastAPI · Transformers (XLM-RoBERTa) · Gemini API
-
-## 🚀 Hướng dẫn cài đặt chi tiết cho Team
-
-### 1. Cài đặt Backend (Python & FastAPI)
-
-Thư mục `backend` chứa logic xử lý AI, phân tích ngụy biện và kết nối WebSocket.
-
-**Các bước thực hiện:**
-
-1.  **Mở terminal** và di chuyển vào thư mục backend:
-    ```bash
-    cd backend
-    ```
-
-2.  **Tạo môi trường ảo (Virtual Environment):**
-    Việc này giúp tránh xung đột thư viện giữa các project.
-    - **Windows:**
-      ```powershell
-      python -m venv venv
-      ```
-    - **Mac/Linux:**
-      ```bash
-      python3 -m venv venv
-      ```
-
-3.  **Kích hoạt môi trường ảo:**
-    - **Windows:**
-      ```powershell
-      .\venv\Scripts\activate
-      ```
-    - **Mac/Linux:**
-      ```bash
-      source venv/bin/activate
-      ```
-    *(Sau khi kích hoạt, bạn sẽ thấy chữ `(venv)` hiện ở đầu dòng lệnh)*
-
-4.  **Cài đặt các thư viện cần thiết:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-5.  **Cấu hình biến môi trường:**
-    Tạo file `.env` trong thư mục `backend/` và thêm key Gemini của bạn (lấy tại [AI Studio](https://aistudio.google.com/apikey)):
-    ```env
-    GEMINI_API_KEY=AIzaSy... (key của bạn)
-    ```
-
-6.  **Chạy server:**
-    ```bash
-    uvicorn main:app --reload --port 8000
-    ```
-
-### 2. Cài đặt Frontend (React & Vite)
-
-Mở một terminal mới (vẫn ở thư mục gốc `kaiko`):
-
-1.  **Di chuyển vào frontend:**
-    ```bash
-    cd frontend
-    ```
-
-2.  **Cài đặt dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Chạy ứng dụng:**
-    ```bash
-    npm run dev
-    ```
-
-4.  **Truy cập:** Mở trình duyệt vào [http://localhost:5173](http://localhost:5173)
+**Stack:** React (Vite) · FastAPI · WebRTC + WebSocket · Transformers (XLM-RoBERTa) · MediaPipe · Gemini API · PostgreSQL (Neon)
 
 ---
 
+## 🚀 Cài đặt cho Team
+
+### 1. Backend (FastAPI)
+
+```bash
+cd backend
+python -m venv venv
+.\venv\Scripts\activate         # Windows  |  source venv/bin/activate (Mac/Linux)
+pip install -r requirements.txt
+```
+
+Tạo file `backend/.env`:
+```env
+GEMINI_API_KEY=AIzaSy...                         # lấy tại https://aistudio.google.com/apikey
+DATABASE_URL=postgresql://...neon.tech/neondb?sslmode=require   # PostgreSQL (Neon)
+# AI_SERVICE_URL=http://localhost:8001           # (tuỳ chọn) dùng model tự train, xem ai_service/
+```
+
+Chạy server:
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+### 2. Frontend (React + Vite)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Truy cập: **http://localhost:5173** (dùng **Chrome/Edge** để có Web Speech API + camera).
+
+### 3. (Tuỳ chọn) Tài khoản test theo level
+
+```bash
+cd backend && python seed_test_accounts.py       # tạo kaiko_lv1..lv101, mật khẩu: Kaiko@123
+```
+
+---
+
+## 🧠 Thành phần AI
+
+| Thành phần | Vai trò | Tài liệu |
+|---|---|---|
+| **Fallacy Detection** | Phân loại ngụy biện **6 nhóm** (XLM-RoBERTa fine-tuned) | [ai_model/README.md](ai_model/README.md) |
+| **ArgKP Matching** | Kiểm tra lập luận có bám chủ đề (bám/lạc đề) | [ai_model/README.md](ai_model/README.md) |
+| **Gesture Analysis** | Chấm điểm cử chỉ qua camera (MediaPipe FaceLandmarker) | `frontend/src/hooks/useGestureAnalysis.js` |
+| **AI Inference Service** | Chạy 2 model tự train qua HTTP để gameplay dùng model thật | [ai_service/README.md](ai_service/README.md) |
+| **Gemini** | Chấm điểm/phân tích + **fallback** khi model local chưa sẵn sàng | `gemini-3.1-flash-lite-preview` |
+
+> Nếu không cấu hình `AI_SERVICE_URL`, hệ thống tự **fallback sang Gemini** — vẫn chạy đầy đủ.
+
+---
 
 ## 📁 Cấu trúc
 
 ```
 kaiko/
-├── backend/
-│   ├── main.py              # FastAPI app
-│   ├── requirements.txt
-│   ├── .env                 # API keys
-│   ├── utils_preprocess.py  # Nén transcript
-│   ├── utils_cache.py       # Semantic cache
-│   └── fallacy_model/       # Model đã train
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── components/
-│   │   │   ├── HomePage.jsx
-│   │   │   ├── DebateRoom.jsx
-│   │   │   ├── Scoreboard.jsx
-│   │   │   └── FallacyAlert.jsx
-│   │   ├── hooks/
-│   │   │   ├── useSpeechToText.js
-│   │   │   └── useAudioAnalysis.js
-│   │   ├── firebase.js
-│   │   └── main.jsx
-│   └── package.json
-├── .gitignore
-└── README.md
+├── backend/                    # FastAPI: WebSocket signaling, chấm điểm, DB, gọi AI service
+│   ├── main.py
+│   ├── seed_test_accounts.py   # tạo tài khoản test theo level
+│   └── fallacy_model/          # model đã train (tải riêng, xem ai_model/README)
+├── frontend/                   # React (Vite)
+│   └── src/
+│       ├── components/         # DebateRoom, TextDebateRoom, Scoreboard, Dashboard, ControlsBar, VideoGrid...
+│       └── hooks/              # useWebRTC, useSignaling, useSpeechToText, useAudioAnalysis, useGestureAnalysis
+├── ai_model/                   # notebook train + dataset + hướng dẫn model
+├── ai_service/                 # FastAPI inference service cho 2 model tự train
+├── tests/e2e/                  # kiểm thử tự động Playwright (PA5)
+└── docs/                       # tài liệu môn học (PA1–PA5, báo cáo đánh giá ML)
 ```
 
-## 🔧 API Endpoints
+---
 
-### `GET /`
-Kiểm tra status server
+## 🔧 API chính (backend)
 
 ```bash
 curl http://localhost:8000
-# {"status": "ok", "model_loaded": true}
+# {"status": "ok", "ai_service_configured": false}
 ```
 
-### `POST /analyze`
-Phân tích ngụy biện
+- `POST /analyze` — phát hiện ngụy biện trong 1 câu → `{ fallacy, fallacy_en, confidence, is_fallacy }`
+- `POST /check-argument` — kiểm tra bám chủ đề (ArgKP) → `{ match, score }`
+- `POST /score` — chấm điểm cả trận (logic, phong thái/cử chỉ, giọng nói, phản biện)
+- `GET /leaderboard`, `POST /login`, `POST /register`, `POST /save-match`, ... (xem `main.py`)
 
-```bash
-curl -X POST http://localhost:8000/analyze \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Mày dốt nên mới nói vậy!", "speaker": "Player A"}'
-```
-
-Response:
+Ví dụ `/analyze`:
 ```json
-{
-  "fallacy": "Công kích cá nhân",
-  "confidence": 87.3,
-  "is_fallacy": true
-}
+{ "fallacy": "Công kích & Cảm xúc", "confidence": 87.3, "is_fallacy": true }
 ```
 
-### `POST /score`
-Chấm điểm trận tranh biện
-
-```bash
-curl -X POST http://localhost:8000/score \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topic": "...",
-    "player_a": "...",
-    "transcript_a": "...",
-    ...
-  }'
-```
+---
 
 ## 🎯 Tính năng
 
-- ✅ Phát hiện 13 loại ngụy biện (XLM-RoBERTa)
-- ✅ Chuyển giọng → text (Web Speech API)
-- ✅ Phân tích âm lượng & giọng run (Web Audio API)
-- ✅ Chấm điểm thông minh (Gemini API)
-- 🔄 Phân tích video (cần MediaPipe — optional)
-- 🔄 WebRTC video call (cần Firebase — optional)
+- ✅ Phát hiện ngụy biện **6 nhóm** (XLM-RoBERTa, fallback Gemini)
+- ✅ Đối sánh lập luận – chủ đề (ArgKP), cảnh báo lạc đề
+- ✅ Video debate 1v1: WebRTC + Speech-to-Text + **chấm điểm cử chỉ (MediaPipe)**
+- ✅ Chat debate 1v1 / Solo vs AI (Gemini)
+- ✅ Chấm điểm + phân tích + gợi ý (Gemini)
+- ✅ Hệ thống Level 1–101, danh hiệu, khung avatar, cửa hàng, bạn bè, sự kiện, bái sư
+- ✅ Bảng xếp hạng, lịch sử trận, thả emoji real-time, xem live (spectate)
 
-## 📌 Config quan trọng
-
-### Gemini API Key
-
-1. Vào https://aistudio.google.com/apikey
-2. Tạo API key miễn phí
-3. Thêm vào `backend/.env`:
-   ```
-   GEMINI_API_KEY=your_key_here
-   ```
-
-### Model tự fine-tune
-
-1. Chạy Kaggle notebook (Phần 4 trong guide)
-2. Download `fallacy_model.zip`
-3. Giải nén vào `backend/fallacy_model/`
-
-### Firebase (Optional - dùng khi cần WebRTC)
-
-1. Tạo project trên https://console.firebase.google.com
-2. Bật Firestore Database
-3. Copy config vào `frontend/src/firebase.js`
-4. Cài `npm install firebase`
-
-## 🧪 Test
-
-```bash
-# Test backend API
-curl http://localhost:8000/docs
-
-# Test frontend
-Mở http://localhost:5173
-Nhập chủ đề, tên người chơi
-Nhấn "Bắt đầu tranh biện"
-```
+---
 
 ## ⚠️ Lỗi thường gặp
 
 | Lỗi | Giải pháp |
-|-----|----------|
-| `CORS error` | Kiểm tra `allow_origins` trong `backend/main.py` |
-| `Speech không hoạt động` | Dùng Chrome/Edge, cấp quyền mic |
-| `model_loaded: false` | Copy model từ Kaggle vào `backend/fallacy_model/` |
-| `Gemini 403` | Kiểm tra API key tại aistudio.google.com |
+|---|---|
+| `CORS error` | Kiểm tra `allow_origins` trong `backend/main.py`; backend chạy đúng port 8000 |
+| Speech không hoạt động | Dùng **Chrome/Edge**, cấp quyền mic; đổi ngôn ngữ browser sang `vi-VN` |
+| Camera/HUD cử chỉ không chạy | Cấp quyền camera + cần **Internet** (MediaPipe tải model lần đầu) |
+| `Gemini 403 / rate limit` | Kiểm tra `GEMINI_API_KEY`; free tier giới hạn 15 req/phút |
+| Lỗi kết nối DB | Kiểm tra `DATABASE_URL` (Neon) trong `backend/.env` |
 
-## 📚 Tài liệu đầy đủ
+---
 
-Xem `KaiKo_App_Guide (1).md` để biết chi tiết:
-- Fine-tune model trên Kaggle
-- Tích hợp MediaPipe
-- Tối ưu API quota (5 lớp)
-- Xử lý lỗi nâng cao
+## 🧪 Kiểm thử tự động
+
+```bash
+cd tests/e2e && pip install -r requirements.txt && python -m playwright install chromium
+pytest --headed        # sinh report.html (xem tests/e2e/README.md)
+```
+
+## 📚 Tài liệu
+
+- Đánh giá ML: `docs/ml_evaluation_analysis.md` + `docs/pa/PA4/PA4-Group09/KaiKo_ML_Model_Evaluation_Report_PA4.docx`
+- Kiểm thử tự động (PA5): `docs/pa/PA5/PA5-Group09/` + `tests/e2e/README.md`
+- Model AI: `ai_model/README.md` · Inference service: `ai_service/README.md`
 
 ## 📝 License
 
-MIT — Tự do sử dụng, sửa, phân phối
-
+MIT — Tự do sử dụng, sửa, phân phối.
